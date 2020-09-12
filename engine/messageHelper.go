@@ -1,4 +1,4 @@
-package mirrorManager
+package engine
 
 import (
 	"MirrorBotGo/utils"
@@ -10,37 +10,31 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/ext"
 )
 
-var mutex sync.Mutex
 var StatusMessageStorage map[int]*ext.Message // chatId : message
 var Spinner *ProgressSpinner = getSpinner()
+var mutex sync.Mutex
 
 func Init() {
 	StatusMessageStorage = make(map[int]*ext.Message)
 }
 
 func getSpinner() *ProgressSpinner {
-	return &ProgressSpinner{}
+	return &ProgressSpinner{isRunning: false, UpdateInterval: utils.GetStatusUpdateInterval()}
 }
 
 func AddStatusMessage(message *ext.Message) {
-	mutex.Lock()
 	StatusMessageStorage[message.Chat.Id] = message
-	mutex.Unlock()
 }
 
 func GetAllMessages() []*ext.Message {
 	var msgs []*ext.Message
-	mutex.Lock()
 	for _, m := range StatusMessageStorage {
 		msgs = append(msgs, m)
 	}
-	mutex.Unlock()
 	return msgs
 }
 
 func GetMessageByChatId(chatId int) *ext.Message {
-	mutex.Lock()
-	defer mutex.Unlock()
 	for i, m := range StatusMessageStorage {
 		if i == chatId {
 			return m
@@ -54,13 +48,11 @@ func GetAllMessagesCount() int {
 }
 
 func DeleteMessageByChatId(chatId int) {
-	mutex.Lock()
 	for i, _ := range StatusMessageStorage {
 		if i == chatId {
 			delete(StatusMessageStorage, i)
 		}
 	}
-	mutex.Unlock()
 }
 
 func SendMessage(b ext.Bot, messageText string, message *ext.Message) (*ext.Message, error) {
@@ -87,11 +79,12 @@ func GetReadableProgressMessage() string {
 	for _, dl := range GetAllMirrors() {
 		msg += fmt.Sprintf("<i>%s</i> -", dl.Name())
 		msg += fmt.Sprintf(" %s\n", dl.GetStatusType())
-		msg += fmt.Sprintf("%s of ", utils.GetHumanBytes(dl.CompletedLength()))
+		msg += fmt.Sprintf("<code>%s %.2f%%</code>", utils.GetProgressBarString(int(dl.CompletedLength()), int(dl.TotalLength())), dl.Percentage())
+		msg += fmt.Sprintf(" , %s of ", utils.GetHumanBytes(dl.CompletedLength()))
 		msg += fmt.Sprintf("%s at ", utils.GetHumanBytes(dl.TotalLength()))
 		msg += fmt.Sprintf("%s/s, ", utils.GetHumanBytes(int64(dl.Speed())))
 		if dl.ETA() != nil {
-			msg += fmt.Sprintf("ETA - %s", dl.ETA())
+			msg += fmt.Sprintf("ETA: %s", utils.HumanizeDuration(*dl.ETA()))
 		} else {
 			msg += "ETA: -"
 		}
@@ -111,6 +104,7 @@ func SendStatusMessage(b ext.Bot, message *ext.Message) error {
 	}
 	newMsg, err := SendMessage(b, progress, message)
 	if err != nil {
+		log.Println(err)
 		return err
 	}
 	AddStatusMessage(newMsg)
@@ -121,19 +115,15 @@ func UpdateAllMessages(b ext.Bot) {
 	progress := GetReadableProgressMessage()
 	for _, msg := range GetAllMessages() {
 		if msg.Text != progress {
-			_, err := EditMessage(b, progress, msg)
-			if err != nil {
-				log.Println(err)
-				DeleteMessageByChatId(msg.Chat.Id)
-			} else {
-				msg.Text = progress
-			}
+			EditMessage(b, progress, msg)
+			msg.Text = progress
 		}
 	}
 }
 
 type ProgressSpinner struct {
-	isRunning bool
+	isRunning      bool
+	UpdateInterval time.Duration
 }
 
 func (p *ProgressSpinner) IsRunning() bool {
@@ -148,7 +138,7 @@ func (p *ProgressSpinner) SpinProgress(b ext.Bot) {
 			break
 		}
 		UpdateAllMessages(b)
-		time.Sleep(utils.GetSleepTime())
+		time.Sleep(p.UpdateInterval)
 	}
 }
 

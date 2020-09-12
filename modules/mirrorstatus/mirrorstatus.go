@@ -1,7 +1,7 @@
 package mirrorstatus
 
 import (
-	"MirrorBotGo/mirrorManager"
+	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
 
 	"github.com/PaulSonOfLars/gotgbot"
@@ -12,15 +12,15 @@ import (
 
 func MirrorStatusHandler(b ext.Bot, u *gotgbot.Update) error {
 	message := u.EffectiveMessage
-	if !utils.IsUserOwner(u.EffectiveUser.Id) {
+	if !utils.IsUserSudo(u.EffectiveUser.Id) {
 		return nil
 	}
-	if mirrorManager.GetAllMirrorsCount() == 0 {
-		mirrorManager.SendMessage(b, "No Active Downloads.", message)
+	if engine.GetAllMirrorsCount() == 0 {
+		engine.SendMessage(b, "No Active Downloads.", message)
 		return nil
 	}
-	mirrorManager.SendStatusMessage(b, message)
-	mirrorManager.DeleteMessage(b, message)
+	engine.SendStatusMessage(b, message)
+	engine.DeleteMessage(b, message)
 	return nil
 }
 

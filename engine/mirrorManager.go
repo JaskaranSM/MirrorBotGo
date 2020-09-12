@@ -1,6 +1,7 @@
-package mirrorManager
+package engine
 
 var AllMirrors map[int]MirrorStatus = getMap()
+var CanceledMirrors map[int]MirrorStatus = getMap()
 
 const (
 	MirrorStatusDownloading = "Downloading"
@@ -43,6 +44,10 @@ func GetAllMirrorsCount() int {
 
 func AddMirrorLocal(messageId int, dl MirrorStatus) {
 	AllMirrors[messageId] = dl
+}
+
+func MoveMirrorToCancel(messageId int, dl MirrorStatus) {
+	CanceledMirrors[messageId] = dl
 }
 
 func RemoveMirrorLocal(messageId int) {

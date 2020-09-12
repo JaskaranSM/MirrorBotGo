@@ -10,7 +10,7 @@ import (
 )
 
 func StartHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !utils.IsUserOwner(u.EffectiveUser.Id) {
+	if !utils.IsUserSudo(u.EffectiveUser.Id) {
 		return nil
 	}
 	msg := u.EffectiveMessage

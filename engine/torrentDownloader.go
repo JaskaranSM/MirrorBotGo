@@ -1,4 +1,4 @@
-package mirrorManager
+package engine
 
 import (
 	"MirrorBotGo/utils"
@@ -16,7 +16,11 @@ func getSession() *torrent.Session {
 	torrent.DefaultConfig.RPCEnabled = false
 	torrent.DefaultConfig.DataDir = utils.GetDownloadDir()
 	torrent.DefaultConfig.ResumeOnStartup = false
-	client, _ := torrent.NewSession(torrent.DefaultConfig)
+	torrent.DefaultConfig.MaxOpenFiles = 1020
+	client, err := torrent.NewSession(torrent.DefaultConfig)
+	if err != nil {
+		log.Fatal(err)
+	}
 	return client
 }
 
@@ -67,6 +71,10 @@ func (t *TorrentDownloadStatus) Gid() string {
 	return t.tor.ID()
 }
 
+func (t *TorrentDownloadStatus) Percentage() float32 {
+	return float32(t.CompletedLength()*100) / float32(t.TotalLength())
+}
+
 func (t *TorrentDownloadStatus) GetStatusType() string {
 	return MirrorStatusDownloading
 }
@@ -77,6 +85,13 @@ func (t *TorrentDownloadStatus) Path() string {
 
 func (t *TorrentDownloadStatus) GetListener() *MirrorListener {
 	return t.listener
+}
+
+func (t *TorrentDownloadStatus) CancelMirror() bool {
+	t.tor.Stop()
+	listener := t.GetListener()
+	listener.OnDownloadError("Canceled by user.")
+	return true
 }
 
 func NewTorrentDownloadStatus(tor *torrent.Torrent, listener *MirrorListener) *TorrentDownloadStatus {
@@ -94,16 +109,15 @@ func (t *TorrentDownloader) Listen(tor *torrent.Torrent) {
 			log.Println("Listening Complete")
 		}
 		dl := GetMirrorByGid(tor.ID())
-		listener := dl.GetListener()
-		listener.OnDownloadComplete()
+		if dl != nil {
+			listener := dl.GetListener()
+			listener.OnDownloadComplete()
+		}
 	}()
 	go func() {
 		for _ = range tor.NotifyStop() {
 			log.Println("Listening Stop")
 		}
-		dl := GetMirrorByGid(tor.ID())
-		listener := dl.GetListener()
-		listener.OnDownloadError("")
 	}()
 }
 

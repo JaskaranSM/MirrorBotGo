@@ -1,0 +1,328 @@
+package engine
+
+import (
+	"MirrorBotGo/utils"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"os"
+	"path"
+	"strings"
+	"time"
+
+	"golang.org/x/net/context"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
+	"google.golang.org/api/drive/v3"
+)
+
+type GoogleDriveClient struct {
+	RootId              string
+	GDRIVE_DIR_MIMETYPE string
+	TokenFile           string
+	CredentialFile      string
+	TotalLength         int64
+	CompletedLength     int64
+	LastTransferred     int64
+	Speed               int
+	StartTime           time.Time
+	ETA                 time.Duration
+	DriveSrv            *drive.Service
+	Listener            *MirrorListener
+}
+
+func (G *GoogleDriveClient) Init(rootId string) {
+	if rootId == "" {
+		rootId = "root"
+	}
+	G.RootId = rootId
+	G.GDRIVE_DIR_MIMETYPE = "application/vnd.google-apps.folder"
+	G.TokenFile = "token.json"
+	G.CredentialFile = "credentials.json"
+	G.StartTime = time.Now()
+}
+
+// Retrieve a token, saves the token, then returns the generated client.
+func (G *GoogleDriveClient) getClient(config *oauth2.Config) *http.Client {
+	tok, err := G.tokenFromFile(G.TokenFile)
+	if err != nil {
+		tok = G.getTokenFromWeb(config)
+		G.saveToken(G.TokenFile, tok)
+	}
+	return config.Client(context.Background(), tok)
+}
+
+func (G *GoogleDriveClient) Authorize() {
+	b, err := ioutil.ReadFile(G.CredentialFile)
+	if err != nil {
+		log.Fatalf("Unable to read client secret file: %v", err)
+	}
+
+	// If modifying these scopes, delete your previously saved token.json.
+	config, err := google.ConfigFromJSON(b, drive.DriveScope)
+	if err != nil {
+		log.Fatalf("Unable to parse client secret file to config: %v", err)
+	}
+	client := G.getClient(config)
+
+	srv, err := drive.New(client)
+	if err != nil {
+		log.Fatalf("Unable to retrieve Drive client: %v", err)
+	}
+	G.DriveSrv = srv
+}
+
+func (G *GoogleDriveClient) getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
+	authURL := config.AuthCodeURL("state-token", oauth2.AccessTypeOffline)
+	fmt.Printf("Go to the following link in your browser then type the "+
+		"authorization code: \n%v\n", authURL)
+
+	var authCode string
+	if _, err := fmt.Scan(&authCode); err != nil {
+		log.Fatalf("Unable to read authorization code %v", err)
+	}
+
+	tok, err := config.Exchange(context.TODO(), authCode)
+	if err != nil {
+		log.Fatalf("Unable to retrieve token from web %v", err)
+	}
+	return tok
+}
+
+func (G *GoogleDriveClient) tokenFromFile(file string) (*oauth2.Token, error) {
+	f, err := os.Open(file)
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	tok := &oauth2.Token{}
+	err = json.NewDecoder(f).Decode(tok)
+	return tok, err
+}
+
+// Saves a token to a file path.
+func (G *GoogleDriveClient) saveToken(path string, token *oauth2.Token) {
+	fmt.Printf("Saving credential file to: %s\n", path)
+	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		log.Fatalf("Unable to cache oauth token: %v", err)
+	}
+	defer f.Close()
+	json.NewEncoder(f).Encode(token)
+}
+
+func (G *GoogleDriveClient) CreateDir(name string, parentId string) (*drive.File, error) {
+	d := &drive.File{
+		Name:     name,
+		MimeType: G.GDRIVE_DIR_MIMETYPE,
+		Parents:  []string{parentId},
+	}
+	file, err := G.DriveSrv.Files.Create(d).SupportsAllDrives(true).Do()
+	if err != nil {
+		log.Println("Could not create dir: " + err.Error())
+		return G.CreateDir(name, parentId)
+	}
+	fmt.Println("Created G-Drive Folder: ", file.Id)
+	if !utils.IsTeamDrive() {
+		err = G.SetPermissions(file.Id)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+	return file, nil
+}
+
+func (G *GoogleDriveClient) Upload(path string) bool {
+	var link string = "https://drive.google.com/open?id=%s"
+	var file *drive.File
+	var f os.FileInfo
+	var err error
+	f, err = os.Stat(path)
+	if err != nil {
+		G.Listener.OnDownloadError(err.Error())
+		return false
+	}
+	if f.IsDir() {
+		file, err = G.CreateDir(f.Name(), utils.GetGDriveParentId())
+		if err != nil {
+			G.Listener.OnDownloadError(err.Error())
+			return false
+		}
+		G.UploadDirRec(path, file.Id)
+		link = fmt.Sprintf(link, file.Id)
+	} else {
+		file, err = G.UploadFile(utils.GetGDriveParentId(), path)
+		if err != nil {
+			G.Listener.OnDownloadError(err.Error())
+			return false
+		}
+		link = fmt.Sprintf(link, file.Id)
+	}
+	G.Listener.OnUploadComplete(link)
+	return true
+}
+
+func (G *GoogleDriveClient) UploadDirRec(directoryPath string, parentId string) bool {
+	files, err := ioutil.ReadDir(directoryPath)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, f := range files {
+		currentFile := path.Join(directoryPath, f.Name())
+		if f.IsDir() {
+			file, err := G.CreateDir(f.Name(), parentId)
+			if err != nil {
+				G.Listener.OnDownloadError(err.Error())
+				return false
+			}
+			G.UploadDirRec(currentFile, file.Id)
+		} else {
+			file, err := G.UploadFile(parentId, currentFile)
+			if err != nil {
+				G.Listener.OnDownloadError(err.Error())
+				return false
+			} else {
+				fmt.Println("Uploaded File: ", file.Id)
+			}
+		}
+	}
+	return true
+}
+
+func (G *GoogleDriveClient) OnTransferUpdate(current, total int64) {
+	chunkSize := current - G.LastTransferred
+	G.CompletedLength += chunkSize
+	G.LastTransferred = current
+	now := time.Now()
+	diff := now.Sub(G.StartTime)
+	G.Speed = int(G.CompletedLength / int64(diff.Seconds()))
+	var eta int
+	if G.Speed != 0 {
+		eta = int(G.TotalLength - G.CompletedLength/int64(G.Speed))
+	} else {
+		eta = 0
+	}
+	dur, err := time.ParseDuration(fmt.Sprintf("%ns", eta))
+	if err != nil {
+		log.Println(err)
+	} else {
+		G.ETA = dur
+	}
+	fmt.Println(dur)
+	fmt.Println(dur.Seconds())
+}
+
+func (G *GoogleDriveClient) Clean() {
+	G.LastTransferred = 0
+}
+
+func (G *GoogleDriveClient) SetPermissions(fileId string) error {
+	permission := &drive.Permission{
+		AllowFileDiscovery: false,
+		Role:               "reader",
+		Type:               "anyone",
+	}
+	_, err := G.DriveSrv.Permissions.Create(fileId, permission).Fields("").SupportsAllDrives(true).SupportsTeamDrives(true).Do()
+	return err
+}
+
+func (G *GoogleDriveClient) UploadFile(parentId string, file_path string) (*drive.File, error) {
+	defer G.Clean()
+	content, err := os.Open(file_path)
+	if err != nil {
+		fmt.Println(err)
+	}
+	contentType, err := utils.GetFileContentType(content)
+	if err != nil {
+		fmt.Println(err)
+	}
+	arr := strings.Split(file_path, "/")
+	name := arr[len(arr)-1]
+	f := &drive.File{
+		MimeType: contentType,
+		Name:     name,
+		Parents:  []string{parentId},
+	}
+	ctx := context.Background()
+	stat, err := content.Stat()
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	file, err := G.DriveSrv.Files.Create(f).ResumableMedia(ctx, content, stat.Size(), contentType).ProgressUpdater(G.OnTransferUpdate).SupportsAllDrives(true).Do()
+
+	if err != nil {
+		log.Println("Could not create file: " + err.Error())
+		return nil, err
+	}
+	if !utils.IsTeamDrive() {
+		err = G.SetPermissions(file.Id)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+	return file, nil
+}
+
+func NewGDriveClient(size int64, listener *MirrorListener) *GoogleDriveClient {
+	return &GoogleDriveClient{TotalLength: size, Listener: listener}
+}
+
+type GoogleDriveStatus struct {
+	DriveObj *GoogleDriveClient
+	name     string
+	gid      string
+}
+
+func (g *GoogleDriveStatus) Name() string {
+	return g.name
+}
+
+func (g *GoogleDriveStatus) CompletedLength() int64 {
+	return g.DriveObj.CompletedLength
+}
+
+func (g *GoogleDriveStatus) TotalLength() int64 {
+	return g.DriveObj.TotalLength
+}
+
+func (g *GoogleDriveStatus) Speed() int {
+	return g.DriveObj.Speed
+}
+
+func (g *GoogleDriveStatus) Gid() string {
+	return g.gid
+}
+
+func (g *GoogleDriveStatus) ETA() *time.Duration {
+	eta := g.DriveObj.ETA
+	return &eta
+}
+
+func (g *GoogleDriveStatus) GetStatusType() string {
+	return MirrorStatusUploading
+}
+
+func (g *GoogleDriveStatus) Path() string {
+	return path.Join(utils.GetDownloadDir(), g.Gid(), g.Name())
+}
+
+func (g *GoogleDriveStatus) Percentage() float32 {
+	return float32(g.CompletedLength()*100) / float32(g.TotalLength())
+}
+
+func (g *GoogleDriveStatus) GetListener() *MirrorListener {
+	return g.DriveObj.Listener
+}
+
+func (g *GoogleDriveStatus) CancelMirror() bool {
+	listener := g.GetListener()
+	listener.OnUploadError("Canceled by user.")
+	return true
+}
+
+func NewGoogleDriveStatus(driveobj *GoogleDriveClient, name string, gid string) *GoogleDriveStatus {
+	return &GoogleDriveStatus{DriveObj: driveobj, name: name, gid: gid}
+}

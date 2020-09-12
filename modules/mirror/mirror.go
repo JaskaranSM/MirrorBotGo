@@ -1,7 +1,7 @@
 package mirror
 
 import (
-	"MirrorBotGo/mirrorManager"
+	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
 
 	"github.com/PaulSonOfLars/gotgbot"
@@ -13,17 +13,26 @@ import (
 func Mirror(b ext.Bot, u *gotgbot.Update, isTar bool) error {
 	message := u.EffectiveMessage
 	link := utils.ParseMessageArgs(message.Text)
-	listener := mirrorManager.NewMirrorListener(b, u)
-	mirrorManager.NewTorrentDownload(link, &listener)
-	mirrorManager.SendStatusMessage(b, message)
-	if !mirrorManager.Spinner.IsRunning() {
-		mirrorManager.Spinner.Start(b)
+	listener := engine.NewMirrorListener(b, u)
+	isTorrent, err := utils.IsTorrentLink(link)
+	if err != nil {
+		engine.SendMessage(b, err.Error(), message)
+		return nil
+	}
+	if isTorrent {
+		engine.NewTorrentDownload(link, &listener)
+	} else {
+		engine.NewHttpDownload(link, &listener)
+	}
+	engine.SendStatusMessage(b, message)
+	if !engine.Spinner.IsRunning() {
+		engine.Spinner.Start(b)
 	}
 	return nil
 }
 
 func MirrorHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !utils.IsUserOwner(u.EffectiveUser.Id) {
+	if !utils.IsUserSudo(u.EffectiveUser.Id) {
 		return nil
 	}
 	return Mirror(b, u, false)
