@@ -24,6 +24,10 @@ func CancelMirrorHandler(b ext.Bot, u *gotgbot.Update) error {
 		engine.SendMessage(b, "Mirror doesnt exists.", message)
 		return nil
 	}
+	if dl.GetStatusType() != engine.MirrorStatusDownloading {
+		engine.SendMessage(b, "Do not cancel uploads bruh.", message)
+		return nil
+	}
 	dl.CancelMirror()
 	return nil
 }

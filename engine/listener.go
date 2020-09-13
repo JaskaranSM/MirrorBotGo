@@ -33,6 +33,7 @@ func (m *MirrorListener) Clean() {
 	if GetAllMirrorsCount() == 0 {
 		DeleteAllMessages(m.bot)
 	}
+	UpdateAllMessages(m.bot)
 }
 
 func (m *MirrorListener) OnDownloadComplete() {
@@ -90,7 +91,7 @@ type MirrorStatus interface {
 	Name() string
 	CompletedLength() int64
 	TotalLength() int64
-	Speed() int
+	Speed() int64
 	ETA() *time.Duration
 	Gid() string
 	Path() string

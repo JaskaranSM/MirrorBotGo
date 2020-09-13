@@ -67,11 +67,15 @@ func (h *HttpDownloadStatus) CompletedLength() int64 {
 func (h *HttpDownloadStatus) TotalLength() int64 {
 	return h.resp.Size()
 }
-func (h *HttpDownloadStatus) Speed() int {
-	return int(h.resp.BytesPerSecond())
+func (h *HttpDownloadStatus) Speed() int64 {
+	return int64(h.resp.BytesPerSecond())
 }
 
 func (h *HttpDownloadStatus) ETA() *time.Duration {
+	if h.CompletedLength() == 0 {
+		d := time.Duration(0)
+		return &d
+	}
 	eta := h.resp.ETA()
 	dur := time.Until(eta)
 	return &dur
@@ -90,6 +94,9 @@ func (h *HttpDownloadStatus) Path() string {
 }
 
 func (h *HttpDownloadStatus) Percentage() float32 {
+	if h.CompletedLength() == 0 {
+		return float32(0.00)
+	}
 	return float32(h.CompletedLength()*100) / float32(h.TotalLength())
 }
 

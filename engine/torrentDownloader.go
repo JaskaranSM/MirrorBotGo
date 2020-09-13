@@ -57,9 +57,9 @@ func (t *TorrentDownloadStatus) TotalLength() int64 {
 	return stats.Bytes.Total
 }
 
-func (t *TorrentDownloadStatus) Speed() int {
+func (t *TorrentDownloadStatus) Speed() int64 {
 	stats := t.GetStats()
-	return stats.Speed.Download
+	return int64(stats.Speed.Download)
 }
 
 func (t *TorrentDownloadStatus) ETA() *time.Duration {
@@ -72,6 +72,9 @@ func (t *TorrentDownloadStatus) Gid() string {
 }
 
 func (t *TorrentDownloadStatus) Percentage() float32 {
+	if t.CompletedLength() == 0 {
+		return float32(0.00)
+	}
 	return float32(t.CompletedLength()*100) / float32(t.TotalLength())
 }
 

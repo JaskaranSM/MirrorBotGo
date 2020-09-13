@@ -16,6 +16,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/drive/v3"
+	"google.golang.org/api/googleapi"
 )
 
 type GoogleDriveClient struct {
@@ -26,7 +27,7 @@ type GoogleDriveClient struct {
 	TotalLength         int64
 	CompletedLength     int64
 	LastTransferred     int64
-	Speed               int
+	Speed               int64
 	StartTime           time.Time
 	ETA                 time.Duration
 	DriveSrv            *drive.Service
@@ -197,21 +198,12 @@ func (G *GoogleDriveClient) OnTransferUpdate(current, total int64) {
 	G.LastTransferred = current
 	now := time.Now()
 	diff := now.Sub(G.StartTime)
-	G.Speed = int(G.CompletedLength / int64(diff.Seconds()))
-	var eta int
+	G.Speed = G.CompletedLength / int64(diff.Seconds())
 	if G.Speed != 0 {
-		eta = int(G.TotalLength - G.CompletedLength/int64(G.Speed))
+		G.ETA = utils.CalculateETA(G.TotalLength-G.CompletedLength, G.Speed)
 	} else {
-		eta = 0
+		G.ETA = time.Duration(0)
 	}
-	dur, err := time.ParseDuration(fmt.Sprintf("%ns", eta))
-	if err != nil {
-		log.Println(err)
-	} else {
-		G.ETA = dur
-	}
-	fmt.Println(dur)
-	fmt.Println(dur.Seconds())
 }
 
 func (G *GoogleDriveClient) Clean() {
@@ -245,13 +237,7 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string) (*driv
 		Name:     name,
 		Parents:  []string{parentId},
 	}
-	ctx := context.Background()
-	stat, err := content.Stat()
-	if err != nil {
-		log.Println(err)
-		return nil, err
-	}
-	file, err := G.DriveSrv.Files.Create(f).ResumableMedia(ctx, content, stat.Size(), contentType).ProgressUpdater(G.OnTransferUpdate).SupportsAllDrives(true).Do()
+	file, err := G.DriveSrv.Files.Create(f).SupportsAllDrives(true).Media(content, googleapi.ChunkSize(50*1024*1024)).ProgressUpdater(G.OnTransferUpdate).Do()
 
 	if err != nil {
 		log.Println("Could not create file: " + err.Error())
@@ -288,7 +274,7 @@ func (g *GoogleDriveStatus) TotalLength() int64 {
 	return g.DriveObj.TotalLength
 }
 
-func (g *GoogleDriveStatus) Speed() int {
+func (g *GoogleDriveStatus) Speed() int64 {
 	return g.DriveObj.Speed
 }
 

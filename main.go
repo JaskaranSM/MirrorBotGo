@@ -45,6 +45,7 @@ func main() {
 	l.Info("Starting updater")
 	RegisterAllHandlers(updater, l)
 	engine.Init()
+	engine.Clean()
 	updater.StartPolling()
 	l.Info("Started Updater.")
 	updater.Idle()

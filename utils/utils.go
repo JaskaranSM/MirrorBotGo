@@ -12,6 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gabriel-vasile/mimetype"
+
 	"github.com/lithammer/shortuuid"
 )
 
@@ -147,6 +149,33 @@ func GetFileNameLink(link string) (string, error) {
 	return fname, nil
 }
 
+func EndsWithTorrent(str string) bool {
+	return strings.HasSuffix(str, ".torrent")
+}
+
+func GetUrlInfo(url string) (string, string, error) { // fileName,mimeType,error
+	var err error
+	var params map[string]string
+	var fname string
+	var mimeType string
+	resp, err := http.Get(url)
+	if err != nil {
+		return fname, mimeType, err
+	}
+	mim, er := mimetype.DetectReader(resp.Body)
+	if er != nil {
+		return fname, mimeType, err
+	}
+	mimeType = mim.String()
+	_, params, _ = mime.ParseMediaType(resp.Header.Get("Content-Disposition"))
+	for i, j := range params {
+		if i == "filename" {
+			fname = j
+		}
+	}
+	return fname, mimeType, err
+}
+
 func GetFileBaseName(path string) string {
 	data := strings.Split(path, "/")
 	if len(data) >= 1 {
@@ -159,17 +188,11 @@ func IsTorrentLink(link string) (bool, error) {
 	if strings.Contains(link, "magnet") {
 		return true, nil
 	}
-	fileName, err := GetFileNameLink(link)
+	fname, mimeType, err := GetUrlInfo(link)
 	if err != nil {
-		if strings.HasSuffix(link, ".torrent") {
-			return false, nil
-		}
-		if strings.Contains(err.Error(), "no media") {
-			return false, nil
-		}
 		return false, err
 	}
-	if strings.HasSuffix(fileName, ".torrent") {
+	if EndsWithTorrent(fname) || strings.Contains(mimeType, "torrent") {
 		return true, nil
 	}
 	return false, nil
@@ -214,14 +237,33 @@ func GetProgressBarString(current, total int) string {
 	p = int(math.Min(math.Max(float64(p), 0), 100))
 	cFull = p / 8
 	cPart = p%8 - 1
-	for i := 0; i <= cFull; i++ {
-		outStr += pStr
-	}
+	outStr += strings.Repeat(pStr, cFull)
 	if cPart >= 0 {
 		outStr += PROGRESS_INCOMPLETE[cPart]
 	}
-	for i := 0; i <= PROGRESS_MAX_SIZE-cFull; i++ {
-		outStr += sStr
-	}
+	outStr += strings.Repeat(sStr, PROGRESS_MAX_SIZE-cFull)
 	return fmt.Sprintf("[%s]", outStr)
+}
+
+func CalculateETA(bytesLeft, speed int64) time.Duration {
+	eta := time.Duration(bytesLeft/speed) * time.Second
+	switch {
+	case eta > 8*time.Hour:
+		eta = eta.Round(time.Hour)
+	case eta > 4*time.Hour:
+		eta = eta.Round(30 * time.Minute)
+	case eta > 2*time.Hour:
+		eta = eta.Round(15 * time.Minute)
+	case eta > time.Hour:
+		eta = eta.Round(5 * time.Minute)
+	case eta > 30*time.Minute:
+		eta = eta.Round(1 * time.Minute)
+	case eta > 15*time.Minute:
+		eta = eta.Round(30 * time.Second)
+	case eta > 5*time.Minute:
+		eta = eta.Round(15 * time.Second)
+	case eta > time.Minute:
+		eta = eta.Round(5 * time.Second)
+	}
+	return eta
 }
