@@ -17,6 +17,7 @@ func getSession() *torrent.Session {
 	torrent.DefaultConfig.DataDir = utils.GetDownloadDir()
 	torrent.DefaultConfig.ResumeOnStartup = false
 	torrent.DefaultConfig.MaxOpenFiles = 1020
+	torrent.DefaultConfig.SpeedLimitUpload = 1
 	client, err := torrent.NewSession(torrent.DefaultConfig)
 	if err != nil {
 		log.Fatal(err)
