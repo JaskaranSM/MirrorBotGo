@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"github.com/gabriel-vasile/mimetype"
-
 	"github.com/lithammer/shortuuid"
 )
 
@@ -48,6 +47,7 @@ type ConfigJson struct {
 	IS_TEAM_DRIVE          bool   `json:"is_team_drive"`
 	GDRIVE_PARENT_ID       string `json:"gdrive_parent_id"`
 	STATUS_UPDATE_INTERVAL int    `json:"status_update_interval"`
+	AUTO_DELETE_TIMEOUT    int    `json:"auto_delete_timeout"`
 }
 
 var Config *ConfigJson = InitConfig()
@@ -86,6 +86,10 @@ func IsUserSudo(userId int) bool {
 
 func GetDownloadDir() string {
 	return Config.DOWNLOAD_DIR
+}
+
+func GetAutoDeleteTimeOut() time.Duration {
+	return time.Duration(Config.AUTO_DELETE_TIMEOUT) * time.Second
 }
 
 func GetGDriveParentId() string {

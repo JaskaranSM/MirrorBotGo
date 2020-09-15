@@ -111,6 +111,15 @@ func SendStatusMessage(b ext.Bot, message *ext.Message) error {
 	return nil
 }
 
+func AutoDeleteMessages(b ext.Bot, timeout time.Duration, messages ...*ext.Message) {
+	go func() {
+		time.Sleep(timeout)
+		for _, m := range messages {
+			DeleteMessage(b, m)
+		}
+	}()
+}
+
 func UpdateAllMessages(b ext.Bot) {
 	progress := GetReadableProgressMessage()
 	for _, msg := range GetAllMessages() {

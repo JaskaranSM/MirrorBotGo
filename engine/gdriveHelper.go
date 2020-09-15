@@ -135,7 +135,7 @@ func (G *GoogleDriveClient) CreateDir(name string, parentId string) (*drive.File
 }
 
 func (G *GoogleDriveClient) Upload(path string) bool {
-	var link string = "https://drive.google.com/open?id=%s"
+	var link string
 	var file *drive.File
 	var f os.FileInfo
 	var err error
@@ -151,14 +151,14 @@ func (G *GoogleDriveClient) Upload(path string) bool {
 			return false
 		}
 		G.UploadDirRec(path, file.Id)
-		link = fmt.Sprintf(link, file.Id)
+		link = G.FormatLink(file.Id)
 	} else {
 		file, err = G.UploadFile(utils.GetGDriveParentId(), path)
 		if err != nil {
 			G.Listener.OnDownloadError(err.Error())
 			return false
 		}
-		link = fmt.Sprintf(link, file.Id)
+		link = G.FormatLink(file.Id)
 	}
 	G.Listener.OnUploadComplete(link)
 	return true
@@ -217,6 +217,43 @@ func (G *GoogleDriveClient) SetPermissions(fileId string) error {
 	}
 	_, err := G.DriveSrv.Permissions.Create(fileId, permission).Fields("").SupportsAllDrives(true).SupportsTeamDrives(true).Do()
 	return err
+}
+
+func (G *GoogleDriveClient) FormatLink(fileId string) string {
+	return fmt.Sprintf("https://drive.google.com/open?id=%s", fileId)
+}
+
+//count = -1 for disabling limit
+func (G *GoogleDriveClient) ListFilesByParentId(parentId string, name string, count int) []*drive.File {
+	var files []*drive.File
+	pageToken := ""
+	query := fmt.Sprintf("'%s' in parents", parentId)
+	if name != "" {
+		query += fmt.Sprintf(" and name contains '%s'", name)
+	}
+	for {
+		request := G.DriveSrv.Files.List().Q(query).OrderBy("modifiedTime desc").SupportsAllDrives(true).IncludeTeamDriveItems(true).PageSize(1000).
+			Fields("nextPageToken,files(id, name,size, mimeType)")
+		if pageToken != "" {
+			request = request.PageToken(pageToken)
+		}
+		res, err := request.Do()
+		if err != nil {
+			log.Printf("Error : %v\n", err)
+			return files
+		}
+		for _, f := range res.Files {
+			if count != -1 && len(files) == count {
+				return files
+			}
+			files = append(files, f)
+		}
+		pageToken = res.NextPageToken
+		if pageToken == "" {
+			break
+		}
+	}
+	return files
 }
 
 func (G *GoogleDriveClient) UploadFile(parentId string, file_path string) (*drive.File, error) {

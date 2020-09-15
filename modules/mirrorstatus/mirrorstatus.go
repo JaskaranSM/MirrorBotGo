@@ -16,7 +16,8 @@ func MirrorStatusHandler(b ext.Bot, u *gotgbot.Update) error {
 		return nil
 	}
 	if engine.GetAllMirrorsCount() == 0 {
-		engine.SendMessage(b, "No Active Downloads.", message)
+		out, _ := engine.SendMessage(b, "No Active Downloads.", message)
+		engine.AutoDeleteMessages(b, utils.GetAutoDeleteTimeOut(), out, message)
 		return nil
 	}
 	engine.SendStatusMessage(b, message)

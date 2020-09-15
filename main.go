@@ -4,6 +4,7 @@ package main
 import (
 	"MirrorBotGo/engine"
 	"MirrorBotGo/modules/cancelmirror"
+	"MirrorBotGo/modules/list"
 	"MirrorBotGo/modules/mirror"
 	"MirrorBotGo/modules/mirrorstatus"
 	"MirrorBotGo/modules/start"
@@ -23,6 +24,7 @@ func RegisterAllHandlers(updater *gotgbot.Updater, l *zap.SugaredLogger) {
 	mirror.LoadMirrorHandlers(updater, l)
 	mirrorstatus.LoadMirrorStatusHandler(updater, l)
 	cancelmirror.LoadCancelMirrorHandler(updater, l)
+	list.LoadListHandler(updater, l)
 }
 
 func main() {
