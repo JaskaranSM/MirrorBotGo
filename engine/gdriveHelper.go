@@ -16,7 +16,6 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/drive/v3"
-	"google.golang.org/api/googleapi"
 )
 
 type GoogleDriveClient struct {
@@ -237,7 +236,14 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string) (*driv
 		Name:     name,
 		Parents:  []string{parentId},
 	}
-	file, err := G.DriveSrv.Files.Create(f).SupportsAllDrives(true).Media(content, googleapi.ChunkSize(50*1024*1024)).ProgressUpdater(G.OnTransferUpdate).Do()
+	ctx := context.Background()
+	stat, err := content.Stat()
+	if err != nil {
+		log.Println(err)
+		return nil, err
+	}
+	log.Printf("Uploading %s with mimeType: %s", f.Name, f.MimeType)
+	file, err := G.DriveSrv.Files.Create(f).ResumableMedia(ctx, content, stat.Size(), contentType).ProgressUpdater(G.OnTransferUpdate).SupportsAllDrives(true).Do()
 
 	if err != nil {
 		log.Println("Could not create file: " + err.Error())
@@ -260,6 +266,7 @@ type GoogleDriveStatus struct {
 	DriveObj *GoogleDriveClient
 	name     string
 	gid      string
+	Index_   int
 }
 
 func (g *GoogleDriveStatus) Name() string {
@@ -301,6 +308,10 @@ func (g *GoogleDriveStatus) Percentage() float32 {
 
 func (g *GoogleDriveStatus) GetListener() *MirrorListener {
 	return g.DriveObj.Listener
+}
+
+func (g *GoogleDriveStatus) Index() int {
+	return g.Index_
 }
 
 func (g *GoogleDriveStatus) CancelMirror() bool {

@@ -10,19 +10,18 @@ import (
 	"go.uber.org/zap"
 )
 
-func Mirror(b ext.Bot, u *gotgbot.Update, isTar bool) error {
+func MirrorTorrent(b ext.Bot, u *gotgbot.Update, isTar bool) error {
 	message := u.EffectiveMessage
 	link := utils.ParseMessageArgs(message.Text)
+	if link == "" {
+		engine.SendMessage(b, "No Source Provided.", message)
+		return nil
+	}
 	listener := engine.NewMirrorListener(b, u)
-	isTorrent, err := utils.IsTorrentLink(link)
+	err := engine.NewTorrentDownload(link, &listener)
 	if err != nil {
 		engine.SendMessage(b, err.Error(), message)
 		return nil
-	}
-	if isTorrent {
-		engine.NewTorrentDownload(link, &listener)
-	} else {
-		engine.NewHttpDownload(link, &listener)
 	}
 	engine.SendStatusMessage(b, message)
 	if !engine.Spinner.IsRunning() {
@@ -31,14 +30,42 @@ func Mirror(b ext.Bot, u *gotgbot.Update, isTar bool) error {
 	return nil
 }
 
-func MirrorHandler(b ext.Bot, u *gotgbot.Update) error {
+func MirrorHttp(b ext.Bot, u *gotgbot.Update, isTar bool) error {
+	message := u.EffectiveMessage
+	link := utils.ParseMessageArgs(message.Text)
+	if link == "" {
+		engine.SendMessage(b, "No Source Provided.", message)
+		return nil
+	}
+	listener := engine.NewMirrorListener(b, u)
+	err := engine.NewHttpDownload(link, &listener)
+	if err != nil {
+		engine.SendMessage(b, err.Error(), message)
+		return nil
+	}
+	engine.SendStatusMessage(b, message)
+	if !engine.Spinner.IsRunning() {
+		engine.Spinner.Start(b)
+	}
+	return nil
+}
+
+func MirrorTorrentHandler(b ext.Bot, u *gotgbot.Update) error {
 	if !utils.IsUserSudo(u.EffectiveUser.Id) {
 		return nil
 	}
-	return Mirror(b, u, false)
+	return MirrorTorrent(b, u, false)
+}
+
+func MirrorHttpHandler(b ext.Bot, u *gotgbot.Update) error {
+	if !utils.IsUserSudo(u.EffectiveUser.Id) {
+		return nil
+	}
+	return MirrorHttp(b, u, false)
 }
 
 func LoadMirrorHandlers(updater *gotgbot.Updater, l *zap.SugaredLogger) {
 	defer l.Info("Mirror Module Loaded.")
-	updater.Dispatcher.AddHandler(handlers.NewCommand("mirror", MirrorHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("torrent", MirrorTorrentHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("http", MirrorHttpHandler))
 }

@@ -38,6 +38,15 @@ func main() {
 	l.Info("token: ", token)
 	updater, err := gotgbot.NewUpdater(logger, token)
 	l.Info("Got Updater")
+	updater.UpdateGetter = ext.BaseRequester{
+		Client: http.Client{
+			Transport:     nil,
+			CheckRedirect: nil,
+			Jar:           nil,
+			Timeout:       time.Second * 45,
+		},
+		ApiUrl: ext.ApiUrl,
+	}
 	updater.Bot.Requester = ext.BaseRequester{Client: http.Client{Timeout: time.Second * 45}}
 	if err != nil {
 		l.Fatalw("failed to start updater", zap.Error(err))

@@ -17,6 +17,7 @@ func getSession() *torrent.Session {
 	torrent.DefaultConfig.DataDir = utils.GetDownloadDir()
 	torrent.DefaultConfig.ResumeOnStartup = false
 	torrent.DefaultConfig.MaxOpenFiles = 1020
+	torrent.DefaultConfig.SpeedLimitUpload = 1
 	client, err := torrent.NewSession(torrent.DefaultConfig)
 	if err != nil {
 		log.Fatal(err)
@@ -32,6 +33,7 @@ func getTorrentDownloader() *TorrentDownloader {
 type TorrentDownloadStatus struct {
 	tor      *torrent.Torrent
 	listener *MirrorListener
+	Index_   int
 }
 
 func (t *TorrentDownloadStatus) Update() {
@@ -90,6 +92,10 @@ func (t *TorrentDownloadStatus) GetListener() *MirrorListener {
 	return t.listener
 }
 
+func (t *TorrentDownloadStatus) Index() int {
+	return t.Index_
+}
+
 func (t *TorrentDownloadStatus) CancelMirror() bool {
 	t.tor.Stop()
 	listener := t.GetListener()
@@ -131,6 +137,7 @@ func (t *TorrentDownloader) AddDownload(link string, listener *MirrorListener) e
 	}
 	t.Listen(tor)
 	status := NewTorrentDownloadStatus(tor, listener)
+	status.Index_ = GlobalMirrorIndex + 1
 	AddMirrorLocal(listener.GetUid(), status)
 	status.GetListener().OnDownloadStart(tor.ID())
 	return nil

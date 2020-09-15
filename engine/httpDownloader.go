@@ -36,6 +36,7 @@ func (h *HttpDownloader) AddDownload(link string, listener *MirrorListener) erro
 	resp := h.client.Do(req)
 	h.Listen(resp)
 	status := NewHttpDownloadStatus(h.Gid, h.BasePath, resp, listener)
+	status.Index_ = GlobalMirrorIndex + 1
 	AddMirrorLocal(listener.GetUid(), status)
 	status.GetListener().OnDownloadStart(status.Gid())
 	return nil
@@ -54,6 +55,7 @@ type HttpDownloadStatus struct {
 	listener *MirrorListener
 	gid      string
 	BasePath string
+	Index_   int
 }
 
 func (h *HttpDownloadStatus) Name() string {
@@ -102,6 +104,10 @@ func (h *HttpDownloadStatus) Percentage() float32 {
 
 func (h *HttpDownloadStatus) GetListener() *MirrorListener {
 	return h.listener
+}
+
+func (h *HttpDownloadStatus) Index() int {
+	return h.Index_
 }
 
 func (h *HttpDownloadStatus) CancelMirror() bool {

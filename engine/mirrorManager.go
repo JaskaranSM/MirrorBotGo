@@ -1,7 +1,12 @@
 package engine
 
+import (
+	"sort"
+)
+
 var AllMirrors map[int]MirrorStatus = getMap()
 var CanceledMirrors map[int]MirrorStatus = getMap()
+var GlobalMirrorIndex int = 0
 
 const (
 	MirrorStatusDownloading = "Downloading"
@@ -17,6 +22,9 @@ func GetAllMirrors() []MirrorStatus {
 	for _, dl := range AllMirrors {
 		dls = append(dls, dl)
 	}
+	sort.SliceStable(dls, func(i, j int) bool {
+		return dls[i].Index() < dls[j].Index()
+	})
 	return dls
 }
 

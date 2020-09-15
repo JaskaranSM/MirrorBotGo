@@ -45,6 +45,7 @@ func (m *MirrorListener) OnDownloadComplete() {
 	drive.Init("")
 	drive.Authorize()
 	driveStatus := NewGoogleDriveStatus(drive, name, dl.Gid())
+	driveStatus.Index_ = dl.Index()
 	AddMirrorLocal(m.GetUid(), driveStatus)
 	UpdateAllMessages(m.bot)
 	drive.Upload(dl.Path())
@@ -97,6 +98,7 @@ type MirrorStatus interface {
 	Path() string
 	Percentage() float32
 	GetStatusType() string
+	Index() int
 	GetListener() *MirrorListener
 	CancelMirror() bool
 }

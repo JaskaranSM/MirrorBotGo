@@ -3,12 +3,14 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"math"
 	"mime"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -22,6 +24,21 @@ const ConfigJsonPath string = "config.json"
 const PROGRESS_MAX_SIZE = 100 / 8
 
 var PROGRESS_INCOMPLETE []string = []string{"▏", "▎", "▍", "▌", "▋", "▊", "▉"}
+
+const (
+	MAGNET_REGEX string = "magnet:\\?xt=urn:btih:[a-zA-Z0-9]*"
+	URL_REGEX    string = "(?:(?:https?|ftp):\\/\\/)?[\\w/\\-?=%.]+\\.[\\w/\\-?=%.]+"
+)
+
+func IsMagnetLink(link string) bool {
+	match := regexp.MustCompile(MAGNET_REGEX)
+	return match.MatchString(link)
+}
+
+func IsUrlLink(link string) bool {
+	match := regexp.MustCompile(URL_REGEX)
+	return match.MatchString(link)
+}
 
 type ConfigJson struct {
 	BOT_TOKEN              string `json:"bot_token"`
@@ -246,6 +263,9 @@ func GetProgressBarString(current, total int) string {
 }
 
 func CalculateETA(bytesLeft, speed int64) time.Duration {
+	if speed == 0 {
+		return time.Duration(0)
+	}
 	eta := time.Duration(bytesLeft/speed) * time.Second
 	switch {
 	case eta > 8*time.Hour:
@@ -266,4 +286,12 @@ func CalculateETA(bytesLeft, speed int64) time.Duration {
 		eta = eta.Round(5 * time.Second)
 	}
 	return eta
+}
+
+func GetReaderHandleByUrl(link string) (io.Reader, error) {
+	resp, err := http.Get(link)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Body, nil
 }
