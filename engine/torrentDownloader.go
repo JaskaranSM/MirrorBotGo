@@ -124,8 +124,15 @@ func (t *TorrentDownloader) Listen(tor *torrent.Torrent) {
 		}
 	}()
 	go func() {
-		for _ = range tor.NotifyStop() {
+		for err := range tor.NotifyStop() {
 			log.Println("Listening Stop")
+			if err != nil {
+				dl := GetMirrorByGid(tor.ID())
+				if dl != nil {
+					listener := dl.GetListener()
+					listener.OnDownloadComplete()
+				}
+			}
 		}
 	}()
 }
