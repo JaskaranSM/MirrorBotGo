@@ -25,11 +25,12 @@ func CancelMirrorHandler(b ext.Bot, u *gotgbot.Update) error {
 		engine.SendMessage(b, "Mirror doesnt exists.", message)
 		return nil
 	}
-	if dl.GetStatusType() != engine.MirrorStatusDownloading {
-		engine.SendMessage(b, "Do not cancel uploads bruh.", message)
+	if dl.GetStatusType() == engine.MirrorStatusDownloading {
+		dl.CancelMirror()
+	} else {
+		engine.SendMessage(b, "Can only cancel downloads.", message)
 		return nil
 	}
-	dl.CancelMirror()
 	return nil
 }
 
@@ -44,12 +45,12 @@ func CancelAllMirrorsHandler(b ext.Bot, u *gotgbot.Update) error {
 		return nil
 	}
 	for _, dl := range engine.GetAllMirrors() {
-		if dl.GetStatusType() != engine.MirrorStatusUploading {
+		if dl.GetStatusType() == engine.MirrorStatusDownloading {
 			dl.CancelMirror()
 			count += 1
 		}
 	}
-	engine.SendMessage(b, fmt.Sprintf("%d mirrors cancelled.", count), message)
+	engine.SendMessage(b, fmt.Sprintf("%d mirror(s) cancelled.", count), message)
 	return nil
 }
 

@@ -13,6 +13,7 @@ import (
 type MirrorListener struct {
 	Update *gotgbot.Update
 	bot    ext.Bot
+	isTar  bool
 }
 
 func (m *MirrorListener) GetUid() int {
@@ -40,15 +41,22 @@ func (m *MirrorListener) OnDownloadComplete() {
 	dl := m.GetDownload()
 	name := dl.Name()
 	size := dl.TotalLength()
+	path := dl.Path()
 	log.Printf("[DownloadComplete]: %s (%d)\n", name, size)
+	if m.isTar {
+		tarStatus := NewTarStatus(dl.Gid(), dl.Name(), nil)
+		tarStatus.Index_ = dl.Index()
+		AddMirrorLocal(m.GetUid(), tarStatus)
+		path = TarPath(path)
+	}
 	drive := NewGDriveClient(size, dl.GetListener())
 	drive.Init("")
 	drive.Authorize()
-	driveStatus := NewGoogleDriveStatus(drive, name, dl.Gid())
+	driveStatus := NewGoogleDriveStatus(drive, utils.GetFileBaseName(path), dl.Gid())
 	driveStatus.Index_ = dl.Index()
 	AddMirrorLocal(m.GetUid(), driveStatus)
 	UpdateAllMessages(m.bot)
-	drive.Upload(dl.Path())
+	drive.Upload(path)
 }
 func (m *MirrorListener) OnDownloadError(err string) {
 	fmt.Println("DownloadError: " + err)
@@ -84,8 +92,8 @@ func (m *MirrorListener) OnUploadComplete(link string) {
 	utils.RemoveByPath(dl.Path())
 }
 
-func NewMirrorListener(b ext.Bot, update *gotgbot.Update) MirrorListener {
-	return MirrorListener{bot: b, Update: update}
+func NewMirrorListener(b ext.Bot, update *gotgbot.Update, isTar bool) MirrorListener {
+	return MirrorListener{bot: b, Update: update, isTar: isTar}
 }
 
 type MirrorStatus interface {

@@ -184,7 +184,7 @@ func (G *GoogleDriveClient) UploadDirRec(directoryPath string, parentId string) 
 				G.Listener.OnDownloadError(err.Error())
 				return false
 			} else {
-				fmt.Println("Uploaded File: ", file.Id)
+				log.Println("Uploaded File: ", file.Id)
 			}
 		}
 	}

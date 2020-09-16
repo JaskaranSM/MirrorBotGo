@@ -29,10 +29,12 @@ func (h *HttpDownloader) Listen(resp *grab.Response) {
 	}()
 }
 func (h *HttpDownloader) AddDownload(link string, listener *MirrorListener) error {
+	h.client.UserAgent = utils.GetHttpUserAgent()
 	req, err := grab.NewRequest(h.BasePath, link)
 	if err != nil {
 		return err
 	}
+	req.HTTPRequest.Header.Set("User-Agent", utils.GetHttpUserAgent())
 	resp := h.client.Do(req)
 	h.Listen(resp)
 	status := NewHttpDownloadStatus(h.Gid, h.BasePath, resp, listener)

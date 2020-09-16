@@ -17,7 +17,7 @@ func MirrorTorrent(b ext.Bot, u *gotgbot.Update, isTar bool) error {
 		engine.SendMessage(b, "No Source Provided.", message)
 		return nil
 	}
-	listener := engine.NewMirrorListener(b, u)
+	listener := engine.NewMirrorListener(b, u, isTar)
 	err := engine.NewTorrentDownload(link, &listener)
 	if err != nil {
 		engine.SendMessage(b, err.Error(), message)
@@ -37,7 +37,7 @@ func MirrorHttp(b ext.Bot, u *gotgbot.Update, isTar bool) error {
 		engine.SendMessage(b, "No Source Provided.", message)
 		return nil
 	}
-	listener := engine.NewMirrorListener(b, u)
+	listener := engine.NewMirrorListener(b, u, isTar)
 	err := engine.NewHttpDownload(link, &listener)
 	if err != nil {
 		engine.SendMessage(b, err.Error(), message)
@@ -64,8 +64,24 @@ func MirrorHttpHandler(b ext.Bot, u *gotgbot.Update) error {
 	return MirrorHttp(b, u, false)
 }
 
+func TarMirrorTorrentHandler(b ext.Bot, u *gotgbot.Update) error {
+	if !utils.IsUserSudo(u.EffectiveUser.Id) {
+		return nil
+	}
+	return MirrorTorrent(b, u, true)
+}
+
+func TarMirrorHttpHandler(b ext.Bot, u *gotgbot.Update) error {
+	if !utils.IsUserSudo(u.EffectiveUser.Id) {
+		return nil
+	}
+	return MirrorHttp(b, u, true)
+}
+
 func LoadMirrorHandlers(updater *gotgbot.Updater, l *zap.SugaredLogger) {
 	defer l.Info("Mirror Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("torrent", MirrorTorrentHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("http", MirrorHttpHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("tartorrent", TarMirrorTorrentHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("tarhttp", TarMirrorHttpHandler))
 }

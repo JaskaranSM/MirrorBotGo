@@ -76,17 +76,20 @@ func DeleteAllMessages(b ext.Bot) {
 
 func GetReadableProgressMessage() string {
 	msg := ""
-	for _, dl := range GetAllMirrors() {
-		msg += fmt.Sprintf("<i>%s</i> -", dl.Name())
-		msg += fmt.Sprintf(" %s\n", dl.GetStatusType())
-		msg += fmt.Sprintf("<code>%s %.2f%%</code>", utils.GetProgressBarString(int(dl.CompletedLength()), int(dl.TotalLength())), dl.Percentage())
-		msg += fmt.Sprintf(" , %s of ", utils.GetHumanBytes(dl.CompletedLength()))
-		msg += fmt.Sprintf("%s at ", utils.GetHumanBytes(dl.TotalLength()))
-		msg += fmt.Sprintf("%s/s, ", utils.GetHumanBytes(int64(dl.Speed())))
-		if dl.ETA() != nil {
-			msg += fmt.Sprintf("ETA: %s", utils.HumanizeDuration(*dl.ETA()))
-		} else {
-			msg += "ETA: -"
+	dls := GetAllMirrors()
+	for i := 0; i <= len(dls)-1; i++ {
+		msg += fmt.Sprintf("<i>%s</i> -", dls[i].Name())
+		msg += fmt.Sprintf(" %s\n", dls[i].GetStatusType())
+		if dls[i].GetStatusType() != MirrorStatusArchiving {
+			msg += fmt.Sprintf("<code>%s %.2f%%</code>", utils.GetProgressBarString(int(dls[i].CompletedLength()), int(dls[i].TotalLength())), dls[i].Percentage())
+			msg += fmt.Sprintf(" , %s of ", utils.GetHumanBytes(dls[i].CompletedLength()))
+			msg += fmt.Sprintf("%s at ", utils.GetHumanBytes(dls[i].TotalLength()))
+			msg += fmt.Sprintf("%s/s, ", utils.GetHumanBytes(int64(dls[i].Speed())))
+			if dls[i].ETA() != nil {
+				msg += fmt.Sprintf("ETA: %s", utils.HumanizeDuration(*dls[i].ETA()))
+			} else {
+				msg += "ETA: -"
+			}
 		}
 		msg += "\n\n"
 	}
