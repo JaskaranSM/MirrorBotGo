@@ -24,7 +24,7 @@ func GetAllMirrors() []MirrorStatus {
 		dls = append(dls, dl)
 	}
 	sort.Slice(dls, func(i, j int) bool {
-		return dls[i].Index() < dls[j].Index()
+		return dls[i].Name() > dls[j].Name()
 	})
 	return dls
 }

@@ -15,12 +15,20 @@ func CancelMirrorHandler(b ext.Bot, u *gotgbot.Update) error {
 	if !utils.IsUserSudo(u.EffectiveUser.Id) {
 		return nil
 	}
+	var dl engine.MirrorStatus
 	message := u.EffectiveMessage
-	if message.ReplyToMessage == nil {
-		engine.SendMessage(b, "Reply to mirror start message to cancel it.", message)
+	gid := utils.ParseMessageArgs(message.Text)
+	if message.ReplyToMessage == nil && gid == "" {
+		engine.SendMessage(b, "Reply to mirror start message or provide gid to cancel it.", message)
 		return nil
 	}
-	dl := engine.GetMirrorByUid(message.ReplyToMessage.MessageId)
+	if message.ReplyToMessage != nil {
+		dl = engine.GetMirrorByUid(message.ReplyToMessage.MessageId)
+	} else if gid != "" {
+		dl = engine.GetMirrorByGid(gid)
+	} else {
+		dl = nil
+	}
 	if dl == nil {
 		engine.SendMessage(b, "Mirror doesnt exists.", message)
 		return nil

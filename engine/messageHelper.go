@@ -90,6 +90,7 @@ func GetReadableProgressMessage() string {
 			} else {
 				msg += "ETA: -"
 			}
+			msg += fmt.Sprintf("\nGID: <code>%s</code>", dls[i].Gid())
 		}
 		msg += "\n\n"
 	}
