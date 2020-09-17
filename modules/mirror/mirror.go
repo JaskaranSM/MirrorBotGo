@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func MirrorTorrent(b ext.Bot, u *gotgbot.Update, isTar bool) error {
+func Mirror(b ext.Bot, u *gotgbot.Update, isTar bool) error {
 	message := u.EffectiveMessage
 	var link string
 	if message.ReplyToMessage != nil && message.ReplyToMessage.Document != nil {
@@ -30,7 +30,7 @@ func MirrorTorrent(b ext.Bot, u *gotgbot.Update, isTar bool) error {
 		return nil
 	}
 	listener := engine.NewMirrorListener(b, u, isTar)
-	err := engine.NewTorrentDownload(link, &listener)
+	err := engine.NewAriaDownload(link, &listener)
 	if err != nil {
 		engine.SendMessage(b, err.Error(), message)
 		return nil
@@ -42,58 +42,22 @@ func MirrorTorrent(b ext.Bot, u *gotgbot.Update, isTar bool) error {
 	return nil
 }
 
-func MirrorHttp(b ext.Bot, u *gotgbot.Update, isTar bool) error {
-	message := u.EffectiveMessage
-	link := utils.ParseMessageArgs(message.Text)
-	if link == "" {
-		engine.SendMessage(b, "No Source Provided.", message)
-		return nil
-	}
-	listener := engine.NewMirrorListener(b, u, isTar)
-	err := engine.NewHttpDownload(link, &listener)
-	if err != nil {
-		engine.SendMessage(b, err.Error(), message)
-		return nil
-	}
-	engine.SendStatusMessage(b, message)
-	if !engine.Spinner.IsRunning() {
-		engine.Spinner.Start(b)
-	}
-	return nil
-}
-
-func MirrorTorrentHandler(b ext.Bot, u *gotgbot.Update) error {
+func MirrorHandler(b ext.Bot, u *gotgbot.Update) error {
 	if !utils.IsUserSudo(u.EffectiveUser.Id) {
 		return nil
 	}
-	return MirrorTorrent(b, u, false)
+	return Mirror(b, u, false)
 }
 
-func MirrorHttpHandler(b ext.Bot, u *gotgbot.Update) error {
+func TarMirrorHandler(b ext.Bot, u *gotgbot.Update) error {
 	if !utils.IsUserSudo(u.EffectiveUser.Id) {
 		return nil
 	}
-	return MirrorHttp(b, u, false)
-}
-
-func TarMirrorTorrentHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !utils.IsUserSudo(u.EffectiveUser.Id) {
-		return nil
-	}
-	return MirrorTorrent(b, u, true)
-}
-
-func TarMirrorHttpHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !utils.IsUserSudo(u.EffectiveUser.Id) {
-		return nil
-	}
-	return MirrorHttp(b, u, true)
+	return Mirror(b, u, true)
 }
 
 func LoadMirrorHandlers(updater *gotgbot.Updater, l *zap.SugaredLogger) {
 	defer l.Info("Mirror Module Loaded.")
-	updater.Dispatcher.AddHandler(handlers.NewCommand("torrent", MirrorTorrentHandler))
-	updater.Dispatcher.AddHandler(handlers.NewCommand("http", MirrorHttpHandler))
-	updater.Dispatcher.AddHandler(handlers.NewCommand("tartorrent", TarMirrorTorrentHandler))
-	updater.Dispatcher.AddHandler(handlers.NewCommand("tarhttp", TarMirrorHttpHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("mirror", MirrorHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("tarmirror", TarMirrorHandler))
 }

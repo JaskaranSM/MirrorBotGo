@@ -2,8 +2,10 @@ package engine
 
 import (
 	"sort"
+	"sync"
 )
 
+var dlMutex sync.Mutex
 var AllMirrors map[int]MirrorStatus = getMap()
 var CanceledMirrors map[int]MirrorStatus = getMap()
 var GlobalMirrorIndex int = 0
@@ -52,14 +54,20 @@ func GetAllMirrorsCount() int {
 }
 
 func AddMirrorLocal(messageId int, dl MirrorStatus) {
+	dlMutex.Lock()
+	defer dlMutex.Unlock()
 	AllMirrors[messageId] = dl
 }
 
 func MoveMirrorToCancel(messageId int, dl MirrorStatus) {
+	dlMutex.Lock()
+	defer dlMutex.Unlock()
 	CanceledMirrors[messageId] = dl
 }
 
 func RemoveMirrorLocal(messageId int) {
+	dlMutex.Lock()
+	defer dlMutex.Unlock()
 	_, ok := AllMirrors[messageId]
 	if ok {
 		delete(AllMirrors, messageId)

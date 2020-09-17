@@ -196,8 +196,12 @@ func (G *GoogleDriveClient) OnTransferUpdate(current, total int64) {
 	G.CompletedLength += chunkSize
 	G.LastTransferred = current
 	now := time.Now()
-	diff := now.Sub(G.StartTime)
-	G.Speed = G.CompletedLength / int64(diff.Seconds())
+	diff := int64(now.Sub(G.StartTime).Seconds())
+	if diff != 0 {
+		G.Speed = G.CompletedLength / diff
+	} else {
+		G.Speed = 0
+	}
 	if G.Speed != 0 {
 		G.ETA = utils.CalculateETA(G.TotalLength-G.CompletedLength, G.Speed)
 	} else {

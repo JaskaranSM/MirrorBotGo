@@ -27,6 +27,7 @@ func (m *MirrorListener) GetDownload() MirrorStatus {
 
 func (m *MirrorListener) OnDownloadStart(text string) {
 	log.Println(text)
+	UpdateAllMessages(m.bot)
 }
 
 func (m *MirrorListener) Clean() {

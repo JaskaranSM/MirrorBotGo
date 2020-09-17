@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -321,4 +322,16 @@ func ExitCleanup() {
 	log.Println("Exit Cleanup")
 	RemoveByPath(GetDownloadDir())
 	os.Exit(1)
+}
+
+func ParseStringToInt64(str string) int64 {
+	if n, err := strconv.Atoi(str); err == nil {
+		return int64(n)
+	} else {
+		return 0
+	}
+}
+
+func ParseIntToString(i int) string {
+	return strconv.Itoa(i)
 }
