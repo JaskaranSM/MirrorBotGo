@@ -14,6 +14,9 @@ const (
 	MirrorStatusDownloading = "Downloading"
 	MirrorStatusUploading   = "Uploading"
 	MirrorStatusArchiving   = "Archiving"
+	MirrorStatusWaiting     = "Queued"
+	MirrorStatusFailed      = "Failed"
+	MirrorStatusCanceled    = "Canceled"
 )
 
 func getMap() map[int]MirrorStatus {

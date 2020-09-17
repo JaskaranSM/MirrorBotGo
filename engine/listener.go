@@ -80,7 +80,7 @@ func (m *MirrorListener) OnUploadError(err string) {
 	m.Clean()
 	msg := "Your upload has been stopped due to: %s"
 	SendMessage(m.bot, fmt.Sprintf(msg, err), m.Update.Message)
-	utils.RemoveByPath(dl.Path())
+	utils.RemoveByPath(path.Join(utils.GetDownloadDir(), utils.ParseIntToString(m.GetUid())))
 }
 
 func (m *MirrorListener) OnUploadComplete(link string) {
@@ -91,7 +91,7 @@ func (m *MirrorListener) OnUploadComplete(link string) {
 	msg := fmt.Sprintf("<a href='%s'>%s</a> (%s)", link, dl.Name(), utils.GetHumanBytes(dl.TotalLength()))
 	m.Clean()
 	SendMessage(m.bot, msg, m.Update.Message)
-	utils.RemoveByPath(path.Join(utils.GetDownloadDir(), dl.Gid()))
+	utils.RemoveByPath(path.Join(utils.GetDownloadDir(), utils.ParseIntToString(m.GetUid())))
 }
 
 func NewMirrorListener(b ext.Bot, update *gotgbot.Update, isTar bool) MirrorListener {

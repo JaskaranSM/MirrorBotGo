@@ -98,7 +98,10 @@ func (t *AriaDownloadStatus) Name() string {
 		return stats.BitTorrent.Info.Name
 	}
 	if len(stats.Files) != 0 {
-		t.name = utils.GetFileBaseName(stats.Files[0].Path)
+		pth := utils.GetFileBaseName(stats.Files[0].Path)
+		if pth != "" {
+			t.name = pth
+		}
 	}
 	return t.name
 }
@@ -135,6 +138,16 @@ func (t *AriaDownloadStatus) Percentage() float32 {
 }
 
 func (t *AriaDownloadStatus) GetStatusType() string {
+	stats := t.GetStats()
+	if stats.Status == "paused" {
+		return MirrorStatusCanceled
+	} else if stats.Status == "error" {
+		return MirrorStatusFailed
+	} else if stats.Status == "waiting" {
+		return MirrorStatusWaiting
+	} else if stats.Status == "removed" {
+		return MirrorStatusCanceled
+	}
 	return MirrorStatusDownloading
 }
 
