@@ -12,7 +12,19 @@ import (
 
 func MirrorTorrent(b ext.Bot, u *gotgbot.Update, isTar bool) error {
 	message := u.EffectiveMessage
-	link := utils.ParseMessageArgs(message.Text)
+	var link string
+	if message.ReplyToMessage != nil && message.ReplyToMessage.Document != nil {
+		doc := message.ReplyToMessage.Document
+		if doc.MimeType == "application/x-bittorrent" {
+			file, err := b.GetFile(doc.FileId)
+			if err != nil {
+				b.Logger.Error(err)
+			}
+			link = utils.FormatTGFileLink(file.FilePath, b.Token)
+		}
+	} else {
+		link = utils.ParseMessageArgs(message.Text)
+	}
 	if link == "" {
 		engine.SendMessage(b, "No Source Provided.", message)
 		return nil

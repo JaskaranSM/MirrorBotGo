@@ -4,6 +4,7 @@ import (
 	"MirrorBotGo/utils"
 	"fmt"
 	"log"
+	"path"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot"
@@ -89,7 +90,7 @@ func (m *MirrorListener) OnUploadComplete(link string) {
 	msg := fmt.Sprintf("<a href='%s'>%s</a> (%s)", link, dl.Name(), utils.GetHumanBytes(dl.TotalLength()))
 	m.Clean()
 	SendMessage(m.bot, msg, m.Update.Message)
-	utils.RemoveByPath(dl.Path())
+	utils.RemoveByPath(path.Join(utils.GetDownloadDir(), dl.Gid()))
 }
 
 func NewMirrorListener(b ext.Bot, update *gotgbot.Update, isTar bool) MirrorListener {

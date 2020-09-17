@@ -4,6 +4,7 @@ package main
 import (
 	"MirrorBotGo/engine"
 	"MirrorBotGo/modules/cancelmirror"
+	"MirrorBotGo/modules/goexec"
 	"MirrorBotGo/modules/list"
 	"MirrorBotGo/modules/mirror"
 	"MirrorBotGo/modules/mirrorstatus"
@@ -25,6 +26,7 @@ func RegisterAllHandlers(updater *gotgbot.Updater, l *zap.SugaredLogger) {
 	mirrorstatus.LoadMirrorStatusHandler(updater, l)
 	cancelmirror.LoadCancelMirrorHandler(updater, l)
 	list.LoadListHandler(updater, l)
+	goexec.LoadExecHandler(updater, l)
 }
 
 func main() {
@@ -45,11 +47,11 @@ func main() {
 			Transport:     nil,
 			CheckRedirect: nil,
 			Jar:           nil,
-			Timeout:       time.Second * 45,
+			Timeout:       time.Second * 65,
 		},
 		ApiUrl: ext.ApiUrl,
 	}
-	updater.Bot.Requester = ext.BaseRequester{Client: http.Client{Timeout: time.Second * 45}}
+	updater.Bot.Requester = ext.BaseRequester{Client: http.Client{Timeout: time.Second * 65}}
 	if err != nil {
 		l.Fatalw("failed to start updater", zap.Error(err))
 	}
@@ -57,6 +59,7 @@ func main() {
 	RegisterAllHandlers(updater, l)
 	engine.Init()
 	engine.Clean()
+	go utils.ExitCleanup()
 	updater.StartPolling()
 	l.Info("Started Updater.")
 	updater.Idle()

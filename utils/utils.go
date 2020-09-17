@@ -10,6 +10,7 @@ import (
 	"mime"
 	"net/http"
 	"os"
+	"os/signal"
 	"regexp"
 	"strings"
 	"time"
@@ -21,6 +22,7 @@ import (
 const ConfigJsonPath string = "config.json"
 
 const PROGRESS_MAX_SIZE = 100 / 8
+const MaxMessageTextLength int = 4000
 
 var PROGRESS_INCOMPLETE []string = []string{"▏", "▎", "▍", "▌", "▋", "▊", "▉"}
 
@@ -69,6 +71,10 @@ func InitConfig() *ConfigJson {
 
 func GetBotToken() string {
 	return Config.BOT_TOKEN
+}
+
+func GetMaxMessageTextLength() int {
+	return MaxMessageTextLength
 }
 
 func IsUserOwner(userId int) bool {
@@ -302,4 +308,17 @@ func GetReaderHandleByUrl(link string) (io.Reader, error) {
 		return nil, err
 	}
 	return resp.Body, nil
+}
+
+func FormatTGFileLink(sub string, token string) string {
+	return fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", token, sub)
+}
+
+func ExitCleanup() {
+	killSignal := make(chan os.Signal, 1)
+	signal.Notify(killSignal, os.Interrupt)
+	<-killSignal
+	log.Println("Exit Cleanup")
+	RemoveByPath(GetDownloadDir())
+	os.Exit(1)
 }
