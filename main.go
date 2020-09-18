@@ -11,6 +11,7 @@ import (
 	"MirrorBotGo/modules/mirror"
 	"MirrorBotGo/modules/mirrorstatus"
 	"MirrorBotGo/modules/start"
+	"MirrorBotGo/modules/stats"
 	"MirrorBotGo/utils"
 	"net/http"
 	"os"
@@ -30,6 +31,7 @@ func RegisterAllHandlers(updater *gotgbot.Updater, l *zap.SugaredLogger) {
 	list.LoadListHandler(updater, l)
 	goexec.LoadExecHandler(updater, l)
 	authorization.LoadAuthorizationHandlers(updater, l)
+	stats.LoadStatsHandler(updater, l)
 }
 
 func main() {
