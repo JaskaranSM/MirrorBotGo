@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
@@ -45,12 +46,14 @@ func IsUrlLink(link string) bool {
 type ConfigJson struct {
 	BOT_TOKEN              string `json:"bot_token"`
 	SUDO_USERS             []int  `json:"sudo_users"`
+	AUTHORIZED_CHATS       []int  `json:"authorized_chats"`
 	OWNER_ID               int    `json:"owner_id"`
 	DOWNLOAD_DIR           string `json:"download_dir"`
 	IS_TEAM_DRIVE          bool   `json:"is_team_drive"`
 	GDRIVE_PARENT_ID       string `json:"gdrive_parent_id"`
 	STATUS_UPDATE_INTERVAL int    `json:"status_update_interval"`
 	AUTO_DELETE_TIMEOUT    int    `json:"auto_delete_timeout"`
+	DB_URI                 string `json:"db_uri"`
 }
 
 var Config *ConfigJson = InitConfig()
@@ -72,6 +75,14 @@ func InitConfig() *ConfigJson {
 
 func GetBotToken() string {
 	return Config.BOT_TOKEN
+}
+
+func GetSudoUsers() []int {
+	return Config.SUDO_USERS
+}
+
+func GetAuthorizedChats() []int {
+	return Config.AUTHORIZED_CHATS
 }
 
 func GetMaxMessageTextLength() int {
@@ -116,6 +127,10 @@ func IsTeamDrive() bool {
 
 func GetStatusUpdateInterval() time.Duration {
 	return time.Duration(Config.STATUS_UPDATE_INTERVAL) * time.Second
+}
+
+func GetDbUri() string {
+	return Config.DB_URI
 }
 
 func GetHumanBytes(b int64) string {
@@ -334,4 +349,12 @@ func ParseStringToInt64(str string) int64 {
 
 func ParseIntToString(i int) string {
 	return strconv.Itoa(i)
+}
+
+func ParseInterfaceToInt(i interface{}) int {
+	tempType := reflect.TypeOf(i).Name()
+	if tempType == "int32" {
+		return int(i.(int32))
+	}
+	return int(i.(int64))
 }

@@ -25,7 +25,9 @@ func (a Aria2Listener) OnDownloadStop(events []rpc.Event) {
 	log.Println("[OnDownloadStop]")
 	for _, event := range events {
 		dl := GetMirrorByGid(event.Gid)
-		go dl.GetListener().OnDownloadError("Canceled by Stop event.")
+		if dl != nil {
+			go dl.GetListener().OnDownloadError("Canceled by Stop event.")
+		}
 	}
 }
 
@@ -34,7 +36,9 @@ func (a Aria2Listener) OnDownloadError(events []rpc.Event) {
 	for _, event := range events {
 		ariaDl, _ := client.TellStatus(event.Gid)
 		dl := GetMirrorByGid(event.Gid)
-		go dl.GetListener().OnDownloadError(ariaDl.ErrorMessage)
+		if dl != nil {
+			go dl.GetListener().OnDownloadError(ariaDl.ErrorMessage)
+		}
 	}
 }
 
@@ -47,14 +51,16 @@ func (a Aria2Listener) OnDownloadComplete(events []rpc.Event) {
 	for _, event := range events {
 		ariaDl, _ := client.TellStatus(event.Gid)
 		dl := GetMirrorByGid(event.Gid)
-		listener := dl.GetListener()
-		if len(ariaDl.FollowedBy) != 0 {
-			status := NewAriaDownloadStatus(dl.Name(), ariaDl.FollowedBy[0], listener)
-			status.Index_ = dl.Index()
-			AddMirrorLocal(listener.GetUid(), status)
-			go listener.OnDownloadStart(status.Gid())
-		} else {
-			go listener.OnDownloadComplete()
+		if dl != nil {
+			listener := dl.GetListener()
+			if len(ariaDl.FollowedBy) != 0 {
+				status := NewAriaDownloadStatus(dl.Name(), ariaDl.FollowedBy[0], listener)
+				status.Index_ = dl.Index()
+				AddMirrorLocal(listener.GetUid(), status)
+				go listener.OnDownloadStart(status.Gid())
+			} else {
+				go listener.OnDownloadComplete()
+			}
 		}
 	}
 }
@@ -164,7 +170,7 @@ func (t *AriaDownloadStatus) Index() int {
 }
 
 func (t *AriaDownloadStatus) CancelMirror() bool {
-	_, err := client.Pause(t.Gid())
+	_, err := client.Remove(t.Gid())
 	if err != nil {
 		log.Println(err)
 	}

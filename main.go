@@ -2,7 +2,9 @@
 package main
 
 import (
+	"MirrorBotGo/db"
 	"MirrorBotGo/engine"
+	"MirrorBotGo/modules/authorization"
 	"MirrorBotGo/modules/cancelmirror"
 	"MirrorBotGo/modules/goexec"
 	"MirrorBotGo/modules/list"
@@ -27,6 +29,7 @@ func RegisterAllHandlers(updater *gotgbot.Updater, l *zap.SugaredLogger) {
 	cancelmirror.LoadCancelMirrorHandler(updater, l)
 	list.LoadListHandler(updater, l)
 	goexec.LoadExecHandler(updater, l)
+	authorization.LoadAuthorizationHandlers(updater, l)
 }
 
 func main() {
@@ -57,6 +60,7 @@ func main() {
 	}
 	l.Info("Starting updater")
 	RegisterAllHandlers(updater, l)
+	db.Init()
 	engine.Init()
 	go utils.ExitCleanup()
 	updater.StartPolling()

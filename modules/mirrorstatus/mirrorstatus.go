@@ -1,6 +1,7 @@
 package mirrorstatus
 
 import (
+	"MirrorBotGo/db"
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
 
@@ -11,10 +12,10 @@ import (
 )
 
 func MirrorStatusHandler(b ext.Bot, u *gotgbot.Update) error {
-	message := u.EffectiveMessage
-	if !utils.IsUserSudo(u.EffectiveUser.Id) {
+	if !db.IsAuthorized(u.EffectiveMessage) {
 		return nil
 	}
+	message := u.EffectiveMessage
 	if engine.GetAllMirrorsCount() == 0 {
 		out, _ := engine.SendMessage(b, "No Active Downloads.", message)
 		engine.AutoDeleteMessages(b, utils.GetAutoDeleteTimeOut(), out, message)

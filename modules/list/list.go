@@ -1,6 +1,7 @@
 package list
 
 import (
+	"MirrorBotGo/db"
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
 	"fmt"
@@ -12,11 +13,11 @@ import (
 )
 
 func ListHandler(b ext.Bot, u *gotgbot.Update) error {
-	var out *ext.Message
-	var err error
-	if !utils.IsUserSudo(u.EffectiveUser.Id) {
+	if !db.IsAuthorized(u.EffectiveMessage) {
 		return nil
 	}
+	var out *ext.Message
+	var err error
 	message := u.EffectiveMessage
 	name := utils.ParseMessageArgs(message.Text)
 	if name == "" {

@@ -1,6 +1,7 @@
 package mirror
 
 import (
+	"MirrorBotGo/db"
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
 
@@ -43,14 +44,14 @@ func Mirror(b ext.Bot, u *gotgbot.Update, isTar bool) error {
 }
 
 func MirrorHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !utils.IsUserSudo(u.EffectiveUser.Id) {
+	if !db.IsAuthorized(u.EffectiveMessage) {
 		return nil
 	}
 	return Mirror(b, u, false)
 }
 
 func TarMirrorHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !utils.IsUserSudo(u.EffectiveUser.Id) {
+	if !db.IsAuthorized(u.EffectiveMessage) {
 		return nil
 	}
 	return Mirror(b, u, true)

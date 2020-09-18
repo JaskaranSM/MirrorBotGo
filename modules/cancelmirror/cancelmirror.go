@@ -1,6 +1,7 @@
 package cancelmirror
 
 import (
+	"MirrorBotGo/db"
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
 	"fmt"
@@ -12,7 +13,7 @@ import (
 )
 
 func CancelMirrorHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !utils.IsUserSudo(u.EffectiveUser.Id) {
+	if !db.IsAuthorized(u.EffectiveMessage) {
 		return nil
 	}
 	var dl engine.MirrorStatus
@@ -33,7 +34,8 @@ func CancelMirrorHandler(b ext.Bot, u *gotgbot.Update) error {
 		engine.SendMessage(b, "Mirror doesnt exists.", message)
 		return nil
 	}
-	if dl.GetStatusType() == engine.MirrorStatusDownloading {
+	status := dl.GetStatusType()
+	if status == engine.MirrorStatusDownloading || status == engine.MirrorStatusWaiting || status == engine.MirrorStatusFailed {
 		dl.CancelMirror()
 	} else {
 		engine.SendMessage(b, "Can only cancel downloads.", message)
@@ -43,7 +45,7 @@ func CancelMirrorHandler(b ext.Bot, u *gotgbot.Update) error {
 }
 
 func CancelAllMirrorsHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !utils.IsUserSudo(u.EffectiveUser.Id) {
+	if !utils.IsUserOwner(u.EffectiveUser.Id) {
 		return nil
 	}
 	count := 0
@@ -53,7 +55,8 @@ func CancelAllMirrorsHandler(b ext.Bot, u *gotgbot.Update) error {
 		return nil
 	}
 	for _, dl := range engine.GetAllMirrors() {
-		if dl.GetStatusType() == engine.MirrorStatusDownloading {
+		status := dl.GetStatusType()
+		if status == engine.MirrorStatusDownloading || status == engine.MirrorStatusWaiting || status == engine.MirrorStatusFailed {
 			dl.CancelMirror()
 			count += 1
 		}

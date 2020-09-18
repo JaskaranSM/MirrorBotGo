@@ -1,7 +1,7 @@
 package start
 
 import (
-	"MirrorBotGo/utils"
+	"MirrorBotGo/db"
 
 	"github.com/PaulSonOfLars/gotgbot"
 	"github.com/PaulSonOfLars/gotgbot/ext"
@@ -10,7 +10,7 @@ import (
 )
 
 func StartHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !utils.IsUserSudo(u.EffectiveUser.Id) {
+	if !db.IsAuthorized(u.EffectiveMessage) {
 		return nil
 	}
 	msg := u.EffectiveMessage
