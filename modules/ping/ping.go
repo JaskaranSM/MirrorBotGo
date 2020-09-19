@@ -1,6 +1,7 @@
 package ping
 
 import (
+	"MirrorBotGo/engine"
 	"fmt"
 	"math"
 	"time"
@@ -13,18 +14,18 @@ import (
 
 func PingHandler(b ext.Bot, u *gotgbot.Update) error {
 	startTime := time.Now()
-	message, err := b.SendMessage(u.Message.Chat.Id, "Starting Ping!")
+	message, err := engine.SendMessage(b, "Starting ping", u.EffectiveMessage)
 	if err != nil {
 		b.Logger.Error(err)
 	}
 	endTime := time.Now()
 	elapsed := int(math.Round(float64(endTime.Sub(startTime).Milliseconds())))
-	_, _ = b.EditMessageText(u.Message.Chat.Id, message.MessageId, fmt.Sprintf("Pong %d ms", elapsed))
+	_, _ = engine.EditMessage(b, fmt.Sprintf("Pong %d ms", elapsed), message)
 	return nil
 }
 
 func LoadPingHandler(updater *gotgbot.Updater, l *zap.SugaredLogger) {
-	defer l.Info("Stats Module Loaded.")
+	defer l.Info("Ping Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("ping", PingHandler))
 }
 
