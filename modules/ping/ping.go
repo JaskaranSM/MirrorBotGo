@@ -1,6 +1,7 @@
 package ping
 
 import (
+	"MirrorBotGo/db"
 	"MirrorBotGo/engine"
 	"fmt"
 	"math"
@@ -13,6 +14,9 @@ import (
 )
 
 func PingHandler(b ext.Bot, u *gotgbot.Update) error {
+	if !db.IsAuthorized(u.EffectiveMessage) {
+		return nil
+	}
 	startTime := time.Now()
 	message, err := engine.SendMessage(b, "Starting ping", u.EffectiveMessage)
 	if err != nil {
@@ -28,4 +32,3 @@ func LoadPingHandler(updater *gotgbot.Updater, l *zap.SugaredLogger) {
 	defer l.Info("Ping Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("ping", PingHandler))
 }
-
