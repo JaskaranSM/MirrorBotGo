@@ -45,7 +45,7 @@ func GetCpuUsage() string {
 		log.Println(err)
 		return out
 	}
-	total := after.User - before.User
+	total := int(after.User-before.User) / runtime.NumCPU()
 	out += fmt.Sprintf("%d%%", total)
 	return out
 }

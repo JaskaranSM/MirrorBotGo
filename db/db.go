@@ -200,9 +200,10 @@ func InitChats() bool {
 		if err != nil {
 			log.Println(err)
 		} else {
-			if result["userId"] != nil {
+			if result["chatId"] != nil {
 				chatId := utils.ParseInterfaceToInt(result["chatId"])
 				AuthorizeUserLocal(chatId)
+				log.Printf("Added %d in AuthorizedChats\n", chatId)
 			}
 		}
 	}
@@ -228,6 +229,7 @@ func InitUsers() bool {
 			if result["userId"] != nil {
 				userId := utils.ParseInterfaceToInt(result["userId"])
 				AuthorizeUserLocal(userId)
+				log.Printf("Added %d in AuthorizedUsers\n", userId)
 			}
 		}
 	}
