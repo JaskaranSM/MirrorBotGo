@@ -202,7 +202,7 @@ func InitChats() bool {
 		} else {
 			if result["chatId"] != nil {
 				chatId := utils.ParseInterfaceToInt(result["chatId"])
-				AuthorizeUserLocal(chatId)
+				AuthorizeChatLocal(chatId)
 				log.Printf("Added %d in AuthorizedChats\n", chatId)
 			}
 		}
