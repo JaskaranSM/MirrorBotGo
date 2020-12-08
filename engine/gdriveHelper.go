@@ -260,6 +260,10 @@ func (G *GoogleDriveClient) ListFilesByParentId(parentId string, name string, co
 	return files
 }
 
+func (G *GoogleDriveClient) GetFileMetadata(fileId string) (*drive.File, error) {
+	return G.DriveSrv.Files.Get(fileId).Fields("name,mimeType,size,id,md5Checksum").SupportsAllDrives(true).Do()
+}
+
 func (G *GoogleDriveClient) UploadFile(parentId string, file_path string) (*drive.File, error) {
 	defer G.Clean()
 	content, err := os.Open(file_path)
@@ -297,6 +301,73 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string) (*driv
 		}
 	}
 	return file, nil
+}
+
+func (G *GoogleDriveClient) Clone(fileId string) string {
+	var link string
+	meta, err := G.GetFileMetadata(fileId)
+	if err != nil {
+		return err.Error()
+	}
+	log.Println("Cloning: " + meta.Name)
+	if meta.MimeType == G.GDRIVE_DIR_MIMETYPE {
+		new_dir, err := G.CreateDir(meta.Name, utils.GetGDriveParentId())
+		if err != nil {
+			log.Println("GDriveCreateDir: " + err.Error())
+			return err.Error()
+		} else {
+			G.CopyFolder(meta.Id, new_dir.Id)
+		}
+		link = G.FormatLink(new_dir.Id)
+	} else {
+		file, err := G.CopyFile(meta.Id, utils.GetGDriveParentId())
+		if err != nil {
+			return err.Error()
+		}
+		link = G.FormatLink(file.Id)
+		G.TotalLength += meta.Size
+	}
+	log.Println("CloneDone: " + meta.Name)
+	out_str := fmt.Sprintf("<a href='%s'>%s</a> (%s)", link, meta.Name, utils.GetHumanBytes(G.TotalLength))
+	return out_str
+}
+
+func (G *GoogleDriveClient) CopyFolder(folderId, parentId string) {
+	files := G.ListFilesByParentId(folderId, "", -1)
+	for _, file := range files {
+		if file.MimeType == G.GDRIVE_DIR_MIMETYPE {
+			new_dir, err := G.CreateDir(file.Name, parentId)
+			if err != nil {
+				log.Println("GDriveCreateDir: " + err.Error())
+			} else {
+				G.CopyFolder(file.Id, new_dir.Id)
+			}
+		} else {
+			_, err := G.CopyFile(file.Id, parentId)
+			if err != nil {
+				log.Println("GDriveCopy: " + err.Error())
+			}
+			G.TotalLength += file.Size
+		}
+	}
+
+}
+
+func (G *GoogleDriveClient) CopyFile(fileId, parentId string) (*drive.File, error) {
+	f := &drive.File{
+		Parents: []string{parentId},
+	}
+	file, err := G.DriveSrv.Files.Copy(fileId, f).SupportsAllDrives(true).SupportsTeamDrives(true).Do()
+	if err != nil {
+		return file, err
+	}
+	if !utils.IsTeamDrive() {
+		err = G.SetPermissions(file.Id)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+	return file, err
 }
 
 func NewGDriveClient(size int64, listener *MirrorListener) *GoogleDriveClient {

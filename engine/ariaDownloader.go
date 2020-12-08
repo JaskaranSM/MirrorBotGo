@@ -190,7 +190,7 @@ func (t *AriaDownloader) AddDownload(link string, listener *MirrorListener) erro
 	pth := path.Join(utils.GetDownloadDir(), utils.ParseIntToString(listener.GetUid()))
 	opt := make(map[string]string)
 	opt["dir"] = pth
-	ariaGid, err := client.AddURI(link, opt)
+	ariaGid, err := client.AddURI([]string{link}, opt)
 	if err != nil {
 		return err
 	}

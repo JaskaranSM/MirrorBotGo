@@ -9,6 +9,7 @@ import (
 	"math"
 	"mime"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"reflect"
@@ -29,8 +30,9 @@ const MaxMessageTextLength int = 4000
 var PROGRESS_INCOMPLETE []string = []string{"▏", "▎", "▍", "▌", "▋", "▊", "▉"}
 
 const (
-	MAGNET_REGEX string = "magnet:\\?xt=urn:btih:[a-zA-Z0-9]*"
-	URL_REGEX    string = "(?:(?:https?|ftp):\\/\\/)?[\\w/\\-?=%.]+\\.[\\w/\\-?=%.]+"
+	MAGNET_REGEX     string = "magnet:\\?xt=urn:btih:[a-zA-Z0-9]*"
+	URL_REGEX        string = "(?:(?:https?|ftp):\\/\\/)?[\\w/\\-?=%.]+\\.[\\w/\\-?=%.]+"
+	DRIVE_LINK_REGEX string = `https://drive\.google\.com/(drive)?/?u?/?\d?/?(mobile)?/?(file)?(folders)?/?d?/([-\w]+)[?+]?/?(w+)?`
 )
 
 func IsMagnetLink(link string) bool {
@@ -357,4 +359,26 @@ func ParseInterfaceToInt(i interface{}) int {
 		return int(i.(int32))
 	}
 	return int(i.(int64))
+}
+
+func GetFileIdByGDriveLink(link string) string {
+	match := regexp.MustCompile(DRIVE_LINK_REGEX)
+	matches := match.FindStringSubmatch(link)
+	if len(matches) >= 2 {
+		return matches[len(matches)-2]
+	}
+	urlParsed, err := url.Parse(link)
+	if err != nil {
+		return ""
+	}
+	values := urlParsed.Query()
+	if len(values) == 0 {
+		return ""
+	}
+	for i, j := range values {
+		if i == "id" {
+			return j[0]
+		}
+	}
+	return ""
 }

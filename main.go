@@ -6,13 +6,14 @@ import (
 	"MirrorBotGo/engine"
 	"MirrorBotGo/modules/authorization"
 	"MirrorBotGo/modules/cancelmirror"
+	"MirrorBotGo/modules/clone"
 	"MirrorBotGo/modules/goexec"
 	"MirrorBotGo/modules/list"
 	"MirrorBotGo/modules/mirror"
 	"MirrorBotGo/modules/mirrorstatus"
+	"MirrorBotGo/modules/ping"
 	"MirrorBotGo/modules/start"
 	"MirrorBotGo/modules/stats"
-	"MirrorBotGo/modules/ping"
 	"MirrorBotGo/utils"
 	"net/http"
 	"os"
@@ -34,6 +35,7 @@ func RegisterAllHandlers(updater *gotgbot.Updater, l *zap.SugaredLogger) {
 	authorization.LoadAuthorizationHandlers(updater, l)
 	stats.LoadStatsHandler(updater, l)
 	ping.LoadPingHandler(updater, l)
+	clone.LoadCloneHandler(updater, l)
 }
 
 func main() {
