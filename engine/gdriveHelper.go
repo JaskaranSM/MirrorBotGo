@@ -303,18 +303,18 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string) (*driv
 	return file, nil
 }
 
-func (G *GoogleDriveClient) Clone(fileId string) string {
+func (G *GoogleDriveClient) Clone(fileId string) (string, error) {
 	var link string
 	meta, err := G.GetFileMetadata(fileId)
 	if err != nil {
-		return err.Error()
+		return link, err
 	}
 	log.Println("Cloning: " + meta.Name)
 	if meta.MimeType == G.GDRIVE_DIR_MIMETYPE {
 		new_dir, err := G.CreateDir(meta.Name, utils.GetGDriveParentId())
 		if err != nil {
 			log.Println("GDriveCreateDir: " + err.Error())
-			return err.Error()
+			return link, err
 		} else {
 			G.CopyFolder(meta.Id, new_dir.Id)
 		}
@@ -322,14 +322,22 @@ func (G *GoogleDriveClient) Clone(fileId string) string {
 	} else {
 		file, err := G.CopyFile(meta.Id, utils.GetGDriveParentId())
 		if err != nil {
-			return err.Error()
+			return link, err
 		}
 		link = G.FormatLink(file.Id)
 		G.TotalLength += meta.Size
 	}
 	log.Println("CloneDone: " + meta.Name)
 	out_str := fmt.Sprintf("<a href='%s'>%s</a> (%s)", link, meta.Name, utils.GetHumanBytes(G.TotalLength))
-	return out_str
+	in_url := utils.GetIndexUrl()
+	if in_url != "" {
+		in_url = in_url + "/" + meta.Name
+		if meta.MimeType == G.GDRIVE_DIR_MIMETYPE {
+			in_url += "/"
+		}
+		out_str += fmt.Sprintf("\n\n Shareable Link: <a href='%s'>here</a>", in_url)
+	}
+	return out_str, nil
 }
 
 func (G *GoogleDriveClient) CopyFolder(folderId, parentId string) {
@@ -411,7 +419,7 @@ func (g *GoogleDriveStatus) GetStatusType() string {
 }
 
 func (g *GoogleDriveStatus) Path() string {
-	return path.Join(utils.GetDownloadDir(), g.Gid(), g.Name())
+	return path.Join(utils.GetDownloadDir(), utils.ParseIntToString(g.GetListener().GetUid()), g.Name())
 }
 
 func (g *GoogleDriveStatus) Percentage() float32 {

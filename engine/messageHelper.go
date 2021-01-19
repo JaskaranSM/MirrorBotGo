@@ -81,7 +81,7 @@ func GetReadableProgressMessage() string {
 		dl := dls[i]
 		msg += fmt.Sprintf("<i>%s</i> -", dl.Name())
 		msg += fmt.Sprintf(" %s\n", dl.GetStatusType())
-		if dl.GetStatusType() != MirrorStatusArchiving {
+		if dl.GetStatusType() != "bruh" {
 			msg += fmt.Sprintf("<code>%s %.2f%% </code>", utils.GetProgressBarString(int(dl.CompletedLength()), int(dl.TotalLength())), dl.Percentage())
 			msg += fmt.Sprintf(", %s of ", utils.GetHumanBytes(dl.CompletedLength()))
 			msg += fmt.Sprintf("%s at ", utils.GetHumanBytes(dl.TotalLength()))

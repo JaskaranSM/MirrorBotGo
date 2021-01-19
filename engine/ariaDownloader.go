@@ -2,83 +2,97 @@ package engine
 
 import (
 	"MirrorBotGo/utils"
-	"context"
+	"fmt"
 	"log"
 	"path"
 	"time"
 
-	"github.com/zyxar/argo/rpc"
+	"github.com/coolerfall/aria2go"
 )
 
-var client rpc.Client = getSession()
+//AriaStatusCodeToString get status as string
+func AriaStatusCodeToString(code int) string {
+	if code == -1 {
+		return "Unknown"
+	}
+	switch code {
+	case 0:
+		return MirrorStatusDownloading
+	case 1:
+		return MirrorStatusWaiting
+	case 2:
+		return MirrorStatusCanceled
+	case 3:
+		return MirrorStatusDownloading
+	case 4:
+		return MirrorStatusFailed
+	case 5:
+		return MirrorStatusCanceled
+	}
+	return "Unknown"
+}
+
+var client *aria2go.Aria2 = getSession()
 var ariaDownloader *AriaDownloader = getAriaDownloader()
 
 type Aria2Listener struct {
 	dl string
 }
 
-func (a Aria2Listener) OnDownloadStart(events []rpc.Event) {
+func (a Aria2Listener) OnStart(gid string) {
 	log.Println("[OnDownloadStart]")
 }
 
-func (a Aria2Listener) OnDownloadStop(events []rpc.Event) {
+func (a Aria2Listener) OnStop(gid string) {
 	log.Println("[OnDownloadStop]")
-	for _, event := range events {
-		dl := GetMirrorByGid(event.Gid)
-		if dl != nil {
-			go dl.GetListener().OnDownloadError("Canceled by Stop event.")
-		}
+	dl := GetMirrorByGid(gid)
+	if dl != nil {
+		go dl.GetListener().OnDownloadError("Canceled by Stop event.")
 	}
 }
 
-func (a Aria2Listener) OnDownloadError(events []rpc.Event) {
+func (a Aria2Listener) OnError(gid string) {
 	log.Println("[OnDownloadError]")
-	for _, event := range events {
-		ariaDl, _ := client.TellStatus(event.Gid)
-		dl := GetMirrorByGid(event.Gid)
-		if dl != nil {
-			go dl.GetListener().OnDownloadError(ariaDl.ErrorMessage)
-		}
+	dl := GetMirrorByGid(gid)
+	dlinfo := client.GetDownloadInfo(gid)
+	if dl != nil {
+		go dl.GetListener().OnDownloadError(utils.ParseIntToString(dlinfo.ErrorCode))
 	}
 }
 
-func (a Aria2Listener) OnDownloadPause(events []rpc.Event) {
+func (a Aria2Listener) OnPause(gid string) {
 	log.Println("[OnDownloadPause]")
 }
 
-func (a Aria2Listener) OnDownloadComplete(events []rpc.Event) {
-	log.Println("[OnDownloadComplete]")
-	for _, event := range events {
-		ariaDl, _ := client.TellStatus(event.Gid)
-		dl := GetMirrorByGid(event.Gid)
-		if dl != nil {
-			listener := dl.GetListener()
-			if len(ariaDl.FollowedBy) != 0 {
-				status := NewAriaDownloadStatus(dl.Name(), ariaDl.FollowedBy[0], listener)
-				status.Index_ = dl.Index()
-				AddMirrorLocal(listener.GetUid(), status)
-				go listener.OnDownloadStart(status.Gid())
-			} else {
-				go listener.OnDownloadComplete()
-			}
+func (a Aria2Listener) OnComplete(gid string) {
+	log.Println("[OnDownloadComplete]: ", gid)
+	dinfo := client.GetDownloadInfo(gid)
+	dl := GetMirrorByGid(gid)
+	if dl != nil {
+		listener := dl.GetListener()
+		if dinfo.FollowedByGid != "0" {
+			status := NewAriaDownloadStatus(dl.Name(), dinfo.FollowedByGid, listener)
+			status.Index_ = dl.Index()
+			AddMirrorLocal(listener.GetUid(), status)
+			go listener.OnDownloadStart(status.Gid())
+		} else {
+			go listener.OnDownloadComplete()
 		}
 	}
 }
 
-func (a Aria2Listener) OnBtDownloadComplete(events []rpc.Event) {
-	log.Println("[OnBtDownloadComplete]")
-	log.Println(events)
-}
-
-func getSession() rpc.Client {
-	RPC_URL := "http://localhost:6800/jsonrpc"
-	RPC_TOKEN := ""
+func getSession() *aria2go.Aria2 {
 	notifier := Aria2Listener{}
-	client, err := rpc.New(context.Background(), RPC_URL, RPC_TOKEN, 20*time.Second, notifier)
-	if err != nil {
-		log.Fatalf("Unable to start Aria2 Client: %v", err)
-	}
-	return client
+	a := aria2go.NewAria2(aria2go.Config{
+		Options: aria2go.Options{
+			"seed-time":                "0.01",
+			"max-overall-upload-limit": "1K",
+			"max-concurrent-downloads": "3",
+		},
+	})
+	a.SetNotifier(notifier)
+	go a.Run()
+	return a
 }
 
 func getAriaDownloader() *AriaDownloader {
@@ -93,18 +107,18 @@ type AriaDownloadStatus struct {
 	name     string
 }
 
-func (t *AriaDownloadStatus) GetStats() rpc.StatusInfo {
-	stats, _ := client.TellStatus(t.ariaGid)
+func (t *AriaDownloadStatus) GetStats() aria2go.DownloadInfo {
+	stats := client.GetDownloadInfo(t.ariaGid)
 	return stats
 }
 
 func (t *AriaDownloadStatus) Name() string {
 	stats := t.GetStats()
-	if stats.BitTorrent.Info.Name != "" {
-		return stats.BitTorrent.Info.Name
+	if stats.MetaInfo.Name != "" {
+		return stats.MetaInfo.Name
 	}
 	if len(stats.Files) != 0 {
-		pth := utils.GetFileBaseName(stats.Files[0].Path)
+		pth := utils.GetFileBaseName(stats.Files[0].Name)
 		if pth != "" {
 			t.name = pth
 		}
@@ -114,17 +128,17 @@ func (t *AriaDownloadStatus) Name() string {
 
 func (t *AriaDownloadStatus) CompletedLength() int64 {
 	stats := t.GetStats()
-	return utils.ParseStringToInt64(stats.CompletedLength)
+	return stats.BytesCompleted
 }
 
 func (t *AriaDownloadStatus) TotalLength() int64 {
 	stats := t.GetStats()
-	return utils.ParseStringToInt64(stats.TotalLength)
+	return stats.TotalLength
 }
 
 func (t *AriaDownloadStatus) Speed() int64 {
 	stats := t.GetStats()
-	return utils.ParseStringToInt64(stats.DownloadSpeed)
+	return int64(stats.DownloadSpeed)
 }
 
 func (t *AriaDownloadStatus) ETA() *time.Duration {
@@ -145,16 +159,7 @@ func (t *AriaDownloadStatus) Percentage() float32 {
 
 func (t *AriaDownloadStatus) GetStatusType() string {
 	stats := t.GetStats()
-	if stats.Status == "paused" {
-		return MirrorStatusCanceled
-	} else if stats.Status == "error" {
-		return MirrorStatusFailed
-	} else if stats.Status == "waiting" {
-		return MirrorStatusWaiting
-	} else if stats.Status == "removed" {
-		return MirrorStatusCanceled
-	}
-	return MirrorStatusDownloading
+	return AriaStatusCodeToString(stats.Status)
 }
 
 func (t *AriaDownloadStatus) Path() string {
@@ -170,10 +175,7 @@ func (t *AriaDownloadStatus) Index() int {
 }
 
 func (t *AriaDownloadStatus) CancelMirror() bool {
-	_, err := client.Remove(t.Gid())
-	if err != nil {
-		log.Println(err)
-	}
+	client.Remove(t.Gid())
 	t.GetListener().OnDownloadError("Canceled by user.")
 	return true
 }
@@ -190,7 +192,8 @@ func (t *AriaDownloader) AddDownload(link string, listener *MirrorListener) erro
 	pth := path.Join(utils.GetDownloadDir(), utils.ParseIntToString(listener.GetUid()))
 	opt := make(map[string]string)
 	opt["dir"] = pth
-	ariaGid, err := client.AddURI([]string{link}, opt)
+	fmt.Println("Adding download: ", link)
+	ariaGid, err := client.AddUri(link, opt)
 	if err != nil {
 		return err
 	}

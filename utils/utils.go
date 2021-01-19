@@ -56,6 +56,7 @@ type ConfigJson struct {
 	STATUS_UPDATE_INTERVAL int    `json:"status_update_interval"`
 	AUTO_DELETE_TIMEOUT    int    `json:"auto_delete_timeout"`
 	DB_URI                 string `json:"db_uri"`
+	INDEX_URL              string `json:"index_url"`
 }
 
 var Config *ConfigJson = InitConfig()
@@ -106,6 +107,10 @@ func IsUserSudo(userId int) bool {
 
 func GetDownloadDir() string {
 	return Config.DOWNLOAD_DIR
+}
+
+func GetIndexUrl() string {
+	return Config.INDEX_URL
 }
 
 func GetAutoDeleteTimeOut() time.Duration {
@@ -381,4 +386,14 @@ func GetFileIdByGDriveLink(link string) string {
 		}
 	}
 	return ""
+}
+
+func IsPathDir(pth string) bool {
+	fi, err := os.Stat(pth)
+	if err != nil {
+		log.Println("CheckPathError: " + err.Error())
+		return false
+	}
+	mode := fi.Mode()
+	return mode.IsDir()
 }

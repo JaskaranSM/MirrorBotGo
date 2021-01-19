@@ -34,10 +34,19 @@ func ListHandler(b ext.Bot, u *gotgbot.Update) error {
 	}
 	for _, file := range files {
 		if file.MimeType == drive.GDRIVE_DIR_MIMETYPE {
-			outMsg += fmt.Sprintf("⁍ <a href='%s'>%s</a> (folder)\n", drive.FormatLink(file.Id), file.Name)
+			outMsg += fmt.Sprintf("⁍ <a href='%s'>%s</a> (folder)", drive.FormatLink(file.Id), file.Name)
 		} else {
-			outMsg += fmt.Sprintf("⁍ <a href='%s'>%s</a> (%s)\n", drive.FormatLink(file.Id), file.Name, utils.GetHumanBytes(file.Size))
+			outMsg += fmt.Sprintf("⁍ <a href='%s'>%s</a> (%s)", drive.FormatLink(file.Id), file.Name, utils.GetHumanBytes(file.Size))
 		}
+		in_url := utils.GetIndexUrl()
+		if in_url != "" {
+			in_url = in_url + "/" + file.Name
+			if file.MimeType == drive.GDRIVE_DIR_MIMETYPE {
+				in_url += "/"
+			}
+			outMsg += fmt.Sprintf(" | <a href='%s'>Index url</a>", in_url)
+		}
+		outMsg += "\n"
 	}
 	out, err = engine.SendMessage(b, outMsg, message)
 	if err != nil {

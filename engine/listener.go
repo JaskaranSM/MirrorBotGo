@@ -12,9 +12,10 @@ import (
 )
 
 type MirrorListener struct {
-	Update *gotgbot.Update
-	bot    ext.Bot
-	isTar  bool
+	Update     *gotgbot.Update
+	bot        ext.Bot
+	isTar      bool
+	isCanceled bool
 }
 
 func (m *MirrorListener) GetUid() int {
@@ -46,10 +47,11 @@ func (m *MirrorListener) OnDownloadComplete() {
 	path := dl.Path()
 	log.Printf("[DownloadComplete]: %s (%d)\n", name, size)
 	if m.isTar {
-		tarStatus := NewTarStatus(dl.Gid(), dl.Name(), nil)
+		archiver := NewTarArchiver(NewProgress(), dl.TotalLength())
+		tarStatus := NewTarStatus(dl.Gid(), dl.Name(), nil, archiver)
 		tarStatus.Index_ = dl.Index()
 		AddMirrorLocal(m.GetUid(), tarStatus)
-		path = TarPath(path)
+		path = archiver.TarPath(path)
 	}
 	drive := NewGDriveClient(size, dl.GetListener())
 	drive.Init("")
@@ -61,6 +63,10 @@ func (m *MirrorListener) OnDownloadComplete() {
 	drive.Upload(path)
 }
 func (m *MirrorListener) OnDownloadError(err string) {
+	if m.isCanceled {
+		return
+	}
+	m.isCanceled = true
 	fmt.Println("DownloadError: " + err)
 	dl := m.GetDownload()
 	name := dl.Name()
@@ -89,6 +95,14 @@ func (m *MirrorListener) OnUploadComplete(link string) {
 	size := dl.TotalLength()
 	log.Printf("[UploadComplete]: %s (%d)\n", name, size)
 	msg := fmt.Sprintf("<a href='%s'>%s</a> (%s)", link, dl.Name(), utils.GetHumanBytes(dl.TotalLength()))
+	in_url := utils.GetIndexUrl()
+	if in_url != "" {
+		in_url = in_url + "/" + name
+		if utils.IsPathDir(dl.Path()) {
+			in_url += "/"
+		}
+		msg += fmt.Sprintf("\n\n Shareable Link: <a href='%s'>here</a>", in_url)
+	}
 	m.Clean()
 	SendMessage(m.bot, msg, m.Update.Message)
 	utils.RemoveByPath(path.Join(utils.GetDownloadDir(), utils.ParseIntToString(m.GetUid())))

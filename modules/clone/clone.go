@@ -35,9 +35,15 @@ func CloneHandler(b ext.Bot, u *gotgbot.Update) error {
 			drive_client := engine.NewGDriveClient(0, nil)
 			drive_client.Init("")
 			drive_client.Authorize()
-			out_link := drive_client.Clone(fileId)
+			out_link, err := drive_client.Clone(fileId)
+			if err != nil {
+				_, err = engine.SendMessage(b, "CloneError: "+err.Error(), message)
+				if err != nil {
+					log.Println("SendMessage: " + err.Error())
+				}
+			}
 			engine.DeleteMessage(b, msg)
-			_, err := engine.SendMessage(b, out_link, message)
+			_, err = engine.SendMessage(b, out_link, message)
 			if err != nil {
 				log.Println("SendMessage: " + err.Error())
 			}
