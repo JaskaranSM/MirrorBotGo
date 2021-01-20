@@ -8,7 +8,6 @@ import (
 	"github.com/mholt/archiver"
 )
 
-// I do not have method to get progress of tar archivals, so adding methods with dummy methods for MirrorStatus interface implementation.
 type TarStatus struct {
 	name     string
 	listener *MirrorListener
@@ -76,6 +75,7 @@ type TarArchiver struct {
 	Speed     int64
 	StartTime time.Time
 	Completed int64
+	isDone    bool
 	Total     int64
 	ETA       time.Duration
 }
@@ -111,6 +111,9 @@ func (t *TarArchiver) OnTarProgress() {
 
 func (t *TarArchiver) ProgressLoop() {
 	for {
+		if t.isDone {
+			break
+		}
 		t.OnTarProgress()
 		time.Sleep(1 * time.Second)
 	}
@@ -124,6 +127,11 @@ func (t *TarArchiver) TarPath(path string) string {
 	tar.Prg = t.Prg
 	tar.ImplicitTopLevelFolder = true
 	go t.ProgressLoop()
-	tar.Archive([]string{path}, outPath)
+	err := tar.Archive([]string{path}, outPath)
+	t.isDone = true
+	if err != nil {
+		log.Printf("[TarError]: %v, uploading without tar.\n", err)
+		return path
+	}
 	return outPath
 }

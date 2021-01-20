@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func Mirror(b ext.Bot, u *gotgbot.Update, isTar bool) error {
+func Mirror(b ext.Bot, u *gotgbot.Update, isTar bool, doUnArchive bool) error {
 	message := u.EffectiveMessage
 	var link string
 	if message.ReplyToMessage != nil && message.ReplyToMessage.Document != nil {
@@ -30,7 +30,7 @@ func Mirror(b ext.Bot, u *gotgbot.Update, isTar bool) error {
 		engine.SendMessage(b, "No Source Provided.", message)
 		return nil
 	}
-	listener := engine.NewMirrorListener(b, u, isTar)
+	listener := engine.NewMirrorListener(b, u, isTar, doUnArchive)
 	err := engine.NewAriaDownload(link, &listener)
 	if err != nil {
 		engine.SendMessage(b, err.Error(), message)
@@ -47,18 +47,26 @@ func MirrorHandler(b ext.Bot, u *gotgbot.Update) error {
 	if !db.IsAuthorized(u.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, u, false)
+	return Mirror(b, u, false, false)
 }
 
 func TarMirrorHandler(b ext.Bot, u *gotgbot.Update) error {
 	if !db.IsAuthorized(u.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, u, true)
+	return Mirror(b, u, true, false)
+}
+
+func UnArchMirrorHandler(b ext.Bot, u *gotgbot.Update) error {
+	if !db.IsAuthorized(u.EffectiveMessage) {
+		return nil
+	}
+	return Mirror(b, u, false, true)
 }
 
 func LoadMirrorHandlers(updater *gotgbot.Updater, l *zap.SugaredLogger) {
 	defer l.Info("Mirror Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("mirror", MirrorHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("tarmirror", TarMirrorHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("unarchmirror", UnArchMirrorHandler))
 }

@@ -12,10 +12,11 @@ import (
 )
 
 type MirrorListener struct {
-	Update     *gotgbot.Update
-	bot        ext.Bot
-	isTar      bool
-	isCanceled bool
+	Update      *gotgbot.Update
+	bot         ext.Bot
+	isTar       bool
+	doUnArchive bool
+	isCanceled  bool
 }
 
 func (m *MirrorListener) GetUid() int {
@@ -52,6 +53,19 @@ func (m *MirrorListener) OnDownloadComplete() {
 		tarStatus.Index_ = dl.Index()
 		AddMirrorLocal(m.GetUid(), tarStatus)
 		path = archiver.TarPath(path)
+	}
+	if m.doUnArchive {
+		cntSize, err := GetArchiveContentSize(path)
+		if err != nil {
+			log.Printf("cannot get archive content size: %v,uploading without unarchive\n", err)
+		} else {
+			size = cntSize
+			unarchiver := NewUnArchiver(NewProgress(), size)
+			unArchiverStatus := NewUnArchiverStatus(dl.Gid(), dl.Name(), nil, unarchiver)
+			unArchiverStatus.Index_ = dl.Index()
+			AddMirrorLocal(m.GetUid(), unArchiverStatus)
+			path = unarchiver.UnArchivePath(path)
+		}
 	}
 	drive := NewGDriveClient(size, dl.GetListener())
 	drive.Init("")
@@ -108,8 +122,8 @@ func (m *MirrorListener) OnUploadComplete(link string) {
 	utils.RemoveByPath(path.Join(utils.GetDownloadDir(), utils.ParseIntToString(m.GetUid())))
 }
 
-func NewMirrorListener(b ext.Bot, update *gotgbot.Update, isTar bool) MirrorListener {
-	return MirrorListener{bot: b, Update: update, isTar: isTar}
+func NewMirrorListener(b ext.Bot, update *gotgbot.Update, isTar bool, doUnArchive bool) MirrorListener {
+	return MirrorListener{bot: b, Update: update, isTar: isTar, doUnArchive: doUnArchive}
 }
 
 type MirrorStatus interface {

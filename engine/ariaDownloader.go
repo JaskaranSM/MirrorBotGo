@@ -85,9 +85,13 @@ func getSession() *aria2go.Aria2 {
 	notifier := Aria2Listener{}
 	a := aria2go.NewAria2(aria2go.Config{
 		Options: aria2go.Options{
-			"seed-time":                "0.01",
-			"max-overall-upload-limit": "1K",
-			"max-concurrent-downloads": "3",
+			"seed-time":                 "0.01",
+			"max-overall-upload-limit":  "1K",
+			"max-concurrent-downloads":  "3",
+			"max-connection-per-server": "10",
+			"split":                     "10",
+			"min-split-size":            "10M",
+			"allow-overwrite":           "true",
 		},
 	})
 	a.SetNotifier(notifier)

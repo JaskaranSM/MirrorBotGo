@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -396,4 +397,34 @@ func IsPathDir(pth string) bool {
 	}
 	mode := fi.Mode()
 	return mode.IsDir()
+}
+
+func GetFileBaseNameNoExt(path string) string {
+	basename := GetFileBaseName(path)
+	return strings.TrimSuffix(basename, filepath.Ext(basename))
+}
+
+func TrimExt(path string) string {
+	return strings.TrimSuffix(path, filepath.Ext(path))
+}
+
+func GetLinksFromTextFileLink(url string) ([]string, error) {
+	var links []string
+	res, err := http.Get(url)
+	if err != nil {
+		return links, err
+	}
+	defer res.Body.Close()
+	cnt, err := ioutil.ReadAll(res.Body)
+	if err != nil {
+		return links, err
+	}
+	cntString := string(cnt)
+	data := strings.Split(cntString, "\n")
+	for _, d := range data {
+		if d != "" {
+			links = append(links, d)
+		}
+	}
+	return links, nil
 }

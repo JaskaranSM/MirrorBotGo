@@ -14,6 +14,7 @@ const (
 	MirrorStatusDownloading = "Downloading"
 	MirrorStatusUploading   = "Uploading"
 	MirrorStatusArchiving   = "Archiving"
+	MirrorStatusUnArchiving = "UnArchiving"
 	MirrorStatusWaiting     = "Queued"
 	MirrorStatusFailed      = "Failed"
 	MirrorStatusCanceled    = "Canceled"
