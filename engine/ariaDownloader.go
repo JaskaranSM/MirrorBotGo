@@ -56,7 +56,9 @@ func (a Aria2Listener) OnStop(gid string) {
 func (a Aria2Listener) OnError(gid string) {
 	log.Println("[OnDownloadError]")
 	dl := GetMirrorByGid(gid)
+	ariaMutex.Lock()
 	dlinfo := client.GetDownloadInfo(gid)
+	ariaMutex.Unlock()
 	if dl != nil {
 		go dl.GetListener().OnDownloadError(utils.ParseIntToString(dlinfo.ErrorCode))
 	}
@@ -68,7 +70,9 @@ func (a Aria2Listener) OnPause(gid string) {
 
 func (a Aria2Listener) OnComplete(gid string) {
 	log.Println("[OnDownloadComplete]: ", gid)
+	ariaMutex.Lock()
 	dinfo := client.GetDownloadInfo(gid)
+	ariaMutex.Unlock()
 	dl := GetMirrorByGid(gid)
 	if dl != nil {
 		listener := dl.GetListener()
@@ -92,6 +96,7 @@ func getSession() *aria2go.Aria2 {
 			"max-concurrent-downloads":  "3",
 			"max-connection-per-server": "10",
 			"split":                     "10",
+			"follow-torrent":            "mem",
 			"min-split-size":            "10M",
 			"allow-overwrite":           "true",
 		},
@@ -114,14 +119,19 @@ type AriaDownloadStatus struct {
 }
 
 func (t *AriaDownloadStatus) GetStats() aria2go.DownloadInfo {
+	ariaMutex.Lock()
 	stats := client.GetDownloadInfo(t.ariaGid)
+	ariaMutex.Unlock()
 	return stats
 }
 
 func (t *AriaDownloadStatus) Name() string {
 	stats := t.GetStats()
 	if stats.MetaInfo.Name != "" {
-		return stats.MetaInfo.Name
+		t.name = stats.MetaInfo.Name
+	}
+	if t.name != "" {
+		return t.name
 	}
 	if len(stats.Files) != 0 {
 		pth := utils.GetFileBaseName(stats.Files[0].Name)
@@ -129,6 +139,7 @@ func (t *AriaDownloadStatus) Name() string {
 			t.name = pth
 		}
 	}
+
 	return t.name
 }
 
