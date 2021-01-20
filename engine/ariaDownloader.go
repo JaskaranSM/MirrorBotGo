@@ -112,10 +112,11 @@ func getAriaDownloader() *AriaDownloader {
 }
 
 type AriaDownloadStatus struct {
-	ariaGid  string
-	listener *MirrorListener
-	Index_   int
-	name     string
+	ariaGid   string
+	listener  *MirrorListener
+	Index_    int
+	isTorrent bool
+	name      string
 }
 
 func (t *AriaDownloadStatus) GetStats() aria2go.DownloadInfo {
@@ -129,17 +130,14 @@ func (t *AriaDownloadStatus) Name() string {
 	stats := t.GetStats()
 	if stats.MetaInfo.Name != "" {
 		t.name = stats.MetaInfo.Name
+		t.isTorrent = true
 	}
-	if t.name != "" {
-		return t.name
-	}
-	if len(stats.Files) != 0 {
+	if !t.isTorrent && len(stats.Files) != 0 {
 		pth := utils.GetFileBaseName(stats.Files[0].Name)
 		if pth != "" {
 			t.name = pth
 		}
 	}
-
 	return t.name
 }
 
