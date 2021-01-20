@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"path"
+	"sync"
 	"time"
 
 	"github.com/coolerfall/aria2go"
@@ -34,6 +35,7 @@ func AriaStatusCodeToString(code int) string {
 
 var client *aria2go.Aria2 = getSession()
 var ariaDownloader *AriaDownloader = getAriaDownloader()
+var ariaMutex sync.Mutex
 
 type Aria2Listener struct {
 	dl string
@@ -197,7 +199,9 @@ func (t *AriaDownloader) AddDownload(link string, listener *MirrorListener) erro
 	opt := make(map[string]string)
 	opt["dir"] = pth
 	fmt.Println("Adding download: ", link)
+	ariaMutex.Lock() //libaria2 is not thread safe
 	ariaGid, err := client.AddUri(link, opt)
+	ariaMutex.Unlock()
 	if err != nil {
 		return err
 	}

@@ -141,13 +141,13 @@ func (G *GoogleDriveClient) Upload(path string) bool {
 	var err error
 	f, err = os.Stat(path)
 	if err != nil {
-		G.Listener.OnDownloadError(err.Error())
+		G.Listener.OnUploadError(err.Error())
 		return false
 	}
 	if f.IsDir() {
 		file, err = G.CreateDir(f.Name(), utils.GetGDriveParentId())
 		if err != nil {
-			G.Listener.OnDownloadError(err.Error())
+			G.Listener.OnUploadError(err.Error())
 			return false
 		}
 		G.UploadDirRec(path, file.Id)
@@ -155,7 +155,7 @@ func (G *GoogleDriveClient) Upload(path string) bool {
 	} else {
 		file, err = G.UploadFile(utils.GetGDriveParentId(), path)
 		if err != nil {
-			G.Listener.OnDownloadError(err.Error())
+			G.Listener.OnUploadError(err.Error())
 			return false
 		}
 		link = G.FormatLink(file.Id)
@@ -174,14 +174,14 @@ func (G *GoogleDriveClient) UploadDirRec(directoryPath string, parentId string) 
 		if f.IsDir() {
 			file, err := G.CreateDir(f.Name(), parentId)
 			if err != nil {
-				G.Listener.OnDownloadError(err.Error())
+				G.Listener.OnUploadError(err.Error())
 				return false
 			}
 			G.UploadDirRec(currentFile, file.Id)
 		} else {
 			file, err := G.UploadFile(parentId, currentFile)
 			if err != nil {
-				G.Listener.OnDownloadError(err.Error())
+				G.Listener.OnUploadError(err.Error())
 				return false
 			} else {
 				log.Println("Uploaded File: ", file.Id)

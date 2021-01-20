@@ -33,12 +33,12 @@ func (m *MirrorListener) OnDownloadStart(text string) {
 }
 
 func (m *MirrorListener) Clean() {
-	MoveMirrorToCancel(m.GetUid(), GetMirrorByUid(m.GetUid()))
-	RemoveMirrorLocal(m.GetUid())
 	if GetAllMirrorsCount() == 0 {
 		DeleteAllMessages(m.bot)
 	}
 	UpdateAllMessages(m.bot)
+	MoveMirrorToCancel(m.GetUid(), GetMirrorByUid(m.GetUid()))
+	RemoveMirrorLocal(m.GetUid())
 }
 
 func (m *MirrorListener) OnDownloadComplete() {
@@ -117,9 +117,10 @@ func (m *MirrorListener) OnUploadComplete(link string) {
 		}
 		msg += fmt.Sprintf("\n\n Shareable Link: <a href='%s'>here</a>", in_url)
 	}
-	m.Clean()
 	SendMessage(m.bot, msg, m.Update.Message)
-	utils.RemoveByPath(path.Join(utils.GetDownloadDir(), utils.ParseIntToString(m.GetUid())))
+	rmpath := path.Join(utils.GetDownloadDir(), utils.ParseIntToString(m.GetUid()))
+	m.Clean()
+	utils.RemoveByPath(rmpath)
 }
 
 func NewMirrorListener(b ext.Bot, update *gotgbot.Update, isTar bool, doUnArchive bool) MirrorListener {
