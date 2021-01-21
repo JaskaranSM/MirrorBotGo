@@ -5,6 +5,7 @@ import (
 	"MirrorBotGo/db"
 	"MirrorBotGo/engine"
 	"MirrorBotGo/modules/authorization"
+	"MirrorBotGo/modules/botlog"
 	"MirrorBotGo/modules/cancelmirror"
 	"MirrorBotGo/modules/clone"
 	"MirrorBotGo/modules/goexec"
@@ -15,6 +16,8 @@ import (
 	"MirrorBotGo/modules/start"
 	"MirrorBotGo/modules/stats"
 	"MirrorBotGo/utils"
+	"io"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -36,14 +39,26 @@ func RegisterAllHandlers(updater *gotgbot.Updater, l *zap.SugaredLogger) {
 	stats.LoadStatsHandler(updater, l)
 	ping.LoadPingHandler(updater, l)
 	clone.LoadCloneHandler(updater, l)
+	botlog.LoadLogHandler(updater, l)
 }
 
 func main() {
+	engine.InitLog()
+	handle, err := engine.GetLogFileHandle()
+	if err != nil {
+		log.Println("Cannot open log file: ", err)
+	}
+	log.SetOutput(io.MultiWriter(os.Stdout, handle))
 	cfg := zap.NewProductionEncoderConfig()
 	cfg.EncodeLevel = zapcore.CapitalLevelEncoder
 	cfg.EncodeTime = zapcore.RFC3339TimeEncoder
-
-	logger := zap.New(zapcore.NewCore(zapcore.NewConsoleEncoder(cfg), os.Stdout, zap.InfoLevel))
+	handleSync, _, err := zap.Open(engine.LogFile)
+	if err != nil {
+		log.Println("Cannot open log file for zap: ", err)
+	}
+	core1 := zapcore.NewCore(zapcore.NewConsoleEncoder(cfg), os.Stdout, zap.InfoLevel)
+	core2 := zapcore.NewCore(zapcore.NewConsoleEncoder(cfg), handleSync, zap.InfoLevel)
+	logger := zap.New(zapcore.NewTee(core1, core2))
 	defer logger.Sync() // flushes buffer, if any
 	l := logger.Sugar()
 	token := utils.GetBotToken()
