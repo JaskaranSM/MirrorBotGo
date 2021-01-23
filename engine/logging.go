@@ -4,7 +4,7 @@ import (
 	"os"
 )
 
-const LogFile string = "../log.txt"
+const LogFile string = "log.txt"
 
 func InitLog() {
 	//call before starting new session

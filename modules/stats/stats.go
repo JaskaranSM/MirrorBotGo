@@ -50,6 +50,17 @@ func GetCpuUsage() string {
 	return out
 }
 
+func GetMemoryStats() string {
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+	outStr := ""
+	outStr += fmt.Sprintf("Alloc: %s\n", utils.GetHumanBytes(int64(mem.Alloc)))
+	outStr += fmt.Sprintf("TotalAlloc: %s\n", utils.GetHumanBytes(int64(mem.TotalAlloc)))
+	outStr += fmt.Sprintf("HeapAlloc: %s\n", utils.GetHumanBytes(int64(mem.HeapAlloc)))
+	outStr += fmt.Sprintf("NumGC: %d", mem.NumGC)
+	return outStr
+}
+
 func StatsHandler(b ext.Bot, u *gotgbot.Update) error {
 	if !db.IsAuthorized(u.EffectiveMessage) {
 		return nil
@@ -65,7 +76,9 @@ func StatsHandler(b ext.Bot, u *gotgbot.Update) error {
 	out += fmt.Sprintf("CPU: %s\n", GetCpuUsage())
 	out += fmt.Sprintf("RAM: %s\n", GetMemoryUsage())
 	out += fmt.Sprintf("Cores: %d\n", runtime.NumCPU())
-	out += fmt.Sprintf("Goroutines: %d", runtime.NumGoroutine())
+	out += fmt.Sprintf("Goroutines: %d\n", runtime.NumGoroutine())
+	sysStats := GetMemoryStats()
+	out += sysStats
 	engine.SendMessage(b, out, message)
 	return nil
 }
