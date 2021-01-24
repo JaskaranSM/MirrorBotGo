@@ -3,7 +3,9 @@ package engine
 import (
 	"MirrorBotGo/utils"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -27,7 +29,11 @@ type GoogleDriveClient struct {
 	CompletedLength     int64
 	LastTransferred     int64
 	Speed               int64
+	name                string
 	MaxRetries          int
+	isCancelled         bool
+	doNothing           bool
+	prg                 *ProgressContext
 	SleepTime           time.Duration
 	StartTime           time.Time
 	ETA                 time.Duration
@@ -178,6 +184,119 @@ func (G *GoogleDriveClient) Upload(path string) bool {
 	}
 	G.Listener.OnUploadComplete(link)
 	return true
+}
+
+func (G *GoogleDriveClient) IsDir(file *drive.File) bool {
+	return file.MimeType == G.GDRIVE_DIR_MIMETYPE
+}
+
+func (G *GoogleDriveClient) Download(fileId string, dir string) {
+	G.name = "getting metadata"
+	meta, err := G.GetFileMetadata(fileId)
+	if err != nil {
+		G.Listener.OnDownloadError(err.Error())
+		return
+	}
+	if G.IsDir(meta) {
+		G.GetFolderSize(meta.Id, &G.TotalLength)
+	} else {
+		G.TotalLength = meta.Size
+	}
+	G.name = meta.Name
+	log.Println(G.name)
+	local := path.Join(dir, meta.Name)
+	if G.IsDir(meta) {
+		os.Mkdir(local, 0755)
+		G.DownloadFolder(meta.Id, local)
+	} else {
+		err := G.DownloadFile(meta.Id, local, meta.Size, 1)
+		G.Clean()
+		if err != nil {
+			G.Listener.OnDownloadError(err.Error())
+			return
+		}
+	}
+	if G.doNothing {
+		return
+	}
+	if !G.isCancelled {
+		G.Listener.OnDownloadComplete()
+	} else {
+		G.Listener.OnDownloadError("Canceled by user.")
+	}
+}
+
+func (G *GoogleDriveClient) GetFolderSize(folderId string, size *int64) {
+	files := G.ListFilesByParentId(folderId, "", -1)
+	for _, file := range files {
+		if G.isCancelled {
+			return
+		}
+		if file.MimeType == G.GDRIVE_DIR_MIMETYPE {
+			G.GetFolderSize(file.Id, size)
+		} else {
+			*size += file.Size
+		}
+	}
+}
+
+func (G *GoogleDriveClient) DownloadFolder(folderId string, local string) bool {
+	files := G.ListFilesByParentId(folderId, "", -1)
+	for _, file := range files {
+		if G.isCancelled {
+			return false
+		}
+		current_path := path.Join(local, file.Name)
+		if file.MimeType == G.GDRIVE_DIR_MIMETYPE {
+			os.Mkdir(current_path, 0755)
+			G.DownloadFolder(file.Id, current_path)
+		} else {
+			err := G.DownloadFile(file.Id, current_path, file.Size, 1)
+			G.Clean()
+			if err != nil {
+				G.doNothing = true
+				G.Listener.OnDownloadError(err.Error())
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func (G *GoogleDriveClient) CancelDownload() {
+	G.isCancelled = true
+	if G.prg != nil {
+		G.prg.Cancel()
+	}
+}
+
+func (G *GoogleDriveClient) DownloadFile(fileId string, local string, size int64, retry int) error {
+	writer, err := os.OpenFile(local, os.O_WRONLY|os.O_CREATE, 0644)
+	defer writer.Close()
+	if err != nil {
+		return err
+	}
+	request := G.DriveSrv.Files.Get(fileId).SupportsAllDrives(true)
+	response, err := request.Download()
+	if err != nil {
+		if strings.Contains(strings.ToLower(err.Error()), "rate") {
+			if retry <= G.MaxRetries {
+				log.Println("Encountered: ", err.Error(), " retryin: ", retry)
+				time.Sleep(G.SleepTime)
+				G.Clean()
+				return G.DownloadFile(fileId, local, size, retry+1)
+			} else {
+				log.Println("Could not download drive file (even after retryin): " + err.Error())
+				return err
+			}
+		} else {
+			log.Println("Could not download drive file: " + err.Error())
+			return err
+		}
+	}
+	G.prg = &ProgressContext{drive: G, total: size, completed: 0}
+	_, err = io.Copy(writer, io.TeeReader(response.Body, G.prg))
+	return err
 }
 
 func (G *GoogleDriveClient) UploadDirRec(directoryPath string, parentId string) bool {
@@ -438,6 +557,80 @@ func NewGDriveClient(size int64, listener *MirrorListener) *GoogleDriveClient {
 	return &GoogleDriveClient{TotalLength: size, Listener: listener, MaxRetries: 5, SleepTime: 5 * time.Second}
 }
 
+func NewGDriveDownload(fileId string, listener *MirrorListener) {
+	client := NewGDriveClient(0, listener)
+	client.Init("")
+	client.Authorize()
+	dir := path.Join(utils.GetDownloadDir(), utils.ParseIntToString(listener.GetUid()))
+	os.MkdirAll(dir, 0755)
+	go client.Download(fileId, dir)
+	gid := utils.RandString(16)
+	status := NewGoogleDriveDownloadStatus(client, gid)
+	status.Index_ = GlobalMirrorIndex + 1
+	AddMirrorLocal(listener.GetUid(), status)
+	status.GetListener().OnDownloadStart(status.Gid())
+}
+
+type GoogleDriveDownloadStatus struct {
+	DriveObj *GoogleDriveClient
+	gid      string
+	Index_   int
+}
+
+func (g *GoogleDriveDownloadStatus) Name() string {
+	return g.DriveObj.name
+}
+
+func (g *GoogleDriveDownloadStatus) CompletedLength() int64 {
+	return g.DriveObj.CompletedLength
+}
+
+func (g *GoogleDriveDownloadStatus) TotalLength() int64 {
+	return g.DriveObj.TotalLength
+}
+
+func (g *GoogleDriveDownloadStatus) Speed() int64 {
+	return g.DriveObj.Speed
+}
+
+func (g *GoogleDriveDownloadStatus) Gid() string {
+	return g.gid
+}
+
+func (g *GoogleDriveDownloadStatus) ETA() *time.Duration {
+	eta := g.DriveObj.ETA
+	return &eta
+}
+
+func (g *GoogleDriveDownloadStatus) GetStatusType() string {
+	return MirrorStatusDownloading
+}
+
+func (g *GoogleDriveDownloadStatus) Path() string {
+	return path.Join(utils.GetDownloadDir(), utils.ParseIntToString(g.GetListener().GetUid()), g.Name())
+}
+
+func (g *GoogleDriveDownloadStatus) Percentage() float32 {
+	return float32(g.CompletedLength()*100) / float32(g.TotalLength())
+}
+
+func (g *GoogleDriveDownloadStatus) GetListener() *MirrorListener {
+	return g.DriveObj.Listener
+}
+
+func (g *GoogleDriveDownloadStatus) Index() int {
+	return g.Index_
+}
+
+func (g *GoogleDriveDownloadStatus) CancelMirror() bool {
+	g.DriveObj.CancelDownload()
+	return true
+}
+
+func NewGoogleDriveDownloadStatus(driveobj *GoogleDriveClient, gid string) *GoogleDriveDownloadStatus {
+	return &GoogleDriveDownloadStatus{DriveObj: driveobj, gid: gid}
+}
+
 type GoogleDriveStatus struct {
 	DriveObj *GoogleDriveClient
 	name     string
@@ -498,4 +691,25 @@ func (g *GoogleDriveStatus) CancelMirror() bool {
 
 func NewGoogleDriveStatus(driveobj *GoogleDriveClient, name string, gid string) *GoogleDriveStatus {
 	return &GoogleDriveStatus{DriveObj: driveobj, name: name, gid: gid}
+}
+
+type ProgressContext struct {
+	isCancelled bool
+	completed   int64
+	total       int64
+	drive       *GoogleDriveClient
+}
+
+func (p *ProgressContext) Write(b []byte) (int, error) {
+	if p.isCancelled {
+		return 0, errors.New("Canceled by user.")
+	}
+	n := len(b)
+	p.completed += int64(n)
+	p.drive.OnTransferUpdate(p.completed, p.total)
+	return n, nil
+}
+
+func (p *ProgressContext) Cancel() {
+	p.isCancelled = true
 }

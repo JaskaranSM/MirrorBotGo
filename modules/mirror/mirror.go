@@ -31,9 +31,18 @@ func Mirror(b ext.Bot, u *gotgbot.Update, isTar bool, doUnArchive bool) error {
 		return nil
 	}
 	listener := engine.NewMirrorListener(b, u, isTar, doUnArchive)
-	err := engine.NewAriaDownload(link, &listener)
-	if err != nil {
-		engine.SendMessage(b, err.Error(), message)
+	fileId := utils.GetFileIdByGDriveLink(link)
+	if fileId != "" {
+		engine.NewGDriveDownload(fileId, &listener)
+	} else {
+		err := engine.NewAriaDownload(link, &listener)
+		if err != nil {
+			engine.SendMessage(b, err.Error(), message)
+			return nil
+		}
+	}
+	if fileId == "" && link == "" {
+		engine.SendMessage(b, "No Source Provided.", message)
 		return nil
 	}
 	engine.SendStatusMessage(b, message)
