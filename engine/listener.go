@@ -16,6 +16,7 @@ type MirrorListener struct {
 	bot         ext.Bot
 	isTar       bool
 	doUnArchive bool
+	parentId    string
 	isCanceled  bool
 }
 
@@ -74,7 +75,19 @@ func (m *MirrorListener) OnDownloadComplete() {
 	driveStatus.Index_ = dl.Index()
 	AddMirrorLocal(m.GetUid(), driveStatus)
 	UpdateAllMessages(m.bot)
-	drive.Upload(path)
+	var parentId string
+	if m.parentId != "" {
+		_, err := drive.GetFileMetadata(m.parentId)
+		if err != nil {
+			log.Println("Error while checking for user supplied parentId so uploading to main parentId: ",err)
+			parentId = utils.GetGDriveParentId()
+		} else {
+			parentId = m.parentId
+		}
+	} else {
+		parentId = utils.GetGDriveParentId()
+	}
+	drive.Upload(path, parentId)
 }
 func (m *MirrorListener) OnDownloadError(err string) {
 	if m.isCanceled {
@@ -123,8 +136,8 @@ func (m *MirrorListener) OnUploadComplete(link string) {
 	utils.RemoveByPath(rmpath)
 }
 
-func NewMirrorListener(b ext.Bot, update *gotgbot.Update, isTar bool, doUnArchive bool) MirrorListener {
-	return MirrorListener{bot: b, Update: update, isTar: isTar, doUnArchive: doUnArchive}
+func NewMirrorListener(b ext.Bot, update *gotgbot.Update, isTar bool, doUnArchive bool, parentId string) MirrorListener {
+	return MirrorListener{bot: b, Update: update, isTar: isTar, doUnArchive: doUnArchive, parentId: parentId}
 }
 
 type MirrorStatus interface {

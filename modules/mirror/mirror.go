@@ -4,6 +4,7 @@ import (
 	"MirrorBotGo/db"
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
+	"strings"
 
 	"github.com/PaulSonOfLars/gotgbot"
 	"github.com/PaulSonOfLars/gotgbot/ext"
@@ -30,7 +31,13 @@ func Mirror(b ext.Bot, u *gotgbot.Update, isTar bool, doUnArchive bool) error {
 		engine.SendMessage(b, "No Source Provided.", message)
 		return nil
 	}
-	listener := engine.NewMirrorListener(b, u, isTar, doUnArchive)
+	var parentId string
+	if strings.Contains(link, "|") {
+		data := strings.SplitN(link, "|", 2)
+		parentId = utils.GetFileIdByGDriveLink(strings.TrimSpace(data[1]))
+		link = strings.TrimSpace(data[0])
+	}
+	listener := engine.NewMirrorListener(b, u, isTar, doUnArchive, parentId)
 	fileId := utils.GetFileIdByGDriveLink(link)
 	if fileId != "" {
 		engine.NewGDriveDownload(fileId, &listener)

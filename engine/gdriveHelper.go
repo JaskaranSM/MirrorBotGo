@@ -156,7 +156,7 @@ func (G *GoogleDriveClient) CreateDir(name string, parentId string, retry int) (
 	return file, nil
 }
 
-func (G *GoogleDriveClient) Upload(path string) bool {
+func (G *GoogleDriveClient) Upload(path string, parentId string) bool {
 	var link string
 	var file *drive.File
 	var f os.FileInfo
@@ -167,7 +167,7 @@ func (G *GoogleDriveClient) Upload(path string) bool {
 		return false
 	}
 	if f.IsDir() {
-		file, err = G.CreateDir(f.Name(), utils.GetGDriveParentId(), 1)
+		file, err = G.CreateDir(f.Name(), parentId, 1)
 		if err != nil {
 			G.Listener.OnUploadError(err.Error())
 			return false
@@ -175,7 +175,7 @@ func (G *GoogleDriveClient) Upload(path string) bool {
 		G.UploadDirRec(path, file.Id)
 		link = G.FormatLink(file.Id)
 	} else {
-		file, err = G.UploadFile(utils.GetGDriveParentId(), path, 1)
+		file, err = G.UploadFile(parentId, path, 1)
 		if err != nil {
 			G.Listener.OnUploadError(err.Error())
 			return false
