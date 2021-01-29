@@ -58,6 +58,7 @@ type ConfigJson struct {
 	STATUS_UPDATE_INTERVAL int    `json:"status_update_interval"`
 	AUTO_DELETE_TIMEOUT    int    `json:"auto_delete_timeout"`
 	DB_URI                 string `json:"db_uri"`
+	USE_SA                 bool   `json:"use_sa"`
 	INDEX_URL              string `json:"index_url"`
 }
 
@@ -92,6 +93,10 @@ func GetAuthorizedChats() []int {
 
 func GetMaxMessageTextLength() int {
 	return MaxMessageTextLength
+}
+
+func UseSa() bool {
+	return Config.USE_SA
 }
 
 func IsUserOwner(userId int) bool {

@@ -20,6 +20,18 @@ import (
 	"google.golang.org/api/drive/v3"
 )
 
+var GLOBAL_SA_INDEX int = 0
+
+const SA_DIR string = "accounts"
+
+func GetSaCount() int {
+	sas, err := ioutil.ReadDir(SA_DIR)
+	if err != nil {
+		log.Println(err)
+	}
+	return len(sas)
+}
+
 type GoogleDriveClient struct {
 	RootId              string
 	GDRIVE_DIR_MIMETYPE string
@@ -50,6 +62,9 @@ func (G *GoogleDriveClient) Init(rootId string) {
 	G.TokenFile = "token.json"
 	G.CredentialFile = "credentials.json"
 	G.StartTime = time.Now()
+	if utils.UseSa() {
+		G.MaxRetries = GetSaCount()
+	}
 }
 
 // Retrieve a token, saves the token, then returns the generated client.
@@ -62,27 +77,70 @@ func (G *GoogleDriveClient) getClient(config *oauth2.Config) *http.Client {
 	return config.Client(context.Background(), tok)
 }
 
+func (G *GoogleDriveClient) SwitchServiceAccount() {
+	if !utils.UseSa() {
+		return
+	}
+	if GLOBAL_SA_INDEX == GetSaCount()-1 {
+		GLOBAL_SA_INDEX = 0
+	}
+	GLOBAL_SA_INDEX += 1
+	log.Printf("Switching to %d service account\n", GLOBAL_SA_INDEX)
+	G.Authorize()
+}
+
 func (G *GoogleDriveClient) Authorize() {
-	b, err := ioutil.ReadFile(G.CredentialFile)
-	if err != nil {
-		G.Listener.OnUploadError("Unable to read client secret file: " + err.Error())
-		return
-	}
+	if utils.UseSa() {
+		log.Printf("Authorizing with %d service account.\n", GLOBAL_SA_INDEX)
+		b, err := ioutil.ReadFile(fmt.Sprintf("%s/%d.json", SA_DIR, GLOBAL_SA_INDEX))
+		config, err := google.JWTConfigFromJSON(b, drive.DriveScope)
+		if err != nil {
+			if G.Listener != nil {
+				G.Listener.OnUploadError("failed to get JWT from JSON: " + err.Error())
+				return
+			} else {
+				log.Println(err)
+			}
+		}
+		client := config.Client(context.Background())
+		srv, err := drive.New(client)
+		if err != nil {
+			log.Println(err)
+		}
+		G.DriveSrv = srv
+	} else {
+		b, err := ioutil.ReadFile(G.CredentialFile)
+		if err != nil {
+			if G.Listener != nil {
+				G.Listener.OnUploadError("Unable to read client secret file: " + err.Error())
+				return
+			} else {
+				log.Println(err)
+			}
+		}
+		// If modifying these scopes, delete your previously saved token.json.
+		config, err := google.ConfigFromJSON(b, drive.DriveScope)
+		if err != nil {
+			if G.Listener != nil {
+				G.Listener.OnUploadError("Unable to parse client secret file to config: " + err.Error())
+				return
+			} else {
+				log.Println(err)
+			}
+		}
+		client := G.getClient(config)
 
-	// If modifying these scopes, delete your previously saved token.json.
-	config, err := google.ConfigFromJSON(b, drive.DriveScope)
-	if err != nil {
-		G.Listener.OnUploadError("Unable to parse client secret file to config: " + err.Error())
-		return
+		srv, err := drive.New(client)
+		if err != nil {
+			if G.Listener != nil {
+				G.Listener.OnUploadError("Unable to retrieve Drive client: " + err.Error())
+				return
+			} else {
+				log.Println(err)
+			}
+		}
+		G.DriveSrv = srv
 	}
-	client := G.getClient(config)
-
-	srv, err := drive.New(client)
-	if err != nil {
-		G.Listener.OnUploadError("Unable to retrieve Drive client: " + err.Error())
-		return
-	}
-	G.DriveSrv = srv
 }
 
 func (G *GoogleDriveClient) getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
@@ -133,6 +191,9 @@ func (G *GoogleDriveClient) CreateDir(name string, parentId string, retry int) (
 	file, err := G.DriveSrv.Files.Create(d).SupportsAllDrives(true).Do()
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "rate") {
+			if utils.UseSa() {
+				G.SwitchServiceAccount()
+			}
 			if retry <= G.MaxRetries {
 				log.Println("Encountered: ", err.Error(), " retryin: ", retry)
 				time.Sleep(G.SleepTime)
@@ -280,6 +341,9 @@ func (G *GoogleDriveClient) DownloadFile(fileId string, local string, size int64
 	response, err := request.Download()
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "rate") {
+			if utils.UseSa() {
+				G.SwitchServiceAccount()
+			}
 			if retry <= G.MaxRetries {
 				log.Println("Encountered: ", err.Error(), " retryin: ", retry)
 				time.Sleep(G.SleepTime)
@@ -358,6 +422,9 @@ func (G *GoogleDriveClient) SetPermissions(fileId string, retry int) error {
 	_, err := G.DriveSrv.Permissions.Create(fileId, permission).Fields("").SupportsAllDrives(true).SupportsTeamDrives(true).Do()
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "rate") {
+			if utils.UseSa() {
+				G.SwitchServiceAccount()
+			}
 			if retry <= G.MaxRetries {
 				log.Println("Encountered: ", err.Error(), " retryin: ", retry)
 				time.Sleep(G.SleepTime)
@@ -443,6 +510,9 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "rate") {
+			if utils.UseSa() {
+				G.SwitchServiceAccount()
+			}
 			if retry <= G.MaxRetries {
 				log.Println("Encountered: ", err.Error(), " retryin: ", retry)
 				time.Sleep(G.SleepTime)
@@ -466,7 +536,12 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 	return file, nil
 }
 
-func (G *GoogleDriveClient) Clone(fileId string) (string, error) {
+func (G *GoogleDriveClient) Clone(fileId string, parentId string) (string, error) {
+	_, err := G.GetFileMetadata(parentId)
+	if err != nil {
+		log.Println("Clone error while checking for user supplied parentId: " + err.Error())
+		parentId = utils.GetGDriveParentId()
+	}
 	var link string
 	meta, err := G.GetFileMetadata(fileId)
 	if err != nil {
@@ -474,7 +549,7 @@ func (G *GoogleDriveClient) Clone(fileId string) (string, error) {
 	}
 	log.Println("Cloning: " + meta.Name)
 	if meta.MimeType == G.GDRIVE_DIR_MIMETYPE {
-		new_dir, err := G.CreateDir(meta.Name, utils.GetGDriveParentId(), 1)
+		new_dir, err := G.CreateDir(meta.Name, parentId, 1)
 		if err != nil {
 			log.Println("GDriveCreateDir: " + err.Error())
 			return link, err
@@ -483,7 +558,7 @@ func (G *GoogleDriveClient) Clone(fileId string) (string, error) {
 		}
 		link = G.FormatLink(new_dir.Id)
 	} else {
-		file, err := G.CopyFile(meta.Id, utils.GetGDriveParentId(), 1)
+		file, err := G.CopyFile(meta.Id, parentId, 1)
 		if err != nil {
 			return link, err
 		}
@@ -531,6 +606,9 @@ func (G *GoogleDriveClient) CopyFile(fileId, parentId string, retry int) (*drive
 	file, err := G.DriveSrv.Files.Copy(fileId, f).SupportsAllDrives(true).SupportsTeamDrives(true).Do()
 	if err != nil {
 		if strings.Contains(strings.ToLower(err.Error()), "rate") {
+			if utils.UseSa() {
+				G.SwitchServiceAccount()
+			}
 			if retry <= G.MaxRetries {
 				log.Println("Encountered: ", err.Error(), " retryin: ", retry)
 				time.Sleep(G.SleepTime)

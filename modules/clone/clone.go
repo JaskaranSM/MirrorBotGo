@@ -5,6 +5,7 @@ import (
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
 	"log"
+	"strings"
 
 	"github.com/PaulSonOfLars/gotgbot"
 	"github.com/PaulSonOfLars/gotgbot/ext"
@@ -24,6 +25,14 @@ func CloneHandler(b ext.Bot, u *gotgbot.Update) error {
 			log.Println("SendMessage: " + err.Error())
 		}
 	} else {
+		var parentId string
+		if strings.Contains(link, "|") {
+			data := strings.SplitN(link, "|", 2)
+			parentId = utils.GetFileIdByGDriveLink(strings.TrimSpace(data[1]))
+			link = strings.TrimSpace(data[0])
+		} else {
+			parentId = utils.GetGDriveParentId()
+		}
 		fileId := utils.GetFileIdByGDriveLink(link)
 		if fileId == "" {
 			_, err := engine.SendMessage(b, "FileId extraction failed, make sure GDrive link is correct.", message)
@@ -35,7 +44,7 @@ func CloneHandler(b ext.Bot, u *gotgbot.Update) error {
 			drive_client := engine.NewGDriveClient(0, nil)
 			drive_client.Init("")
 			drive_client.Authorize()
-			out_link, err := drive_client.Clone(fileId)
+			out_link, err := drive_client.Clone(fileId, parentId)
 			if err != nil {
 				_, err = engine.SendMessage(b, "CloneError: "+err.Error(), message)
 				if err != nil {
