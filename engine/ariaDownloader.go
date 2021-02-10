@@ -93,7 +93,7 @@ func getSession() *aria2go.Aria2 {
 		Options: aria2go.Options{
 			"seed-time":                 "0.01",
 			"max-overall-upload-limit":  "1K",
-			"max-concurrent-downloads":  "5",
+			"max-concurrent-downloads":  "10",
 			"save-session":              "ses.session",
 			"max-connection-per-server": "10",
 			"follow-torrent":            "mem",

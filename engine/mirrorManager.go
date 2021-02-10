@@ -11,13 +11,14 @@ var CanceledMirrors map[int]MirrorStatus = getMap()
 var GlobalMirrorIndex int = 0
 
 const (
-	MirrorStatusDownloading = "Downloading"
-	MirrorStatusUploading   = "Uploading"
-	MirrorStatusArchiving   = "Archiving"
-	MirrorStatusUnArchiving = "UnArchiving"
-	MirrorStatusWaiting     = "Queued"
-	MirrorStatusFailed      = "Failed"
-	MirrorStatusCanceled    = "Canceled"
+	MirrorStatusDownloading  = "Downloading"
+	MirrorStatusUploading    = "Uploading"
+	MirrorStatusArchiving    = "Archiving"
+	MirrorStatusUnArchiving  = "UnArchiving"
+	MirrorStatusWaiting      = "Queued"
+	MirrorStatusFailed       = "Failed"
+	MirrorStatusCanceled     = "Canceled"
+	MirrorStatusUploadQueued = "Queued for upload"
 )
 
 func getMap() map[int]MirrorStatus {

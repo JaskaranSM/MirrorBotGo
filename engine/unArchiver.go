@@ -177,6 +177,7 @@ func createExtractFilesWalker(prg *archiver.Progress, archiveHasBaseDir bool, ou
 		if archiveHasBaseDir {
 			namePathParts := strings.Split(filepath.Dir(name), pathSeparator)
 			dirname = filepath.ToSlash(filepath.Join(outputDir, filepath.Join(namePathParts[1:]...)))
+			os.MkdirAll(dirname, 0755)
 		}
 
 		if f.IsDir() {

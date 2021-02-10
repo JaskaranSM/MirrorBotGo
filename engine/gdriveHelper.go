@@ -21,6 +21,9 @@ import (
 )
 
 var GLOBAL_SA_INDEX int = 0
+var concurrent_uploads int = 10
+
+var upload_limit_chan chan int = make(chan int, concurrent_uploads)
 
 const SA_DIR string = "accounts"
 
@@ -44,6 +47,7 @@ type GoogleDriveClient struct {
 	name                string
 	MaxRetries          int
 	isCancelled         bool
+	isUploading         bool
 	doNothing           bool
 	prg                 *ProgressContext
 	SleepTime           time.Duration
@@ -207,7 +211,7 @@ func (G *GoogleDriveClient) CreateDir(name string, parentId string, retry int) (
 			return nil, err
 		}
 	}
-	fmt.Println("Created G-Drive Folder: ", file.Id)
+	log.Println("Created G-Drive Folder: ", file.Id)
 	if !utils.IsTeamDrive() {
 		err = G.SetPermissions(file.Id, 1)
 		if err != nil {
@@ -218,6 +222,12 @@ func (G *GoogleDriveClient) CreateDir(name string, parentId string, retry int) (
 }
 
 func (G *GoogleDriveClient) Upload(path string, parentId string) bool {
+	G.isUploading = true
+	defer func() {
+		if len(upload_limit_chan) > 0 {
+			<-upload_limit_chan
+		}
+	}()
 	var link string
 	var file *drive.File
 	var f os.FileInfo
@@ -486,11 +496,13 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 	defer G.Clean()
 	content, err := os.Open(file_path)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
+		return nil, err
 	}
 	contentType, err := utils.GetFileContentType(content)
 	if err != nil {
-		fmt.Println(err)
+		log.Println(err)
+		return nil, err
 	}
 	arr := strings.Split(file_path, "/")
 	name := arr[len(arr)-1]
@@ -742,7 +754,10 @@ func (g *GoogleDriveStatus) ETA() *time.Duration {
 }
 
 func (g *GoogleDriveStatus) GetStatusType() string {
-	return MirrorStatusUploading
+	if g.DriveObj.isUploading {
+		return MirrorStatusUploading
+	}
+	return MirrorStatusUploadQueued
 }
 
 func (g *GoogleDriveStatus) Path() string {
@@ -762,8 +777,6 @@ func (g *GoogleDriveStatus) Index() int {
 }
 
 func (g *GoogleDriveStatus) CancelMirror() bool {
-	listener := g.GetListener()
-	listener.OnUploadError("Canceled by user.")
 	return true
 }
 

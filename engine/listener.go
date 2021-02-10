@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"path"
+	"runtime"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot"
@@ -40,6 +41,7 @@ func (m *MirrorListener) Clean() {
 		DeleteAllMessages(m.bot)
 	}
 	UpdateAllMessages(m.bot)
+	runtime.GC()
 }
 
 func (m *MirrorListener) OnDownloadComplete() {
@@ -79,7 +81,7 @@ func (m *MirrorListener) OnDownloadComplete() {
 	if m.parentId != "" {
 		_, err := drive.GetFileMetadata(m.parentId)
 		if err != nil {
-			log.Println("Error while checking for user supplied parentId so uploading to main parentId: ",err)
+			log.Println("Error while checking for user supplied parentId so uploading to main parentId: ", err)
 			parentId = utils.GetGDriveParentId()
 		} else {
 			parentId = m.parentId
@@ -87,6 +89,7 @@ func (m *MirrorListener) OnDownloadComplete() {
 	} else {
 		parentId = utils.GetGDriveParentId()
 	}
+	upload_limit_chan <- 1
 	drive.Upload(path, parentId)
 }
 func (m *MirrorListener) OnDownloadError(err string) {
