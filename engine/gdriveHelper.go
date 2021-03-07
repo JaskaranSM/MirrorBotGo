@@ -49,6 +49,7 @@ type GoogleDriveClient struct {
 	isCancelled         bool
 	isUploading         bool
 	doNothing           bool
+	path                string
 	prg                 *ProgressContext
 	SleepTime           time.Duration
 	StartTime           time.Time
@@ -222,6 +223,7 @@ func (G *GoogleDriveClient) CreateDir(name string, parentId string, retry int) (
 }
 
 func (G *GoogleDriveClient) Upload(path string, parentId string) bool {
+	G.path = path
 	G.isUploading = true
 	defer func() {
 		if len(upload_limit_chan) > 0 {
@@ -761,7 +763,7 @@ func (g *GoogleDriveStatus) GetStatusType() string {
 }
 
 func (g *GoogleDriveStatus) Path() string {
-	return path.Join(utils.GetDownloadDir(), utils.ParseIntToString(g.GetListener().GetUid()), g.Name())
+	return g.DriveObj.path
 }
 
 func (g *GoogleDriveStatus) Percentage() float32 {

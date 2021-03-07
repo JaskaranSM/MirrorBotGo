@@ -4,8 +4,8 @@ import (
 	"MirrorBotGo/utils"
 	"fmt"
 	"log"
-	"path"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot"
@@ -116,7 +116,7 @@ func (m *MirrorListener) OnUploadError(err string) {
 	m.Clean()
 	msg := "Your upload has been stopped due to: %s"
 	SendMessage(m.bot, fmt.Sprintf(msg, err), m.Update.Message)
-	utils.RemoveByPath(path.Join(utils.GetDownloadDir(), utils.ParseIntToString(m.GetUid())))
+	utils.RemoveByPath(dl.Path())
 }
 
 func (m *MirrorListener) OnUploadComplete(link string) {
@@ -124,6 +124,7 @@ func (m *MirrorListener) OnUploadComplete(link string) {
 	name := dl.Name()
 	size := dl.TotalLength()
 	log.Printf("[UploadComplete]: %s (%d)\n", name, size)
+	link = strings.ReplaceAll(link, "'", "")
 	msg := fmt.Sprintf("<a href='%s'>%s</a> (%s)", link, dl.Name(), utils.GetHumanBytes(dl.TotalLength()))
 	in_url := utils.GetIndexUrl()
 	if in_url != "" {
@@ -135,7 +136,7 @@ func (m *MirrorListener) OnUploadComplete(link string) {
 	}
 	m.Clean()
 	SendMessage(m.bot, msg, m.Update.Message)
-	rmpath := path.Join(utils.GetDownloadDir(), utils.ParseIntToString(m.GetUid()))
+	rmpath := dl.Path()
 	utils.RemoveByPath(rmpath)
 }
 

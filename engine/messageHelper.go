@@ -48,7 +48,7 @@ func GetAllMessagesCount() int {
 }
 
 func DeleteMessageByChatId(chatId int) {
-	for i, _ := range StatusMessageStorage {
+	for i := range StatusMessageStorage {
 		if i == chatId {
 			delete(StatusMessageStorage, i)
 		}

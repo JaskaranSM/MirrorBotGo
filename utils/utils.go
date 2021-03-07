@@ -60,6 +60,8 @@ type ConfigJson struct {
 	DB_URI                 string `json:"db_uri"`
 	USE_SA                 bool   `json:"use_sa"`
 	INDEX_URL              string `json:"index_url"`
+	TG_APP_ID              string `json:"tg_app_id"`
+	TG_APP_HASH            string `json:"tg_app_hash"`
 }
 
 var Config *ConfigJson = InitConfig()
@@ -89,6 +91,14 @@ func GetSudoUsers() []int {
 
 func GetAuthorizedChats() []int {
 	return Config.AUTHORIZED_CHATS
+}
+
+func GetTgAppId() string {
+	return Config.TG_APP_ID
+}
+
+func GetTgAppHash() string {
+	return Config.TG_APP_HASH
 }
 
 func GetMaxMessageTextLength() int {
