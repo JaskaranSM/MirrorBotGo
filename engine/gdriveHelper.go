@@ -48,6 +48,7 @@ type GoogleDriveClient struct {
 	MaxRetries          int
 	isCancelled         bool
 	isUploading         bool
+	err                 error
 	doNothing           bool
 	path                string
 	prg                 *ProgressContext
@@ -101,6 +102,7 @@ func (G *GoogleDriveClient) Authorize() {
 		config, err := google.JWTConfigFromJSON(b, drive.DriveScope)
 		if err != nil {
 			if G.Listener != nil {
+				G.err = err
 				G.Listener.OnUploadError("failed to get JWT from JSON: " + err.Error())
 				return
 			} else {
@@ -117,6 +119,7 @@ func (G *GoogleDriveClient) Authorize() {
 		b, err := ioutil.ReadFile(G.CredentialFile)
 		if err != nil {
 			if G.Listener != nil {
+				G.err = err
 				G.Listener.OnUploadError("Unable to read client secret file: " + err.Error())
 				return
 			} else {
@@ -127,6 +130,7 @@ func (G *GoogleDriveClient) Authorize() {
 		config, err := google.ConfigFromJSON(b, drive.DriveScope)
 		if err != nil {
 			if G.Listener != nil {
+				G.err = err
 				G.Listener.OnUploadError("Unable to parse client secret file to config: " + err.Error())
 				return
 			} else {
@@ -138,6 +142,7 @@ func (G *GoogleDriveClient) Authorize() {
 		srv, err := drive.New(client)
 		if err != nil {
 			if G.Listener != nil {
+				G.err = err
 				G.Listener.OnUploadError("Unable to retrieve Drive client: " + err.Error())
 				return
 			} else {
@@ -236,12 +241,14 @@ func (G *GoogleDriveClient) Upload(path string, parentId string) bool {
 	var err error
 	f, err = os.Stat(path)
 	if err != nil {
+		G.err = err
 		G.Listener.OnUploadError(err.Error())
 		return false
 	}
 	if f.IsDir() {
 		file, err = G.CreateDir(f.Name(), parentId, 1)
 		if err != nil {
+			G.err = err
 			G.Listener.OnUploadError(err.Error())
 			return false
 		}
@@ -250,12 +257,15 @@ func (G *GoogleDriveClient) Upload(path string, parentId string) bool {
 	} else {
 		file, err = G.UploadFile(parentId, path, 1)
 		if err != nil {
+			G.err = err
 			G.Listener.OnUploadError(err.Error())
 			return false
 		}
 		link = G.FormatLink(file.Id)
 	}
-	G.Listener.OnUploadComplete(link)
+	if G.err == nil {
+		G.Listener.OnUploadComplete(link)
+	}
 	return true
 }
 
@@ -376,16 +386,24 @@ func (G *GoogleDriveClient) DownloadFile(fileId string, local string, size int64
 }
 
 func (G *GoogleDriveClient) UploadDirRec(directoryPath string, parentId string) bool {
+	if G.err != nil {
+		return false
+	}
 	files, err := ioutil.ReadDir(directoryPath)
 	if err != nil {
+		G.err = err
 		G.Listener.OnUploadError(err.Error())
 		return false
 	}
 	for _, f := range files {
+		if G.err != nil {
+			return false
+		}
 		currentFile := path.Join(directoryPath, f.Name())
 		if f.IsDir() {
 			file, err := G.CreateDir(f.Name(), parentId, 1)
 			if err != nil {
+				G.err = err
 				G.Listener.OnUploadError(err.Error())
 				return false
 			}
@@ -393,6 +411,7 @@ func (G *GoogleDriveClient) UploadDirRec(directoryPath string, parentId string) 
 		} else {
 			file, err := G.UploadFile(parentId, currentFile, 1)
 			if err != nil {
+				G.err = err
 				G.Listener.OnUploadError(err.Error())
 				return false
 			} else {
@@ -498,12 +517,12 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 	defer G.Clean()
 	content, err := os.Open(file_path)
 	if err != nil {
-		log.Println(err)
+		log.Println("Error while opening file for upload: ", err.Error())
 		return nil, err
 	}
 	contentType, err := utils.GetFileContentType(content)
 	if err != nil {
-		log.Println(err)
+		log.Println("Error while sniffing content type: ", err.Error())
 		return nil, err
 	}
 	arr := strings.Split(file_path, "/")
@@ -516,7 +535,7 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 	ctx := context.Background()
 	stat, err := content.Stat()
 	if err != nil {
-		log.Println(err)
+		log.Println("Error while doing content.Stat()", err.Error())
 		return nil, err
 	}
 	log.Printf("Uploading %s with mimeType: %s", f.Name, f.MimeType)

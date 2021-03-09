@@ -156,6 +156,7 @@ func (t *TgMtprotoDownloader) AddDownload(msg *ext.Message, listener *MirrorList
 			updateMsg := (event).(*tdlib.UpdateFile)
 			var isQueued bool = false
 			if updateMsg.File.Local.IsDownloadingCompleted {
+				reciever.GetUpdates = false
 				tgMtProtoClient.RemoveEventReceiver(reciever)
 				mtprotoListener.OnDownloadComplete(updateMsg.File.ID, updateMsg.File.Local.Path)
 				break
@@ -242,6 +243,7 @@ func (t *TelegramDownloadStatus) CancelMirror() bool {
 	_, err := tgMtProtoClient.CancelDownloadFile(t.fileId, false)
 	if err != nil {
 		t.GetListener().OnDownloadError(err.Error())
+		return true
 	}
 	t.GetListener().OnDownloadError("Canceled by user.")
 	return true
