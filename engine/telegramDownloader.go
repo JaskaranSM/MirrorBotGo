@@ -63,15 +63,16 @@ func NewTgMtProtoListener(fileId int32, listener *MirrorListener) *TgMtProtoList
 }
 
 type TgMtProtoListener struct {
-	FileId    int32
-	current   int64
-	total     int64
-	speed     int64
-	isQueued  bool
-	eta       time.Duration
-	startTime time.Time
-	path      string
-	listener  *MirrorListener
+	FileId        int32
+	current       int64
+	total         int64
+	speed         int64
+	isQueued      bool
+	eta           time.Duration
+	startTime     time.Time
+	path          string
+	eventReceiver *tdlib.EventReceiver
+	listener      *MirrorListener
 }
 
 func (t *TgMtProtoListener) SetCurrent(current int64) {
@@ -84,7 +85,7 @@ func (t *TgMtProtoListener) SetTotal(total int64) {
 
 func (t *TgMtProtoListener) OnDownloadComplete(fileId int32, path string) {
 	t.path = path
-	log.Printf("[MtprotoOnDownloadComplete]: %d\n", fileId)
+	log.Printf("[MtprotoOnDownloadComplete]: %d | %s | %d\n", fileId, path, t.eventReceiver.ID)
 	t.listener.OnDownloadComplete()
 }
 
@@ -150,7 +151,8 @@ func (t *TgMtprotoDownloader) AddDownload(msg *ext.Message, listener *MirrorList
 		}
 		return false
 	})
-	log.Printf("MtprotoFileId: %d\n", fileId)
+	mtprotoListener.eventReceiver = &reciever
+	log.Printf("MtprotoDetails: %d | %s | %d\n", fileId, name, mtprotoListener.eventReceiver.ID)
 	go func() {
 		for event := range reciever.Chan {
 			updateMsg := (event).(*tdlib.UpdateFile)
@@ -159,7 +161,7 @@ func (t *TgMtprotoDownloader) AddDownload(msg *ext.Message, listener *MirrorList
 				reciever.GetUpdates = false
 				tgMtProtoClient.RemoveEventReceiver(reciever)
 				mtprotoListener.OnDownloadComplete(updateMsg.File.ID, updateMsg.File.Local.Path)
-				break
+				return
 			}
 			if !updateMsg.File.Local.IsDownloadingActive && !updateMsg.File.Local.IsDownloadingCompleted {
 				isQueued = true
@@ -167,14 +169,15 @@ func (t *TgMtprotoDownloader) AddDownload(msg *ext.Message, listener *MirrorList
 			mtprotoListener.OnDownloadProgress(updateMsg.File.ID, int64(updateMsg.File.Local.DownloadedSize), int64(updateMsg.File.Size), updateMsg.File.Local.Path, isQueued)
 		}
 	}()
-	_, err = tgMtProtoClient.DownloadFile(fileId, 1, 0, 0, false)
-	if err != nil {
-		return err
-	}
 	gid := utils.RandString(16)
 	status := NewTelegramDownloadStatus(gid, fileId, name, mtprotoListener)
 	status.Index_ = GlobalMirrorIndex + 1
 	AddMirrorLocal(listener.GetUid(), status)
+	_, err = tgMtProtoClient.DownloadFile(fileId, 1, 0, 0, false)
+	if err != nil {
+		status.GetListener().OnDownloadError(err.Error())
+		return nil
+	}
 	status.GetListener().OnDownloadStart(status.Gid())
 	return nil
 }
@@ -240,6 +243,10 @@ func (t *TelegramDownloadStatus) Index() int {
 }
 
 func (t *TelegramDownloadStatus) CancelMirror() bool {
+	if t.mtListener.eventReceiver != nil {
+		t.mtListener.eventReceiver.GetUpdates = false
+		tgMtProtoClient.RemoveEventReceiver(*t.mtListener.eventReceiver)
+	}
 	_, err := tgMtProtoClient.CancelDownloadFile(t.fileId, false)
 	if err != nil {
 		t.GetListener().OnDownloadError(err.Error())
