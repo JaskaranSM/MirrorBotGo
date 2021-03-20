@@ -200,7 +200,7 @@ func (G *GoogleDriveClient) CreateDir(name string, parentId string, retry int) (
 	}
 	file, err := G.DriveSrv.Files.Create(d).SupportsAllDrives(true).Do()
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "rate") {
+		if strings.Contains(strings.ToLower(err.Error()), "rate") || file.ServerResponse.HTTPStatusCode >= 500 {
 			if utils.UseSa() {
 				G.SwitchServiceAccount()
 			}
@@ -362,7 +362,7 @@ func (G *GoogleDriveClient) DownloadFile(fileId string, local string, size int64
 	request := G.DriveSrv.Files.Get(fileId).SupportsAllDrives(true)
 	response, err := request.Download()
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "rate") {
+		if strings.Contains(strings.ToLower(err.Error()), "rate") || response.StatusCode >= 500 {
 			if utils.UseSa() {
 				G.SwitchServiceAccount()
 			}
@@ -450,9 +450,9 @@ func (G *GoogleDriveClient) SetPermissions(fileId string, retry int) error {
 		Role:               "reader",
 		Type:               "anyone",
 	}
-	_, err := G.DriveSrv.Permissions.Create(fileId, permission).Fields("").SupportsAllDrives(true).SupportsTeamDrives(true).Do()
+	file, err := G.DriveSrv.Permissions.Create(fileId, permission).Fields("").SupportsAllDrives(true).SupportsTeamDrives(true).Do()
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "rate") {
+		if strings.Contains(strings.ToLower(err.Error()), "rate") || file.ServerResponse.HTTPStatusCode >= 500 {
 			if utils.UseSa() {
 				G.SwitchServiceAccount()
 			}
@@ -542,7 +542,7 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 	file, err := G.DriveSrv.Files.Create(f).ResumableMedia(ctx, content, stat.Size(), contentType).ProgressUpdater(G.OnTransferUpdate).SupportsAllDrives(true).Do()
 
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "rate") {
+		if strings.Contains(strings.ToLower(err.Error()), "rate") || file.ServerResponse.HTTPStatusCode >= 500 {
 			if utils.UseSa() {
 				G.SwitchServiceAccount()
 			}
@@ -638,7 +638,7 @@ func (G *GoogleDriveClient) CopyFile(fileId, parentId string, retry int) (*drive
 	}
 	file, err := G.DriveSrv.Files.Copy(fileId, f).SupportsAllDrives(true).SupportsTeamDrives(true).Do()
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "rate") {
+		if strings.Contains(strings.ToLower(err.Error()), "rate") || file.ServerResponse.HTTPStatusCode >= 500 {
 			if utils.UseSa() {
 				G.SwitchServiceAccount()
 			}
