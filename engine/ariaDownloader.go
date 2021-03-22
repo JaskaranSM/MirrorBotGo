@@ -7,8 +7,7 @@ import (
 	"path"
 	"sync"
 	"time"
-
-	"github.com/coolerfall/aria2go"
+	"github.com/jaskaranSM/aria2go@develop"
 )
 
 //AriaStatusCodeToString get status as string
