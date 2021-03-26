@@ -4,6 +4,7 @@ import (
 	"MirrorBotGo/utils"
 	"fmt"
 	"log"
+	"path"
 	"runtime"
 	"strings"
 	"time"
@@ -105,7 +106,7 @@ func (m *MirrorListener) OnDownloadError(err string) {
 	m.Clean()
 	msg := "Your download has been stopped due to: %s"
 	SendMessage(m.bot, fmt.Sprintf(msg, err), m.Update.Message)
-	utils.RemoveByPath(dl.Path())
+	m.CleanDownload()
 }
 
 func (m *MirrorListener) OnUploadError(err string) {
@@ -116,7 +117,7 @@ func (m *MirrorListener) OnUploadError(err string) {
 	m.Clean()
 	msg := "Your upload has been stopped due to: %s"
 	SendMessage(m.bot, fmt.Sprintf(msg, err), m.Update.Message)
-	utils.RemoveByPath(dl.Path())
+	m.CleanDownload()
 }
 
 func (m *MirrorListener) OnUploadComplete(link string) {
@@ -136,8 +137,11 @@ func (m *MirrorListener) OnUploadComplete(link string) {
 	}
 	m.Clean()
 	SendMessage(m.bot, msg, m.Update.Message)
-	rmpath := dl.Path()
-	utils.RemoveByPath(rmpath)
+	m.CleanDownload()
+}
+
+func (m *MirrorListener) CleanDownload() {
+	utils.RemoveByPath(path.Join(utils.GetDownloadDir(), utils.ParseIntToString(m.GetUid())))
 }
 
 func NewMirrorListener(b ext.Bot, update *gotgbot.Update, isTar bool, doUnArchive bool, parentId string) MirrorListener {

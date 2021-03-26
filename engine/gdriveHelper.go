@@ -200,7 +200,7 @@ func (G *GoogleDriveClient) CreateDir(name string, parentId string, retry int) (
 	}
 	file, err := G.DriveSrv.Files.Create(d).SupportsAllDrives(true).Do()
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "rate") || file.ServerResponse.HTTPStatusCode >= 500 {
+		if G.CheckRetry(file, err) {
 			if utils.UseSa() {
 				G.SwitchServiceAccount()
 			}
@@ -362,7 +362,7 @@ func (G *GoogleDriveClient) DownloadFile(fileId string, local string, size int64
 	request := G.DriveSrv.Files.Get(fileId).SupportsAllDrives(true)
 	response, err := request.Download()
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "rate") || response.StatusCode >= 500 {
+		if G.CheckRetry(nil, err) || response.StatusCode >= 500 {
 			if utils.UseSa() {
 				G.SwitchServiceAccount()
 			}
@@ -452,7 +452,11 @@ func (G *GoogleDriveClient) SetPermissions(fileId string, retry int) error {
 	}
 	file, err := G.DriveSrv.Permissions.Create(fileId, permission).Fields("").SupportsAllDrives(true).SupportsTeamDrives(true).Do()
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "rate") || file.ServerResponse.HTTPStatusCode >= 500 {
+		var tmp *drive.File
+		if file != nil {
+			tmp = &drive.File{ServerResponse: file.ServerResponse} //just a hack
+		}
+		if G.CheckRetry(tmp, err) {
 			if utils.UseSa() {
 				G.SwitchServiceAccount()
 			}
@@ -513,6 +517,18 @@ func (G *GoogleDriveClient) GetFileMetadata(fileId string) (*drive.File, error) 
 	return G.DriveSrv.Files.Get(fileId).Fields("name,mimeType,size,id,md5Checksum").SupportsAllDrives(true).Do()
 }
 
+func (G *GoogleDriveClient) CheckRetry(file *drive.File, err error) bool {
+	if strings.Contains(strings.ToLower(err.Error()), "rate") || strings.Contains(strings.ToLower(err.Error()), "500") {
+		return true
+	}
+	if file != nil {
+		if file.ServerResponse.HTTPStatusCode >= 500 {
+			return true
+		}
+	}
+	return false
+}
+
 func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry int) (*drive.File, error) {
 	defer G.Clean()
 	content, err := os.Open(file_path)
@@ -540,9 +556,8 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 	}
 	log.Printf("Uploading %s with mimeType: %s", f.Name, f.MimeType)
 	file, err := G.DriveSrv.Files.Create(f).ResumableMedia(ctx, content, stat.Size(), contentType).ProgressUpdater(G.OnTransferUpdate).SupportsAllDrives(true).Do()
-
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "rate") || file.ServerResponse.HTTPStatusCode >= 500 {
+		if G.CheckRetry(file, err) {
 			if utils.UseSa() {
 				G.SwitchServiceAccount()
 			}
@@ -638,7 +653,7 @@ func (G *GoogleDriveClient) CopyFile(fileId, parentId string, retry int) (*drive
 	}
 	file, err := G.DriveSrv.Files.Copy(fileId, f).SupportsAllDrives(true).SupportsTeamDrives(true).Do()
 	if err != nil {
-		if strings.Contains(strings.ToLower(err.Error()), "rate") || file.ServerResponse.HTTPStatusCode >= 500 {
+		if G.CheckRetry(file, err) {
 			if utils.UseSa() {
 				G.SwitchServiceAccount()
 			}

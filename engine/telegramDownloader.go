@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
+	pathlib "path"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/ext"
@@ -68,6 +70,7 @@ type TgMtProtoListener struct {
 	total         int64
 	speed         int64
 	isQueued      bool
+	uid           int
 	eta           time.Duration
 	startTime     time.Time
 	path          string
@@ -84,8 +87,12 @@ func (t *TgMtProtoListener) SetTotal(total int64) {
 }
 
 func (t *TgMtProtoListener) OnDownloadComplete(fileId int32, path string) {
-	t.path = path
+	newPath := pathlib.Join(utils.GetDownloadDir(), utils.ParseIntToString(t.uid))
 	log.Printf("[MtprotoOnDownloadComplete]: %d | %s | %d\n", fileId, path, t.eventReceiver.ID)
+	os.MkdirAll(newPath, 0755)
+	newPath = pathlib.Join(newPath, utils.GetFileBaseName(path))
+	os.Rename(path, newPath)
+	t.path = newPath
 	t.listener.OnDownloadComplete()
 }
 
@@ -144,6 +151,7 @@ func (t *TgMtprotoDownloader) AddDownload(msg *ext.Message, listener *MirrorList
 		return errors.New("Not a downloadable content")
 	}
 	mtprotoListener := NewTgMtProtoListener(fileId, listener)
+	mtprotoListener.uid = listener.GetUid()
 	reciever := tgMtProtoClient.AddEventReceiver(&tdlib.UpdateFile{}, func(msg *tdlib.TdMessage) bool {
 		updateMsg := (*msg).(*tdlib.UpdateFile)
 		if updateMsg.File.ID == mtprotoListener.FileId {
