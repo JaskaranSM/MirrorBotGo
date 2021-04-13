@@ -31,16 +31,20 @@ func getMtProtoClient() *tdlib.Client {
 		DeviceModel:         "Go brrrr",
 		SystemVersion:       "1.0.0",
 		ApplicationVersion:  "1.0.0",
-		UseMessageDatabase:  true,
-		UseFileDatabase:     true,
-		UseChatInfoDatabase: true,
+		UseMessageDatabase:  false,
+		UseFileDatabase:     false,
+		UseChatInfoDatabase: false,
 		UseTestDataCenter:   false,
 		DatabaseDirectory:   "./tdlib-db",
 		FileDirectory:       utils.GetDownloadDir(),
 		IgnoreFileNames:     false,
 	})
 	for {
-		currentState, _ := client.Authorize()
+		currentState, err := client.Authorize()
+		if err != nil {
+			log.Println("TG AUTH ERROR: ", err.Error())
+			return client
+		}
 		if currentState.GetAuthorizationStateEnum() == tdlib.AuthorizationStateWaitPhoneNumberType {
 			_, err := client.CheckAuthenticationBotToken(utils.GetBotToken())
 			if err != nil {

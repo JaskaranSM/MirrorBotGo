@@ -70,6 +70,12 @@ func Mirror(b ext.Bot, u *gotgbot.Update, isTar bool, doUnArchive bool) error {
 		}
 	} else if fileId != "" {
 		engine.NewGDriveDownload(fileId, &listener)
+	} else if utils.IsMegaLink(link) {
+		err := engine.NewMegaDownload(link, &listener)
+		if err != nil {
+			engine.SendMessage(b, err.Error(), message)
+			return nil
+		}
 	} else {
 		err := engine.NewAriaDownload(link, &listener)
 		if err != nil {

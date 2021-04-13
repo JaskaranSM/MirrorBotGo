@@ -62,6 +62,9 @@ type ConfigJson struct {
 	INDEX_URL              string `json:"index_url"`
 	TG_APP_ID              string `json:"tg_app_id"`
 	TG_APP_HASH            string `json:"tg_app_hash"`
+	MegaEmail              string `json:"mega_email"`
+	MegaPassword           string `json:"mega_password"`
+	MegaAPIKey             string `json:"mega_api_key"`
 }
 
 var Config *ConfigJson = InitConfig()
@@ -97,6 +100,14 @@ func GetTgAppId() string {
 	return Config.TG_APP_ID
 }
 
+func GetMegaEmail() string {
+	return Config.MegaEmail
+}
+
+func GetMegaPasssword() string {
+	return Config.MegaPassword
+}
+
 func GetTgAppHash() string {
 	return Config.TG_APP_HASH
 }
@@ -120,6 +131,10 @@ func IsUserSudo(userId int) bool {
 		}
 	}
 	return false
+}
+
+func GetMegaAPIKey() string {
+	return Config.MegaAPIKey
 }
 
 func GetDownloadDir() string {
@@ -415,6 +430,13 @@ func IsPathDir(pth string) bool {
 	return mode.IsDir()
 }
 
+func IsPathExists(pth string) bool {
+	if _, err := os.Stat(pth); os.IsNotExist(err) {
+		return false
+	}
+	return true
+}
+
 func GetFileBaseNameNoExt(path string) string {
 	basename := GetFileBaseName(path)
 	return strings.TrimSuffix(basename, filepath.Ext(basename))
@@ -453,4 +475,24 @@ func RandString(n int) string {
 		b[i] = letterRunes[rand.Intn(len(letterRunes))]
 	}
 	return string(b)
+}
+
+func IsMegaFolderLink(link string) bool {
+	return strings.Contains(link, "/folder/")
+}
+
+func MegaLinkToFolderId(link string) (string, string) {
+	data := strings.Split(link, "#")
+	var folderid string
+	var folderkey string
+	if len(data) > 1 {
+		folderkey = data[1]
+	}
+	dt := strings.Split(data[0], "/")
+	folderid = dt[len(dt)-1]
+	return folderid, folderkey
+}
+
+func IsMegaLink(link string) bool {
+	return strings.Contains(link, "mega.nz")
 }
