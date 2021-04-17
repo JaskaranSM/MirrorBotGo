@@ -216,7 +216,7 @@ func (t *AriaDownloader) AddDownload(link string, listener *MirrorListener) erro
 		return err
 	}
 	status := NewAriaDownloadStatus(utils.GetFileBaseName(link), ariaGid, listener)
-	status.Index_ = GlobalMirrorIndex + 1
+	status.Index_ = GenerateMirrorIndex()
 	AddMirrorLocal(listener.GetUid(), status)
 	status.GetListener().OnDownloadStart(status.Gid())
 	return nil

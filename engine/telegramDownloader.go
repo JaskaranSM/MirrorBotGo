@@ -183,7 +183,7 @@ func (t *TgMtprotoDownloader) AddDownload(msg *ext.Message, listener *MirrorList
 	}()
 	gid := utils.RandString(16)
 	status := NewTelegramDownloadStatus(gid, fileId, name, mtprotoListener)
-	status.Index_ = GlobalMirrorIndex + 1
+	status.Index_ = GenerateMirrorIndex()
 	AddMirrorLocal(listener.GetUid(), status)
 	_, err = tgMtProtoClient.DownloadFile(fileId, 1, 0, 0, false)
 	if err != nil {

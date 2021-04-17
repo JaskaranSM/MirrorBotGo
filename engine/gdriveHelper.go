@@ -692,7 +692,7 @@ func NewGDriveDownload(fileId string, listener *MirrorListener) {
 	go client.Download(fileId, dir)
 	gid := utils.RandString(16)
 	status := NewGoogleDriveDownloadStatus(client, gid)
-	status.Index_ = GlobalMirrorIndex + 1
+	status.Index_ = GenerateMirrorIndex()
 	AddMirrorLocal(listener.GetUid(), status)
 	status.GetListener().OnDownloadStart(status.Gid())
 }

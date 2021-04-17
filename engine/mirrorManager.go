@@ -6,6 +6,7 @@ import (
 )
 
 var dlMutex sync.Mutex
+var indexMutex sync.Mutex
 var AllMirrors map[int]MirrorStatus = getMap()
 var CanceledMirrors map[int]MirrorStatus = getMap()
 var GlobalMirrorIndex int = 0
@@ -31,7 +32,7 @@ func GetAllMirrors() []MirrorStatus {
 		dls = append(dls, dl)
 	}
 	sort.Slice(dls, func(i, j int) bool {
-		return dls[i].Name() > dls[j].Name()
+		return dls[i].Index() > dls[j].Index()
 	})
 	return dls
 }
@@ -77,4 +78,13 @@ func RemoveMirrorLocal(messageId int) {
 	if ok {
 		delete(AllMirrors, messageId)
 	}
+}
+
+func GenerateMirrorIndex() int {
+	indexMutex.Lock()
+	defer func() {
+		GlobalMirrorIndex = GlobalMirrorIndex + 1
+		indexMutex.Unlock()
+	}()
+	return GlobalMirrorIndex
 }

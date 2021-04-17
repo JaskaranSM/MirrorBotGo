@@ -69,7 +69,7 @@ func NewMegaDownload(link string, listener *MirrorListener) error {
 		listener.OnDownloadComplete()
 	}()
 	status := NewMegaDownloadStatus(gid, listener)
-	status.Index_ = GlobalMirrorIndex + 1
+	status.Index_ = GenerateMirrorIndex()
 	AddMirrorLocal(listener.GetUid(), status)
 	status.GetListener().OnDownloadStart(status.Gid())
 	return nil
