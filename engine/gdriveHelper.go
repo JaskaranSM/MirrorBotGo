@@ -529,12 +529,65 @@ func (G *GoogleDriveClient) CheckRetry(file *drive.File, err error) bool {
 	return false
 }
 
+func (G *GoogleDriveClient) UploadFileNonResumable(parentId string, file_path string, retry int) (*drive.File, error) {
+	log.Printf("Uploading File with 0 bytes: %s\n", file_path)
+	content, err := os.Open(file_path)
+	if err != nil {
+		log.Println("Error while opening file for upload: ", err.Error())
+		return nil, err
+	}
+	contentType := "application/octet-stream"
+	arr := strings.Split(file_path, "/")
+	name := arr[len(arr)-1]
+	f := &drive.File{
+		MimeType: contentType,
+		Name:     name,
+		Parents:  []string{parentId},
+	}
+	log.Printf("Uploading %s with mimeType: %s", f.Name, f.MimeType)
+	file, err := G.DriveSrv.Files.Create(f).Media(content).SupportsAllDrives(true).Do()
+	if err != nil {
+		if G.CheckRetry(file, err) {
+			if utils.UseSa() {
+				G.SwitchServiceAccount()
+			}
+			if retry <= G.MaxRetries {
+				log.Println("Encountered: ", err.Error(), " retryin: ", retry)
+				time.Sleep(G.SleepTime)
+				return G.UploadFileNonResumable(parentId, file_path, retry+1)
+			} else {
+				log.Println("[NonResumable] Could not create file (even after retryin): " + err.Error())
+				return nil, err
+			}
+		} else {
+			log.Println("[NonResumable] Could not create file: " + err.Error())
+			return nil, err
+		}
+	}
+	if !utils.IsTeamDrive() {
+		err = G.SetPermissions(file.Id, 1)
+		if err != nil {
+			log.Println(err)
+		}
+	}
+	return file, nil
+}
+
 func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry int) (*drive.File, error) {
 	defer G.Clean()
 	content, err := os.Open(file_path)
 	if err != nil {
 		log.Println("Error while opening file for upload: ", err.Error())
 		return nil, err
+	}
+	stat, err := content.Stat()
+	if err != nil {
+		log.Println("Error while doing content.Stat()", err.Error())
+		return nil, err
+	}
+	if stat.Size() == 0 {
+		content.Close()
+		return G.UploadFileNonResumable(parentId, file_path, retry)
 	}
 	contentType, err := utils.GetFileContentType(content)
 	if err != nil {
@@ -549,11 +602,6 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 		Parents:  []string{parentId},
 	}
 	ctx := context.Background()
-	stat, err := content.Stat()
-	if err != nil {
-		log.Println("Error while doing content.Stat()", err.Error())
-		return nil, err
-	}
 	log.Printf("Uploading %s with mimeType: %s", f.Name, f.MimeType)
 	file, err := G.DriveSrv.Files.Create(f).ResumableMedia(ctx, content, stat.Size(), contentType).ProgressUpdater(G.OnTransferUpdate).SupportsAllDrives(true).Do()
 	if err != nil {
@@ -573,7 +621,6 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 			log.Println("Could not create file: " + err.Error())
 			return nil, err
 		}
-
 	}
 	if !utils.IsTeamDrive() {
 		err = G.SetPermissions(file.Id, 1)
