@@ -362,7 +362,7 @@ func (G *GoogleDriveClient) DownloadFile(fileId string, local string, size int64
 	request := G.DriveSrv.Files.Get(fileId).SupportsAllDrives(true)
 	response, err := request.Download()
 	if err != nil {
-		if G.CheckRetry(nil, err) || response.StatusCode >= 500 {
+		if G.CheckRetry(nil, err) || (response != nil && response.StatusCode >= 500) {
 			if utils.UseSa() {
 				G.SwitchServiceAccount()
 			}

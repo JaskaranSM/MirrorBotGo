@@ -496,3 +496,44 @@ func MegaLinkToFolderId(link string) (string, string) {
 func IsMegaLink(link string) bool {
 	return strings.Contains(link, "mega.nz")
 }
+
+func GetCommandLineArgs() map[string]string {
+	var args map[string]string = make(map[string]string)
+	if len(os.Args) < 2 {
+		return args
+	}
+	for _, i := range os.Args[1:] {
+		if strings.Contains(i, "=") {
+			data := strings.Split(i, "=")
+			if len(data) > 1 {
+				args[data[0]] = data[1]
+			}
+		}
+	}
+	return args
+}
+
+func GetEnvironmentArgs(key string) map[string]string {
+	var args map[string]string = make(map[string]string)
+	for _, e := range os.Environ() {
+		if !strings.Contains(e, "=") {
+			continue
+		}
+		data := strings.SplitN(e, "=", 2)
+		if len(data) > 1 {
+			if data[0] == key {
+				t := strings.Split(data[1], ",")
+				for _, j := range t {
+					if !strings.Contains(j, "=") {
+						continue
+					}
+					h := strings.Split(j, "=")
+					if len(h) > 1 {
+						args[h[0]] = h[1]
+					}
+				}
+			}
+		}
+	}
+	return args
+}

@@ -88,19 +88,31 @@ func (a Aria2Listener) OnComplete(gid string) {
 }
 
 func getSession() *aria2go.Aria2 {
+	args := utils.GetCommandLineArgs()
+	envArgs := utils.GetEnvironmentArgs("aria2")
+	log.Printf("CommandLine Args: %v\n", args)
+	log.Printf("Env Args: %v\n", envArgs)
 	notifier := Aria2Listener{}
+	opts := aria2go.Options{
+		"seed-time":                 "0.01",
+		"max-overall-upload-limit":  "1K",
+		"max-concurrent-downloads":  "10",
+		"min-split-size":            "10M",
+		"split":                     "10",
+		"save-session":              "ses.session",
+		"max-connection-per-server": "10",
+		"follow-torrent":            "mem",
+		"allow-overwrite":           "true",
+	}
+	for i, j := range args {
+		opts[i] = j
+	}
+	for i, j := range envArgs {
+		opts[i] = j
+	}
+	log.Printf("Aria2 Opts: %v\n", opts)
 	a := aria2go.NewAria2(aria2go.Config{
-		Options: aria2go.Options{
-			"seed-time":                 "0.01",
-			"max-overall-upload-limit":  "1K",
-			"max-concurrent-downloads":  "10",
-			"min-split-size":            "10M",
-			"split":                     "10",
-			"save-session":              "ses.session",
-			"max-connection-per-server": "10",
-			"follow-torrent":            "mem",
-			"allow-overwrite":           "true",
-		},
+		Options: opts,
 	})
 	a.SetNotifier(notifier)
 	go a.Run()
