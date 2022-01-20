@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/net/context"
@@ -529,6 +530,19 @@ func (G *GoogleDriveClient) CheckRetry(file *drive.File, err error) bool {
 	return false
 }
 
+func (G *GoogleDriveClient) UploadFileByReader(fpath string, fileReader io.ReadSeekCloser, fileR io.Reader, length int64, parentId string) (*drive.File, error) {
+	arr := strings.Split(fpath, "/")
+	name := arr[len(arr)-1]
+	contentType := utils.GetFileMimeType(fileReader)
+	f := &drive.File{
+		MimeType: contentType,
+		Name:     name,
+		Parents:  []string{parentId},
+	}
+	file, err := G.DriveSrv.Files.Create(f).Media(fileR).SupportsAllDrives(true).Do()
+	return file, err
+}
+
 func (G *GoogleDriveClient) UploadFileNonResumable(parentId string, file_path string, retry int) (*drive.File, error) {
 	log.Printf("Uploading File with 0 bytes: %s\n", file_path)
 	content, err := os.Open(file_path)
@@ -871,10 +885,13 @@ type ProgressContext struct {
 	isCancelled bool
 	completed   int64
 	total       int64
+	mut         sync.Mutex
 	drive       *GoogleDriveClient
 }
 
 func (p *ProgressContext) Write(b []byte) (int, error) {
+	p.mut.Lock()
+	defer p.mut.Unlock()
 	if p.isCancelled {
 		return 0, errors.New("Canceled by user.")
 	}

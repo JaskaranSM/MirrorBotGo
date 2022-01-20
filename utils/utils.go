@@ -537,3 +537,15 @@ func GetEnvironmentArgs(key string) map[string]string {
 	}
 	return args
 }
+
+func GetFileMimeType(reader io.ReadSeekCloser) string {
+	buffer := make([]byte, 512)
+	_, err := reader.Read(buffer)
+	if err != nil {
+		return "application/octet-stream"
+	}
+
+	contentType := http.DetectContentType(buffer)
+	reader.Seek(0, 0)
+	return contentType
+}

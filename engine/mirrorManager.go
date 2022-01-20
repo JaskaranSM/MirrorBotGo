@@ -20,6 +20,7 @@ const (
 	MirrorStatusFailed       = "Failed"
 	MirrorStatusCanceled     = "Canceled"
 	MirrorStatusUploadQueued = "Queued for upload"
+	MirrorStatusStreaming    = "Streaming"
 )
 
 func getMap() map[int]MirrorStatus {

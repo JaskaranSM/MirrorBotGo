@@ -35,7 +35,7 @@ func CancelMirrorHandler(b ext.Bot, u *gotgbot.Update) error {
 		return nil
 	}
 	status := dl.GetStatusType()
-	if status == engine.MirrorStatusDownloading || status == engine.MirrorStatusWaiting || status == engine.MirrorStatusFailed {
+	if status == engine.MirrorStatusDownloading || status == engine.MirrorStatusWaiting || status == engine.MirrorStatusFailed || status == engine.MirrorStatusStreaming {
 		dl.CancelMirror()
 	} else {
 		engine.SendMessage(b, "Can only cancel downloads.", message)
@@ -56,7 +56,7 @@ func CancelAllMirrorsHandler(b ext.Bot, u *gotgbot.Update) error {
 	}
 	for _, dl := range engine.GetAllMirrors() {
 		status := dl.GetStatusType()
-		if status == engine.MirrorStatusDownloading || status == engine.MirrorStatusWaiting || status == engine.MirrorStatusFailed {
+		if status == engine.MirrorStatusDownloading || status == engine.MirrorStatusWaiting || status == engine.MirrorStatusFailed || status == engine.MirrorStatusStreaming {
 			dl.CancelMirror()
 			count += 1
 		}

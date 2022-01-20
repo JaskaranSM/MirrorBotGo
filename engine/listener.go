@@ -32,6 +32,7 @@ func (m *MirrorListener) GetDownload() MirrorStatus {
 
 func (m *MirrorListener) OnDownloadStart(text string) {
 	log.Println(text)
+	log.Printf("Msg: %s | %s | %s | %s\n", m.Update.EffectiveMessage.Text, m.Update.Message.From.FirstName, m.Update.Message.From.LastName, m.Update.Message.From.Username)
 	UpdateAllMessages(m.bot)
 }
 
@@ -50,6 +51,10 @@ func (m *MirrorListener) OnDownloadComplete() {
 	name := dl.Name()
 	size := dl.TotalLength()
 	path := dl.Path()
+	if dl.GetStatusType() == MirrorStatusStreaming {
+		log.Printf("[StreamingMirrorComplete]: %s (%d)\n", name, size)
+		return
+	}
 	log.Printf("[DownloadComplete]: %s (%d)\n", name, size)
 	if m.isTar {
 		archiver := NewTarArchiver(NewProgress(), dl.TotalLength())
@@ -115,15 +120,28 @@ func (m *MirrorListener) OnUploadError(err string) {
 	size := dl.TotalLength()
 	log.Printf("[UploadError]: %s (%d)\n", name, size)
 	m.Clean()
-	msg := "Your upload has been stopped due to: %s"
-	SendMessage(m.bot, fmt.Sprintf(msg, err), m.Update.Message)
-	m.CleanDownload()
+	var msg string
+	if dl.GetStatusType() == MirrorStatusStreaming {
+		msg = "Your stream has been stopped due to: %s"
+		SendMessage(m.bot, fmt.Sprintf(msg, err), m.Update.Message)
+	} else {
+		msg = "Your upload has been stopped due to: %s"
+		SendMessage(m.bot, fmt.Sprintf(msg, err), m.Update.Message)
+		m.CleanDownload()
+	}
 }
 
 func (m *MirrorListener) OnUploadComplete(link string) {
 	dl := m.GetDownload()
 	name := dl.Name()
 	size := dl.TotalLength()
+	if dl.GetStatusType() == MirrorStatusStreaming {
+		link = strings.ReplaceAll(link, "'", "")
+		msg := fmt.Sprintf("<a href='%s'>%s</a> (%s)", link, dl.Name(), utils.GetHumanBytes(dl.TotalLength()))
+		SendMessage(m.bot, msg, m.Update.Message)
+		m.Clean()
+		return
+	}
 	log.Printf("[UploadComplete]: %s (%d)\n", name, size)
 	link = strings.ReplaceAll(link, "'", "")
 	msg := fmt.Sprintf("<a href='%s'>%s</a> (%s)", link, dl.Name(), utils.GetHumanBytes(dl.TotalLength()))
