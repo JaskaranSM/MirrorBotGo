@@ -61,6 +61,10 @@ func (t *TarStatus) GetListener() *MirrorListener {
 	return t.listener
 }
 
+func (t *TarStatus) GetCloneListener() *CloneListener {
+	return nil
+}
+
 func (t *TarStatus) CancelMirror() bool {
 	return false
 }

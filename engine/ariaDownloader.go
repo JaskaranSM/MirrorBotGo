@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/coolerfall/aria2go"
+	"github.com/jaskaranSM/aria2go"
 )
 
 //AriaStatusCodeToString get status as string
@@ -196,6 +196,10 @@ func (t *AriaDownloadStatus) Path() string {
 
 func (t *AriaDownloadStatus) GetListener() *MirrorListener {
 	return t.listener
+}
+
+func (t *AriaDownloadStatus) GetCloneListener() *CloneListener {
+	return nil
 }
 
 func (t *AriaDownloadStatus) Index() int {

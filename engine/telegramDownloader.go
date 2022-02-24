@@ -250,6 +250,10 @@ func (t *TelegramDownloadStatus) GetListener() *MirrorListener {
 	return t.mtListener.listener
 }
 
+func (t *TelegramDownloadStatus) GetCloneListener() *CloneListener {
+	return nil
+}
+
 func (t *TelegramDownloadStatus) Index() int {
 	return t.Index_
 }

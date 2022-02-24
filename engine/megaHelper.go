@@ -48,6 +48,12 @@ func NewMegaDownload(link string, listener *MirrorListener) error {
 			}
 			megaMutex.Lock()
 			stats := megaClient.GetDownloadInfo(gid)
+			if stats.Gid == "" {
+				state = megasdkgo.StateFailed
+				do = false
+				megaMutex.Unlock()
+				continue
+			}
 			megaMutex.Unlock()
 			state = stats.State
 			time.Sleep(500 * time.Millisecond)
@@ -140,6 +146,10 @@ func (m *MegaDownloadStatus) Percentage() float32 {
 
 func (m *MegaDownloadStatus) GetListener() *MirrorListener {
 	return m.listener
+}
+
+func (m *MegaDownloadStatus) GetCloneListener() *CloneListener {
+	return nil
 }
 
 func (m *MegaDownloadStatus) CancelMirror() bool {

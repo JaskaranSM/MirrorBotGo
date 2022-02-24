@@ -69,6 +69,10 @@ func (t *UnArchiverStatus) GetListener() *MirrorListener {
 	return t.listener
 }
 
+func (t *UnArchiverStatus) GetCloneListener() *CloneListener {
+	return nil
+}
+
 func (t *UnArchiverStatus) CancelMirror() bool {
 	return false
 }

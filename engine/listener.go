@@ -148,6 +148,75 @@ func NewMirrorListener(b ext.Bot, update *gotgbot.Update, isTar bool, doUnArchiv
 	return MirrorListener{bot: b, Update: update, isTar: isTar, doUnArchive: doUnArchive, parentId: parentId}
 }
 
+type CloneListener struct {
+	Update     *gotgbot.Update
+	bot        ext.Bot
+	parentId   string
+	isCanceled bool
+}
+
+func (m *CloneListener) GetUid() int {
+	return m.Update.Message.MessageId
+}
+
+func (m *CloneListener) GetDownload() MirrorStatus {
+	return GetMirrorByUid(m.GetUid())
+}
+
+func (m *CloneListener) OnCloneStart(text string) {
+	log.Println(text)
+	UpdateAllMessages(m.bot)
+}
+
+func (m *CloneListener) Clean() {
+	MoveMirrorToCancel(m.GetUid(), GetMirrorByUid(m.GetUid()))
+	RemoveMirrorLocal(m.GetUid())
+	if GetAllMirrorsCount() == 0 {
+		DeleteAllMessages(m.bot)
+	}
+	UpdateAllMessages(m.bot)
+	runtime.GC()
+}
+
+func (m *CloneListener) OnCloneError(err string) {
+	if m.isCanceled {
+		return
+	}
+	m.isCanceled = true
+	dl := m.GetDownload()
+	name := dl.Name()
+	size := dl.TotalLength()
+	log.Printf("[onCloneError]: %s (%d) %s\n", name, size, err)
+	m.Clean()
+	msg := "Your clone has been stopped due to: %s"
+	SendMessage(m.bot, fmt.Sprintf(msg, err), m.Update.Message)
+
+}
+
+func (m *CloneListener) OnCloneComplete(link string, is_dir bool) {
+	dl := m.GetDownload()
+	name := dl.Name()
+	size := dl.TotalLength()
+	log.Printf("[CloneComplete]: %s (%d)\n", name, size)
+	link = strings.ReplaceAll(link, "'", "")
+	msg := fmt.Sprintf("<a href='%s'>%s</a> (%s)", link, dl.Name(), utils.GetHumanBytes(dl.TotalLength()))
+	in_url := utils.GetIndexUrl()
+	if in_url != "" {
+		in_url = in_url + "/" + name
+		if is_dir {
+			in_url += "/"
+		}
+		msg += fmt.Sprintf("\n\n Shareable Link: <a href='%s'>here</a>", in_url)
+	}
+	m.Clean()
+	SendMessage(m.bot, msg, m.Update.Message)
+
+}
+
+func NewCloneListener(b ext.Bot, update *gotgbot.Update, parentId string) CloneListener {
+	return CloneListener{bot: b, Update: update, parentId: parentId}
+}
+
 type MirrorStatus interface {
 	Name() string
 	CompletedLength() int64
@@ -160,5 +229,6 @@ type MirrorStatus interface {
 	GetStatusType() string
 	Index() int
 	GetListener() *MirrorListener
+	GetCloneListener() *CloneListener
 	CancelMirror() bool
 }

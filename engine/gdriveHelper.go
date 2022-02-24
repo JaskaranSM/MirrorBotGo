@@ -12,6 +12,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"golang.org/x/net/context"
@@ -51,12 +52,15 @@ type GoogleDriveClient struct {
 	err                 error
 	doNothing           bool
 	path                string
+	wg                  sync.WaitGroup
 	prg                 *ProgressContext
 	SleepTime           time.Duration
 	StartTime           time.Time
 	ETA                 time.Duration
 	DriveSrv            *drive.Service
 	Listener            *MirrorListener
+	CloneListener       *CloneListener
+	isCloneCancelled    bool
 }
 
 func (G *GoogleDriveClient) Init(rootId string) {
@@ -631,7 +635,7 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 	return file, nil
 }
 
-func (G *GoogleDriveClient) Clone(fileId string, parentId string) (string, error) {
+func (G *GoogleDriveClient) Clone(fileId string, parentId string) {
 	_, err := G.GetFileMetadata(parentId)
 	if err != nil {
 		log.Println("Clone error while checking for user supplied parentId: " + err.Error())
@@ -640,61 +644,103 @@ func (G *GoogleDriveClient) Clone(fileId string, parentId string) (string, error
 	var link string
 	meta, err := G.GetFileMetadata(fileId)
 	if err != nil {
-		return link, err
+		G.CloneListener.OnCloneError(err.Error())
+		return
 	}
+	G.name = meta.Name
 	log.Println("Cloning: " + meta.Name)
+	G.CloneListener.OnCloneStart(meta.Name)
 	if meta.MimeType == G.GDRIVE_DIR_MIMETYPE {
 		new_dir, err := G.CreateDir(meta.Name, parentId, 1)
 		if err != nil {
 			log.Println("GDriveCreateDir: " + err.Error())
-			return link, err
+			G.CloneListener.OnCloneError(err.Error())
+			return
 		} else {
-			G.CopyFolder(meta.Id, new_dir.Id)
+			if utils.UseSa() {
+				G.SwitchServiceAccount()
+				G.wg.Add(1)
+				go G.CopyFolder(meta.Id, new_dir.Id, true)
+				G.wg.Wait()
+			} else {
+				G.CopyFolder(meta.Id, new_dir.Id, false)
+			}
 		}
 		link = G.FormatLink(new_dir.Id)
 	} else {
-		file, err := G.CopyFile(meta.Id, parentId, 1)
+		file, err := G.CopyFile(meta.Id, parentId, 1, false, meta.Size)
 		if err != nil {
-			return link, err
+			G.CloneListener.OnCloneError(err.Error())
+			return
+
 		}
 		link = G.FormatLink(file.Id)
 		G.TotalLength += meta.Size
 	}
-	log.Println("CloneDone: " + meta.Name)
-	out_str := fmt.Sprintf("<a href='%s'>%s</a> (%s)", link, meta.Name, utils.GetHumanBytes(G.TotalLength))
-	in_url := utils.GetIndexUrl()
-	if in_url != "" {
-		in_url = in_url + "/" + meta.Name
-		if meta.MimeType == G.GDRIVE_DIR_MIMETYPE {
-			in_url += "/"
-		}
-		out_str += fmt.Sprintf("\n\n Shareable Link: <a href='%s'>here</a>", in_url)
+	if G.isCloneCancelled {
+		G.CloneListener.OnCloneError("Cancelled by user.")
+		return
 	}
-	return out_str, nil
+	log.Println("CloneDone: " + meta.Name)
+	G.CloneListener.OnCloneComplete(link, meta.MimeType == G.GDRIVE_DIR_MIMETYPE)
 }
 
-func (G *GoogleDriveClient) CopyFolder(folderId, parentId string) {
+func (G *GoogleDriveClient) CopyFolder(folderId, parentId string, is_thread bool) {
+	if is_thread {
+		defer G.wg.Done()
+	}
 	files := G.ListFilesByParentId(folderId, "", -1)
 	for _, file := range files {
 		if file.MimeType == G.GDRIVE_DIR_MIMETYPE {
+			continue
+		}
+		G.TotalLength += file.Size
+	}
+	for _, file := range files {
+		if G.isCloneCancelled {
+			return
+		}
+		if file.MimeType == G.GDRIVE_DIR_MIMETYPE {
+			if utils.UseSa() {
+				G.SwitchServiceAccount()
+			}
 			new_dir, err := G.CreateDir(file.Name, parentId, 1)
 			if err != nil {
 				log.Println("GDriveCreateDir: " + err.Error())
 			} else {
-				G.CopyFolder(file.Id, new_dir.Id)
+				if is_thread {
+					if utils.UseSa() {
+						G.SwitchServiceAccount()
+					}
+					G.wg.Add(1)
+					go G.CopyFolder(file.Id, new_dir.Id, true)
+				} else {
+					G.CopyFolder(file.Id, new_dir.Id, false)
+				}
+
 			}
 		} else {
-			_, err := G.CopyFile(file.Id, parentId, 1)
-			if err != nil {
-				log.Println("GDriveCopy: " + err.Error())
+			if is_thread {
+				if utils.UseSa() {
+					G.SwitchServiceAccount()
+				}
+				G.wg.Add(1)
+				go G.CopyFile(file.Id, parentId, 1, true, file.Size)
+			} else {
+				G.CopyFile(file.Id, parentId, 1, false, file.Size)
 			}
-			G.TotalLength += file.Size
 		}
 	}
 
 }
 
-func (G *GoogleDriveClient) CopyFile(fileId, parentId string, retry int) (*drive.File, error) {
+func (G *GoogleDriveClient) CopyFile(fileId, parentId string, retry int, is_thread bool, size int64) (*drive.File, error) {
+	if is_thread {
+		defer G.wg.Done()
+	}
+	if G.isCloneCancelled {
+		return nil, fmt.Errorf("Cancelled by user")
+	}
 	f := &drive.File{
 		Parents: []string{parentId},
 	}
@@ -707,7 +753,7 @@ func (G *GoogleDriveClient) CopyFile(fileId, parentId string, retry int) (*drive
 			if retry <= G.MaxRetries {
 				log.Println("Encountered: ", err.Error(), " retryin: ", retry)
 				time.Sleep(G.SleepTime)
-				return G.CopyFile(fileId, parentId, retry+1)
+				return G.CopyFile(fileId, parentId, retry+1, is_thread, size)
 			} else {
 				log.Println("Could not copy file (even after retryin): " + err.Error())
 				return nil, err
@@ -717,6 +763,7 @@ func (G *GoogleDriveClient) CopyFile(fileId, parentId string, retry int) (*drive
 			return nil, err
 		}
 	}
+	G.CompletedLength += size
 	if !utils.IsTeamDrive() {
 		err = G.SetPermissions(file.Id, 1)
 		if err != nil {
@@ -742,6 +789,19 @@ func NewGDriveDownload(fileId string, listener *MirrorListener) {
 	status.Index_ = GenerateMirrorIndex()
 	AddMirrorLocal(listener.GetUid(), status)
 	status.GetListener().OnDownloadStart(status.Gid())
+}
+
+func NewGDriveClone(fileId string, parentId string, listener *CloneListener) {
+	client := NewGDriveClient(0, nil)
+	client.Init("")
+	client.Authorize()
+	client.name = "getting metadata"
+	client.CloneListener = listener
+	gid := utils.RandString(16)
+	status := NewGoogleDriveCloneStatus(client, gid)
+	status.Index_ = GenerateMirrorIndex()
+	AddMirrorLocal(listener.GetUid(), status)
+	go client.Clone(fileId, parentId)
 }
 
 type GoogleDriveDownloadStatus struct {
@@ -789,6 +849,10 @@ func (g *GoogleDriveDownloadStatus) Percentage() float32 {
 
 func (g *GoogleDriveDownloadStatus) GetListener() *MirrorListener {
 	return g.DriveObj.Listener
+}
+
+func (g *GoogleDriveDownloadStatus) GetCloneListener() *CloneListener {
+	return nil
 }
 
 func (g *GoogleDriveDownloadStatus) Index() int {
@@ -855,6 +919,10 @@ func (g *GoogleDriveStatus) GetListener() *MirrorListener {
 	return g.DriveObj.Listener
 }
 
+func (g *GoogleDriveStatus) GetCloneListener() *CloneListener {
+	return nil
+}
+
 func (g *GoogleDriveStatus) Index() int {
 	return g.Index_
 }
@@ -865,6 +933,81 @@ func (g *GoogleDriveStatus) CancelMirror() bool {
 
 func NewGoogleDriveStatus(driveobj *GoogleDriveClient, name string, gid string) *GoogleDriveStatus {
 	return &GoogleDriveStatus{DriveObj: driveobj, name: name, gid: gid}
+}
+
+type GoogleDriveCloneStatus struct {
+	DriveObj  *GoogleDriveClient
+	gid       string
+	startTime time.Time
+	Index_    int
+}
+
+func (g *GoogleDriveCloneStatus) Name() string {
+	return g.DriveObj.name
+}
+
+func (g *GoogleDriveCloneStatus) CompletedLength() int64 {
+	return g.DriveObj.CompletedLength
+}
+
+func (g *GoogleDriveCloneStatus) TotalLength() int64 {
+	return g.DriveObj.TotalLength
+}
+
+func (g *GoogleDriveCloneStatus) Speed() int64 {
+	now := time.Now()
+	diff := int64(now.Sub(g.startTime).Seconds())
+	if diff != 0 {
+		return g.CompletedLength() / diff
+	}
+	return 0
+}
+
+func (g *GoogleDriveCloneStatus) Gid() string {
+	return g.gid
+}
+
+func (g *GoogleDriveCloneStatus) ETA() *time.Duration {
+	if g.Speed() != 0 {
+		dur := utils.CalculateETA(g.TotalLength()-g.CompletedLength(), g.Speed())
+		return &dur
+	} else {
+		dur := time.Duration(0)
+		return &dur
+	}
+}
+
+func (g *GoogleDriveCloneStatus) GetStatusType() string {
+	return MirrorStatusCloning
+}
+
+func (g *GoogleDriveCloneStatus) Path() string {
+	return g.DriveObj.path
+}
+
+func (g *GoogleDriveCloneStatus) Percentage() float32 {
+	return float32(g.CompletedLength()*100) / float32(g.TotalLength())
+}
+
+func (g *GoogleDriveCloneStatus) GetListener() *MirrorListener {
+	return g.DriveObj.Listener
+}
+
+func (g *GoogleDriveCloneStatus) GetCloneListener() *CloneListener {
+	return g.DriveObj.CloneListener
+}
+
+func (g *GoogleDriveCloneStatus) Index() int {
+	return g.Index_
+}
+
+func (g *GoogleDriveCloneStatus) CancelMirror() bool {
+	g.DriveObj.isCloneCancelled = true
+	return true
+}
+
+func NewGoogleDriveCloneStatus(driveobj *GoogleDriveClient, gid string) *GoogleDriveCloneStatus {
+	return &GoogleDriveCloneStatus{DriveObj: driveobj, gid: gid}
 }
 
 type ProgressContext struct {
