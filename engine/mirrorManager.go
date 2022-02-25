@@ -33,7 +33,7 @@ func GetAllMirrors() []MirrorStatus {
 		dls = append(dls, dl)
 	}
 	sort.Slice(dls, func(i, j int) bool {
-		return dls[i].GetStatusType() == MirrorStatusDownloading
+		return dls[i].Index() < dls[j].Index()
 	})
 	return dls
 }

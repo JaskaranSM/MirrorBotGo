@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool) error {
+func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, sendStatusMessage bool) error {
 	message := ctx.EffectiveMessage
 	var link string
 	var isTgDownload bool = false
@@ -87,7 +87,9 @@ func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool) erro
 		engine.SendMessage(b, "No Source Provided.", message)
 		return nil
 	}
-	engine.SendStatusMessage(b, message)
+	if sendStatusMessage {
+		engine.SendStatusMessage(b, message)
+	}
 	if !engine.Spinner.IsRunning() {
 		engine.Spinner.Start(b)
 	}
@@ -98,21 +100,42 @@ func MirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, false)
+	return Mirror(b, ctx, false, false, true)
+}
+
+func SilentMirrorhandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
+		return nil
+	}
+	return Mirror(b, ctx, false, false, false)
 }
 
 func TarMirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, true, false)
+	return Mirror(b, ctx, true, false, true)
+}
+
+func SilentTarMirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
+		return nil
+	}
+	return Mirror(b, ctx, true, false, false)
 }
 
 func UnArchMirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, true)
+	return Mirror(b, ctx, false, true, true)
+}
+
+func SilentUnArchMirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
+		return nil
+	}
+	return Mirror(b, ctx, false, true, false)
 }
 
 func LoadMirrorHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
@@ -120,4 +143,7 @@ func LoadMirrorHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 	updater.Dispatcher.AddHandler(handlers.NewCommand("mirror", MirrorHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("tarmirror", TarMirrorHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("unarchmirror", UnArchMirrorHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("mirrors", SilentMirrorhandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("tarmirrors", SilentTarMirrorHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("unarchmirrors", SilentUnArchMirrorHandler))
 }

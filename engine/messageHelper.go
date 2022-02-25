@@ -90,16 +90,12 @@ func EditMessage(b *gotgbot.Bot, messageText string, message *gotgbot.Message) (
 func EditMessageMarkup(b *gotgbot.Bot, messageText string, message *gotgbot.Message, markup gotgbot.InlineKeyboardMarkup) (*gotgbot.Message, error) {
 	m, _, err := b.EditMessageText(
 		messageText, &gotgbot.EditMessageTextOpts{
-			ChatId:    message.Chat.Id,
-			MessageId: message.MessageId,
-			ParseMode: "HTML",
+			ChatId:      message.Chat.Id,
+			MessageId:   message.MessageId,
+			ParseMode:   "HTML",
+			ReplyMarkup: markup,
 		},
 	)
-	m, _, err = b.EditMessageReplyMarkup(&gotgbot.EditMessageReplyMarkupOpts{
-		ReplyMarkup: markup,
-		ChatId:      message.Chat.Id,
-		MessageId:   message.MessageId,
-	})
 	return m, err
 }
 
@@ -162,10 +158,12 @@ func GetPaginationMarkup(previous bool, next bool, prString string, nxString str
 	var modulesMatrix [][]gotgbot.InlineKeyboardButton
 	var modules []gotgbot.InlineKeyboardButton
 	if previous {
+		modules = append(modules, NewKeyboardButtonText(fmt.Sprint("First", ""), "first"))
 		modules = append(modules, NewKeyboardButtonText(fmt.Sprintf("<=(%s)", prString), "previous"))
 	}
 	if next {
 		modules = append(modules, NewKeyboardButtonText(fmt.Sprintf("=>(%s)", nxString), "next"))
+		modules = append(modules, NewKeyboardButtonText(fmt.Sprint("Last", ""), "last"))
 	}
 	modulesMatrix = append(modulesMatrix, modules)
 	markup.InlineKeyboard = modulesMatrix
@@ -183,6 +181,7 @@ func SendStatusMessage(b *gotgbot.Bot, message *gotgbot.Message) error {
 		DeleteMessage(b, msg)
 		DeleteMessageByChatId(message.Chat.Id)
 	}
+
 	progress = GetReadableProgressMessage(0)
 	if GetAllMirrorsCount() > STATUS_MESSAGE_CHUNKSIZE {
 		newMsg, err = SendMessageMarkup(b, progress, message, GetPaginationMarkup(false, true, "0", utils.ParseIntToString(len(GetAllMirrorsChunked(STATUS_MESSAGE_CHUNKSIZE))-1)))

@@ -13,10 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func CloneHandler(b *gotgbot.Bot, ctx *ext.Context) error {
-	if !db.IsAuthorized(ctx.EffectiveMessage) {
-		return nil
-	}
+func Clone(b *gotgbot.Bot, ctx *ext.Context, sendStatusMessage bool) error {
 	message := ctx.EffectiveMessage
 	link := utils.ParseMessageArgs(message.Text)
 	if link == "" {
@@ -42,7 +39,9 @@ func CloneHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 		} else {
 			listener := engine.NewCloneListener(b, ctx, parentId)
 			engine.NewGDriveClone(fileId, parentId, &listener)
-			engine.SendStatusMessage(b, message)
+			if sendStatusMessage {
+				engine.SendStatusMessage(b, message)
+			}
 			if !engine.Spinner.IsRunning() {
 				engine.Spinner.Start(b)
 			}
@@ -52,7 +51,22 @@ func CloneHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	return nil
 }
 
+func CloneHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
+		return nil
+	}
+	return Clone(b, ctx, true)
+}
+
+func SilentCloneHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
+		return nil
+	}
+	return Clone(b, ctx, false)
+}
+
 func LoadCloneHandler(updater *ext.Updater, l *zap.SugaredLogger) {
 	defer l.Info("Clone Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("clone", CloneHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("clones", SilentCloneHandler))
 }

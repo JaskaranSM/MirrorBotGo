@@ -40,6 +40,20 @@ func MirrorStatusPreviousHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	return nil
 }
 
+func MirrorStatusFirstHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	cq := ctx.CallbackQuery
+	cq.Answer(b, nil)
+	status_msg := engine.GetMessageByChatId(ctx.EffectiveChat.Id)
+	if status_msg == nil {
+		return nil
+	}
+	if engine.GetAllMirrorsCount() > engine.STATUS_MESSAGE_CHUNKSIZE {
+		status_msg.Date = 0
+	}
+	engine.UpdateAllMessages(b)
+	return nil
+}
+
 func MirrorStatusNextHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	cq := ctx.CallbackQuery
 	cq.Answer(b, nil)
@@ -54,6 +68,20 @@ func MirrorStatusNextHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	return nil
 }
 
+func MirrorStatusLastHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	cq := ctx.CallbackQuery
+	cq.Answer(b, nil)
+	status_msg := engine.GetMessageByChatId(ctx.EffectiveChat.Id)
+	if status_msg == nil {
+		return nil
+	}
+	if engine.GetAllMirrorsCount() > engine.STATUS_MESSAGE_CHUNKSIZE {
+		status_msg.Date = int64(len(engine.GetAllMirrorsChunked(engine.STATUS_MESSAGE_CHUNKSIZE)) - 1)
+	}
+	engine.UpdateAllMessages(b)
+	return nil
+}
+
 func LoadMirrorStatusHandler(updater *ext.Updater, l *zap.SugaredLogger) {
 	defer l.Info("MirrorStatus Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("status", MirrorStatusHandler))
@@ -63,4 +91,10 @@ func LoadMirrorStatusHandler(updater *ext.Updater, l *zap.SugaredLogger) {
 	updater.Dispatcher.AddHandler(handlers.NewCallback(func(cq *gotgbot.CallbackQuery) bool {
 		return cq.Data == "next"
 	}, MirrorStatusNextHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCallback(func(cq *gotgbot.CallbackQuery) bool {
+		return cq.Data == "first"
+	}, MirrorStatusFirstHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCallback(func(cq *gotgbot.CallbackQuery) bool {
+		return cq.Data == "last"
+	}, MirrorStatusLastHandler))
 }
