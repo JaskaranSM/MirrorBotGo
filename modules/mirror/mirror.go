@@ -7,14 +7,14 @@ import (
 	"log"
 	"strings"
 
-	"github.com/PaulSonOfLars/gotgbot"
-	"github.com/PaulSonOfLars/gotgbot/ext"
-	"github.com/PaulSonOfLars/gotgbot/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"go.uber.org/zap"
 )
 
-func Mirror(b ext.Bot, u *gotgbot.Update, isTar bool, doUnArchive bool) error {
-	message := u.EffectiveMessage
+func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool) error {
+	message := ctx.EffectiveMessage
 	var link string
 	var isTgDownload bool = false
 	var parentId string
@@ -23,7 +23,7 @@ func Mirror(b ext.Bot, u *gotgbot.Update, isTar bool, doUnArchive bool) error {
 		if doc.MimeType == "application/x-bittorrent" {
 			file, err := b.GetFile(doc.FileId)
 			if err != nil {
-				b.Logger.Error(err)
+				log.Println(err)
 			}
 			if strings.Contains(message.Text, "|") {
 				data := strings.SplitN(message.Text, "|", 2)
@@ -61,7 +61,7 @@ func Mirror(b ext.Bot, u *gotgbot.Update, isTar bool, doUnArchive bool) error {
 	}
 	log.Println("ALT: ", parentId)
 	fileId := utils.GetFileIdByGDriveLink(link)
-	listener := engine.NewMirrorListener(b, u, isTar, doUnArchive, parentId)
+	listener := engine.NewMirrorListener(b, ctx, isTar, doUnArchive, parentId)
 	if isTgDownload {
 		err := engine.NewTelegramDownload(message.ReplyToMessage, &listener)
 		if err != nil {
@@ -94,28 +94,28 @@ func Mirror(b ext.Bot, u *gotgbot.Update, isTar bool, doUnArchive bool) error {
 	return nil
 }
 
-func MirrorHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !db.IsAuthorized(u.EffectiveMessage) {
+func MirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, u, false, false)
+	return Mirror(b, ctx, false, false)
 }
 
-func TarMirrorHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !db.IsAuthorized(u.EffectiveMessage) {
+func TarMirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, u, true, false)
+	return Mirror(b, ctx, true, false)
 }
 
-func UnArchMirrorHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !db.IsAuthorized(u.EffectiveMessage) {
+func UnArchMirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, u, false, true)
+	return Mirror(b, ctx, false, true)
 }
 
-func LoadMirrorHandlers(updater *gotgbot.Updater, l *zap.SugaredLogger) {
+func LoadMirrorHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 	defer l.Info("Mirror Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("mirror", MirrorHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("tarmirror", TarMirrorHandler))

@@ -9,21 +9,21 @@ import (
 	"strings"
 	"time"
 
-	"github.com/PaulSonOfLars/gotgbot"
-	"github.com/PaulSonOfLars/gotgbot/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 )
 
 type MirrorListener struct {
-	Update      *gotgbot.Update
-	bot         ext.Bot
+	Update      *ext.Context
+	bot         *gotgbot.Bot
 	isTar       bool
 	doUnArchive bool
 	parentId    string
 	isCanceled  bool
 }
 
-func (m *MirrorListener) GetUid() int {
-	return m.Update.Message.MessageId
+func (m *MirrorListener) GetUid() int64 {
+	return m.Update.EffectiveMessage.MessageId
 }
 
 func (m *MirrorListener) GetDownload() MirrorStatus {
@@ -93,6 +93,7 @@ func (m *MirrorListener) OnDownloadComplete() {
 	upload_limit_chan <- 1
 	drive.Upload(path, parentId)
 }
+
 func (m *MirrorListener) OnDownloadError(err string) {
 	if m.isCanceled {
 		return
@@ -141,22 +142,22 @@ func (m *MirrorListener) OnUploadComplete(link string) {
 }
 
 func (m *MirrorListener) CleanDownload() {
-	utils.RemoveByPath(path.Join(utils.GetDownloadDir(), utils.ParseIntToString(m.GetUid())))
+	utils.RemoveByPath(path.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(m.GetUid())))
 }
 
-func NewMirrorListener(b ext.Bot, update *gotgbot.Update, isTar bool, doUnArchive bool, parentId string) MirrorListener {
+func NewMirrorListener(b *gotgbot.Bot, update *ext.Context, isTar bool, doUnArchive bool, parentId string) MirrorListener {
 	return MirrorListener{bot: b, Update: update, isTar: isTar, doUnArchive: doUnArchive, parentId: parentId}
 }
 
 type CloneListener struct {
-	Update     *gotgbot.Update
-	bot        ext.Bot
+	Update     *ext.Context
+	bot        *gotgbot.Bot
 	parentId   string
 	isCanceled bool
 }
 
-func (m *CloneListener) GetUid() int {
-	return m.Update.Message.MessageId
+func (m *CloneListener) GetUid() int64 {
+	return m.Update.EffectiveMessage.MessageId
 }
 
 func (m *CloneListener) GetDownload() MirrorStatus {
@@ -213,7 +214,7 @@ func (m *CloneListener) OnCloneComplete(link string, is_dir bool) {
 
 }
 
-func NewCloneListener(b ext.Bot, update *gotgbot.Update, parentId string) CloneListener {
+func NewCloneListener(b *gotgbot.Bot, update *ext.Context, parentId string) CloneListener {
 	return CloneListener{bot: b, Update: update, parentId: parentId}
 }
 

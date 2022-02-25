@@ -6,18 +6,18 @@ import (
 	"MirrorBotGo/utils"
 	"fmt"
 
-	"github.com/PaulSonOfLars/gotgbot"
-	"github.com/PaulSonOfLars/gotgbot/ext"
-	"github.com/PaulSonOfLars/gotgbot/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"go.uber.org/zap"
 )
 
-func CancelMirrorHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !db.IsAuthorized(u.EffectiveMessage) {
+func CancelMirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
 	var dl engine.MirrorStatus
-	message := u.EffectiveMessage
+	message := ctx.EffectiveMessage
 	gid := utils.ParseMessageArgs(message.Text)
 	if message.ReplyToMessage == nil && gid == "" {
 		engine.SendMessage(b, "Reply to mirror start message or provide gid to cancel it.", message)
@@ -44,12 +44,12 @@ func CancelMirrorHandler(b ext.Bot, u *gotgbot.Update) error {
 	return nil
 }
 
-func CancelAllMirrorsHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !utils.IsUserOwner(u.EffectiveUser.Id) {
+func CancelAllMirrorsHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
 		return nil
 	}
 	count := 0
-	message := u.EffectiveMessage
+	message := ctx.EffectiveMessage
 	if engine.GetAllMirrorsCount() == 0 {
 		engine.SendMessage(b, "No Mirror to cancel.", message)
 		return nil
@@ -65,7 +65,7 @@ func CancelAllMirrorsHandler(b ext.Bot, u *gotgbot.Update) error {
 	return nil
 }
 
-func LoadCancelMirrorHandler(updater *gotgbot.Updater, l *zap.SugaredLogger) {
+func LoadCancelMirrorHandler(updater *ext.Updater, l *zap.SugaredLogger) {
 	defer l.Info("CancelMirror Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("cancel", CancelMirrorHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("cancelall", CancelAllMirrorsHandler))

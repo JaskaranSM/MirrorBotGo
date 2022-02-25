@@ -6,15 +6,15 @@ import (
 	"log"
 	"time"
 
-	"github.com/PaulSonOfLars/gotgbot/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 var dbClient *mongo.Client = getDbClient()
-var AuthorizedUsers []int
-var AuthorizedChats []int
+var AuthorizedUsers []int64
+var AuthorizedChats []int64
 
 func getDbClient() *mongo.Client {
 	log.Printf("[DB] Connection: %s\n", utils.GetDbUri())
@@ -31,7 +31,7 @@ func getDbClient() *mongo.Client {
 	return client
 }
 
-func IsUserAuthorized(userId int) bool {
+func IsUserAuthorized(userId int64) bool {
 	for _, i := range AuthorizedUsers {
 		if i == userId {
 			return true
@@ -40,7 +40,7 @@ func IsUserAuthorized(userId int) bool {
 	return false
 }
 
-func IsChatAuthorized(chatId int) bool {
+func IsChatAuthorized(chatId int64) bool {
 	for _, i := range AuthorizedChats {
 		if i == chatId {
 			return true
@@ -49,7 +49,7 @@ func IsChatAuthorized(chatId int) bool {
 	return false
 }
 
-func GetUserIndex(userId int) int {
+func GetUserIndex(userId int64) int {
 	for i := 0; i <= len(AuthorizedUsers); i++ {
 		if AuthorizedUsers[i] == userId {
 			return i
@@ -58,7 +58,7 @@ func GetUserIndex(userId int) int {
 	return -1
 }
 
-func GetChatIndex(chatId int) int {
+func GetChatIndex(chatId int64) int {
 	for i := 0; i <= len(AuthorizedChats); i++ {
 		if AuthorizedChats[i] == chatId {
 			return i
@@ -67,7 +67,7 @@ func GetChatIndex(chatId int) int {
 	return -1
 }
 
-func AuthorizeUserLocal(userId int) bool {
+func AuthorizeUserLocal(userId int64) bool {
 	if IsUserAuthorized(userId) {
 		return false
 	}
@@ -75,7 +75,7 @@ func AuthorizeUserLocal(userId int) bool {
 	return true
 }
 
-func UnAuthorizeUserLocal(userId int) bool {
+func UnAuthorizeUserLocal(userId int64) bool {
 	if !IsUserAuthorized(userId) {
 		return false
 	}
@@ -88,7 +88,7 @@ func UnAuthorizeUserLocal(userId int) bool {
 	return true
 }
 
-func AuthorizeChatLocal(chatId int) bool {
+func AuthorizeChatLocal(chatId int64) bool {
 	if IsChatAuthorized(chatId) {
 		return false
 	}
@@ -96,7 +96,7 @@ func AuthorizeChatLocal(chatId int) bool {
 	return true
 }
 
-func UnAuthorizeChatLocal(chatId int) bool {
+func UnAuthorizeChatLocal(chatId int64) bool {
 	if !IsChatAuthorized(chatId) {
 		return false
 	}
@@ -109,7 +109,7 @@ func UnAuthorizeChatLocal(chatId int) bool {
 	return true
 }
 
-func AuthorizeChatDb(chatId int) bool {
+func AuthorizeChatDb(chatId int64) bool {
 	Ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 	collection := dbClient.Database("mirrorBot").Collection("AUTHORIZEDCHATS")
@@ -125,7 +125,7 @@ func AuthorizeChatDb(chatId int) bool {
 	return true
 }
 
-func UnAuthorizeChatDb(chatId int) bool {
+func UnAuthorizeChatDb(chatId int64) bool {
 	Ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 	collection := dbClient.Database("mirrorBot").Collection("AUTHORIZEDCHATS")
@@ -141,7 +141,7 @@ func UnAuthorizeChatDb(chatId int) bool {
 	return true
 }
 
-func AuthorizeUserDb(userId int) bool {
+func AuthorizeUserDb(userId int64) bool {
 	Ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 	collection := dbClient.Database("mirrorBot").Collection("AUTHORIZEDUSERS")
@@ -157,7 +157,7 @@ func AuthorizeUserDb(userId int) bool {
 	return true
 }
 
-func UnAuthorizeUserDb(userId int) bool {
+func UnAuthorizeUserDb(userId int64) bool {
 	Ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 	collection := dbClient.Database("mirrorBot").Collection("AUTHORIZEDUSERS")
@@ -201,7 +201,7 @@ func InitChats() bool {
 			log.Println(err)
 		} else {
 			if result["chatId"] != nil {
-				chatId := utils.ParseInterfaceToInt(result["chatId"])
+				chatId := utils.ParseInterfaceToInt64(result["chatId"])
 				AuthorizeChatLocal(chatId)
 				log.Printf("Added %d in AuthorizedChats\n", chatId)
 			}
@@ -227,7 +227,7 @@ func InitUsers() bool {
 			log.Println(err)
 		} else {
 			if result["userId"] != nil {
-				userId := utils.ParseInterfaceToInt(result["userId"])
+				userId := utils.ParseInterfaceToInt64(result["userId"])
 				AuthorizeUserLocal(userId)
 				log.Printf("Added %d in AuthorizedUsers\n", userId)
 			}
@@ -236,7 +236,7 @@ func InitUsers() bool {
 	return true
 }
 
-func IsAuthorized(message *ext.Message) bool {
+func IsAuthorized(message *gotgbot.Message) bool {
 	if IsUserAuthorized(message.From.Id) || IsChatAuthorized(message.Chat.Id) {
 		return true
 	}

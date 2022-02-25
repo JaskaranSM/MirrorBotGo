@@ -6,19 +6,19 @@ import (
 	"MirrorBotGo/utils"
 	"fmt"
 
-	"github.com/PaulSonOfLars/gotgbot"
-	"github.com/PaulSonOfLars/gotgbot/ext"
-	"github.com/PaulSonOfLars/gotgbot/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"go.uber.org/zap"
 )
 
-func ListHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !db.IsAuthorized(u.EffectiveMessage) {
+func ListHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	var out *ext.Message
+	var out *gotgbot.Message
 	var err error
-	message := u.EffectiveMessage
+	message := ctx.EffectiveMessage
 	name := utils.ParseMessageArgs(message.Text)
 	if name == "" {
 		engine.SendMessage(b, "Provide search query.", message)
@@ -57,7 +57,7 @@ func ListHandler(b ext.Bot, u *gotgbot.Update) error {
 	return nil
 }
 
-func LoadListHandler(updater *gotgbot.Updater, l *zap.SugaredLogger) {
+func LoadListHandler(updater *ext.Updater, l *zap.SugaredLogger) {
 	defer l.Info("List Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("list", ListHandler))
 }

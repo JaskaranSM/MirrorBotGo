@@ -7,8 +7,8 @@ import (
 
 var dlMutex sync.Mutex
 var indexMutex sync.Mutex
-var AllMirrors map[int]MirrorStatus = getMap()
-var CanceledMirrors map[int]MirrorStatus = getMap()
+var AllMirrors map[int64]MirrorStatus = getMap()
+var CanceledMirrors map[int64]MirrorStatus = getMap()
 var GlobalMirrorIndex int = 0
 
 const (
@@ -23,8 +23,8 @@ const (
 	MirrorStatusUploadQueued = "Queued for upload"
 )
 
-func getMap() map[int]MirrorStatus {
-	return make(map[int]MirrorStatus)
+func getMap() map[int64]MirrorStatus {
+	return make(map[int64]MirrorStatus)
 }
 
 func GetAllMirrors() []MirrorStatus {
@@ -33,7 +33,7 @@ func GetAllMirrors() []MirrorStatus {
 		dls = append(dls, dl)
 	}
 	sort.Slice(dls, func(i, j int) bool {
-		return dls[i].Index() > dls[j].Index()
+		return dls[i].GetStatusType() == MirrorStatusDownloading
 	})
 	return dls
 }
@@ -47,7 +47,7 @@ func GetMirrorByGid(gid string) MirrorStatus {
 	return nil
 }
 
-func GetMirrorByUid(uid int) MirrorStatus {
+func GetMirrorByUid(uid int64) MirrorStatus {
 	for i, dl := range AllMirrors {
 		if i == uid {
 			return dl
@@ -60,19 +60,19 @@ func GetAllMirrorsCount() int {
 	return len(GetAllMirrors())
 }
 
-func AddMirrorLocal(messageId int, dl MirrorStatus) {
+func AddMirrorLocal(messageId int64, dl MirrorStatus) {
 	dlMutex.Lock()
 	defer dlMutex.Unlock()
 	AllMirrors[messageId] = dl
 }
 
-func MoveMirrorToCancel(messageId int, dl MirrorStatus) {
+func MoveMirrorToCancel(messageId int64, dl MirrorStatus) {
 	dlMutex.Lock()
 	defer dlMutex.Unlock()
 	CanceledMirrors[messageId] = dl
 }
 
-func RemoveMirrorLocal(messageId int) {
+func RemoveMirrorLocal(messageId int64) {
 	dlMutex.Lock()
 	defer dlMutex.Unlock()
 	_, ok := AllMirrors[messageId]
@@ -88,4 +88,17 @@ func GenerateMirrorIndex() int {
 		indexMutex.Unlock()
 	}()
 	return GlobalMirrorIndex
+}
+
+func GetAllMirrorsChunked(chunkSize int) (chunks [][]MirrorStatus) {
+	//While there are more items remaining than chunkSize...
+	items := GetAllMirrors()
+	for chunkSize < len(items) {
+		//We take a slice of size chunkSize from the items array and append it to the new array
+		chunks = append(chunks, items[0:chunkSize])
+		//Then we remove those elements from the items array
+		items = items[chunkSize:]
+	}
+	//Finally we append the remaining items to the new array and return it
+	return append(chunks, items)
 }

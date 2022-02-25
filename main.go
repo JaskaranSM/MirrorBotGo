@@ -20,15 +20,14 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 
-	"github.com/PaulSonOfLars/gotgbot"
-	"github.com/PaulSonOfLars/gotgbot/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
-func RegisterAllHandlers(updater *gotgbot.Updater, l *zap.SugaredLogger) {
+func RegisterAllHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 	start.LoadStartHandler(updater, l)
 	mirror.LoadMirrorHandlers(updater, l)
 	mirrorstatus.LoadMirrorStatusHandler(updater, l)
@@ -64,27 +63,25 @@ func main() {
 	token := utils.GetBotToken()
 	l.Info("Starting Bot.")
 	l.Info("token: ", token)
-	updater, err := gotgbot.NewUpdater(logger, token)
-	l.Info("Got Updater")
-	updater.UpdateGetter = ext.BaseRequester{
-		Client: http.Client{
-			Transport:     nil,
-			CheckRedirect: nil,
-			Jar:           nil,
-			Timeout:       time.Second * 65,
-		},
-		ApiUrl: ext.ApiUrl,
-	}
-	updater.Bot.Requester = ext.BaseRequester{Client: http.Client{Timeout: time.Second * 65}}
+	b, err := gotgbot.NewBot(token, &gotgbot.BotOpts{
+		Client:      http.Client{},
+		GetTimeout:  gotgbot.DefaultGetTimeout,
+		PostTimeout: gotgbot.DefaultPostTimeout,
+	})
 	if err != nil {
-		l.Fatalw("failed to start updater", zap.Error(err))
+		l.Fatal(err)
 	}
+	updater := ext.NewUpdater(&ext.UpdaterOpts{})
 	l.Info("Starting updater")
-	RegisterAllHandlers(updater, l)
+	RegisterAllHandlers(&updater, l)
 	db.Init()
 	engine.Init()
 	go utils.ExitCleanup()
-	updater.StartPolling()
+	err = updater.StartPolling(b, nil)
+	if err != nil {
+		l.Fatalf("Error occurred at start of polling :  %s", err.Error())
+		return
+	}
 	l.Info("Started Updater.")
 	updater.Idle()
 }

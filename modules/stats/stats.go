@@ -12,9 +12,9 @@ import (
 	"github.com/mackerelio/go-osstat/cpu"
 	"github.com/mackerelio/go-osstat/memory"
 
-	"github.com/PaulSonOfLars/gotgbot"
-	"github.com/PaulSonOfLars/gotgbot/ext"
-	"github.com/PaulSonOfLars/gotgbot/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"github.com/ricochet2200/go-disk-usage/du"
 	"go.uber.org/zap"
 )
@@ -61,11 +61,11 @@ func GetMemoryStats() string {
 	return outStr
 }
 
-func StatsHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !db.IsAuthorized(u.EffectiveMessage) {
+func StatsHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	message := u.EffectiveMessage
+	message := ctx.EffectiveMessage
 	out := ""
 	uptime := time.Now().Sub(startTime)
 	diskStats := du.NewDiskUsage("/")
@@ -84,7 +84,7 @@ func StatsHandler(b ext.Bot, u *gotgbot.Update) error {
 	return nil
 }
 
-func LoadStatsHandler(updater *gotgbot.Updater, l *zap.SugaredLogger) {
+func LoadStatsHandler(updater *ext.Updater, l *zap.SugaredLogger) {
 	defer l.Info("Stats Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("stats", StatsHandler))
 }

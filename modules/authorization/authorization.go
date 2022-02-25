@@ -5,39 +5,39 @@ import (
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
 
-	"github.com/PaulSonOfLars/gotgbot"
-	"github.com/PaulSonOfLars/gotgbot/ext"
-	"github.com/PaulSonOfLars/gotgbot/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"go.uber.org/zap"
 )
 
-func ExtractUserId(message *ext.Message) int {
-	var userId int
+func ExtractUserId(message *gotgbot.Message) int64 {
+	var userId int64
 	arg := utils.ParseMessageArgs(message.Text)
 	if message.ReplyToMessage != nil {
 		userId = message.ReplyToMessage.From.Id
 	} else if arg != "" {
-		userId = int(utils.ParseStringToInt64(arg))
+		userId = utils.ParseStringToInt64(arg)
 	}
 	return userId
 }
 
-func ExtractChatId(message *ext.Message) int {
-	var chatId int
+func ExtractChatId(message *gotgbot.Message) int64 {
+	var chatId int64
 	arg := utils.ParseMessageArgs(message.Text)
 	if arg != "" {
-		chatId = int(utils.ParseStringToInt64(arg))
+		chatId = utils.ParseStringToInt64(arg)
 	} else {
 		chatId = message.Chat.Id
 	}
 	return chatId
 }
 
-func AuthorizeUserHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !utils.IsUserOwner(u.EffectiveUser.Id) {
+func AuthorizeUserHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
 		return nil
 	}
-	message := u.EffectiveMessage
+	message := ctx.EffectiveMessage
 	userId := ExtractUserId(message)
 	if userId == 0 {
 		engine.SendMessage(b, "Provide Proper userId", message)
@@ -56,11 +56,11 @@ func AuthorizeUserHandler(b ext.Bot, u *gotgbot.Update) error {
 	return nil
 }
 
-func AuthorizeChatHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !utils.IsUserOwner(u.EffectiveUser.Id) {
+func AuthorizeChatHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
 		return nil
 	}
-	message := u.EffectiveMessage
+	message := ctx.EffectiveMessage
 	chatId := ExtractChatId(message)
 	if chatId == 0 {
 		engine.SendMessage(b, "Provide Proper chatId", message)
@@ -79,11 +79,11 @@ func AuthorizeChatHandler(b ext.Bot, u *gotgbot.Update) error {
 	return nil
 }
 
-func UnAuthorizeUserHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !utils.IsUserOwner(u.EffectiveUser.Id) {
+func UnAuthorizeUserHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
 		return nil
 	}
-	message := u.EffectiveMessage
+	message := ctx.EffectiveMessage
 	userId := ExtractUserId(message)
 	if userId == 0 {
 		engine.SendMessage(b, "Provide Proper userId", message)
@@ -102,11 +102,11 @@ func UnAuthorizeUserHandler(b ext.Bot, u *gotgbot.Update) error {
 	return nil
 }
 
-func UnAuthorizeChatHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !utils.IsUserOwner(u.EffectiveUser.Id) {
+func UnAuthorizeChatHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
 		return nil
 	}
-	message := u.EffectiveMessage
+	message := ctx.EffectiveMessage
 	chatId := ExtractChatId(message)
 	if chatId == 0 {
 		engine.SendMessage(b, "Provide Proper chatId", message)
@@ -125,7 +125,7 @@ func UnAuthorizeChatHandler(b ext.Bot, u *gotgbot.Update) error {
 	return nil
 }
 
-func LoadAuthorizationHandlers(updater *gotgbot.Updater, l *zap.SugaredLogger) {
+func LoadAuthorizationHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 	defer l.Info("Authorization Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("adduser", AuthorizeUserHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("rmuser", UnAuthorizeUserHandler))

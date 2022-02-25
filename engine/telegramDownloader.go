@@ -9,7 +9,7 @@ import (
 	pathlib "path"
 	"time"
 
-	"github.com/PaulSonOfLars/gotgbot/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2"
 
 	"github.com/Arman92/go-tdlib"
 )
@@ -74,7 +74,7 @@ type TgMtProtoListener struct {
 	total         int64
 	speed         int64
 	isQueued      bool
-	uid           int
+	uid           int64
 	eta           time.Duration
 	startTime     time.Time
 	path          string
@@ -91,7 +91,7 @@ func (t *TgMtProtoListener) SetTotal(total int64) {
 }
 
 func (t *TgMtProtoListener) OnDownloadComplete(fileId int32, path string) {
-	newPath := pathlib.Join(utils.GetDownloadDir(), utils.ParseIntToString(t.uid))
+	newPath := pathlib.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(t.uid))
 	log.Printf("[MtprotoOnDownloadComplete]: %d | %s | %d\n", fileId, path, t.eventReceiver.ID)
 	os.MkdirAll(newPath, 0755)
 	newPath = pathlib.Join(newPath, utils.GetFileBaseName(path))
@@ -143,7 +143,7 @@ func GetFileIdByMessageContent(content tdlib.MessageContent) (string, int32) {
 	return name, fileId
 }
 
-func (t *TgMtprotoDownloader) AddDownload(msg *ext.Message, listener *MirrorListener) error {
+func (t *TgMtprotoDownloader) AddDownload(msg *gotgbot.Message, listener *MirrorListener) error {
 	log.Println("Adding Telegram Download.")
 	tgMsg, err := tgMtProtoClient.GetMessage(int64(msg.Chat.Id), int64(msg.MessageId)*1048576)
 	if err != nil {
@@ -194,7 +194,7 @@ func (t *TgMtprotoDownloader) AddDownload(msg *ext.Message, listener *MirrorList
 	return nil
 }
 
-func NewTelegramDownload(msg *ext.Message, listener *MirrorListener) error {
+func NewTelegramDownload(msg *gotgbot.Message, listener *MirrorListener) error {
 	return tgDownloader.AddDownload(msg, listener)
 }
 

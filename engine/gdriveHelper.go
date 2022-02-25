@@ -518,6 +518,9 @@ func (G *GoogleDriveClient) ListFilesByParentId(parentId string, name string, co
 }
 
 func (G *GoogleDriveClient) GetFileMetadata(fileId string) (*drive.File, error) {
+	if utils.UseSa() {
+		G.SwitchServiceAccount()
+	}
 	return G.DriveSrv.Files.Get(fileId).Fields("name,mimeType,size,id,md5Checksum").SupportsAllDrives(true).Do()
 }
 
@@ -753,7 +756,7 @@ func (G *GoogleDriveClient) CopyFile(fileId, parentId string, retry int, is_thre
 			if retry <= G.MaxRetries {
 				log.Println("Encountered: ", err.Error(), " retryin: ", retry)
 				time.Sleep(G.SleepTime)
-				return G.CopyFile(fileId, parentId, retry+1, is_thread, size)
+				return G.CopyFile(fileId, parentId, retry+1, false, size)
 			} else {
 				log.Println("Could not copy file (even after retryin): " + err.Error())
 				return nil, err
@@ -781,7 +784,7 @@ func NewGDriveDownload(fileId string, listener *MirrorListener) {
 	client := NewGDriveClient(0, listener)
 	client.Init("")
 	client.Authorize()
-	dir := path.Join(utils.GetDownloadDir(), utils.ParseIntToString(listener.GetUid()))
+	dir := path.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(listener.GetUid()))
 	os.MkdirAll(dir, 0755)
 	go client.Download(fileId, dir)
 	gid := utils.RandString(16)
@@ -840,7 +843,7 @@ func (g *GoogleDriveDownloadStatus) GetStatusType() string {
 }
 
 func (g *GoogleDriveDownloadStatus) Path() string {
-	return path.Join(utils.GetDownloadDir(), utils.ParseIntToString(g.GetListener().GetUid()), g.Name())
+	return path.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(g.GetListener().GetUid()), g.Name())
 }
 
 func (g *GoogleDriveDownloadStatus) Percentage() float32 {

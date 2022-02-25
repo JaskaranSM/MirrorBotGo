@@ -5,23 +5,24 @@ import (
 	"MirrorBotGo/utils"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"reflect"
 	"strings"
 
-	"github.com/PaulSonOfLars/gotgbot"
-	"github.com/PaulSonOfLars/gotgbot/ext"
-	"github.com/PaulSonOfLars/gotgbot/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"github.com/mattn/anko/env"
 	"github.com/mattn/anko/vm"
 	"go.uber.org/zap"
 )
 
-func ExecHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !utils.IsUserOwner(u.EffectiveUser.Id) {
+func ExecHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
 		return nil
 	}
-	message := u.EffectiveMessage
+	message := ctx.EffectiveMessage
 	code := utils.ParseMessageArgs(message.Text)
 	if code == "" {
 		engine.SendMessage(b, "Provide Code to execute.", message)
@@ -33,7 +34,7 @@ func ExecHandler(b ext.Bot, u *gotgbot.Update) error {
 		if reflect.TypeOf(out).Kind() == reflect.Ptr {
 			out, err = json.MarshalIndent(out, "", " ")
 			if err != nil {
-				b.Logger.Info(err)
+				log.Println(err)
 			}
 		}
 		str := SanitizeString(fmt.Sprintf("%s", out))
@@ -46,7 +47,7 @@ func ExecHandler(b ext.Bot, u *gotgbot.Update) error {
 		}
 	})
 	en.Define("message", message)
-	en.Define("update", u)
+	en.Define("update", ctx)
 	en.Define("bot", b)
 	en.Define("Send", engine.SendMessage)
 	en.Define("Delete", engine.DeleteMessage)
@@ -64,16 +65,16 @@ func SanitizeString(str string) string {
 	return strings.ReplaceAll(strings.ReplaceAll(str, "<", ""), ">", "")
 }
 
-func SendAsDocument(b ext.Bot, str string, chatId int) {
+func SendAsDocument(b *gotgbot.Bot, str string, chatId int64) {
 	f, _ := os.Create("exec.txt")
 	f.WriteString(str)
 	f.Sync()
-	reader, _ := os.Open("exec.txt")
-	file := b.NewFileReader("exec.txt", reader)
-	b.SendDocument(chatId, file)
+	b.SendDocument(
+		chatId, f, nil,
+	)
 }
 
-func LoadExecHandler(updater *gotgbot.Updater, l *zap.SugaredLogger) {
+func LoadExecHandler(updater *ext.Updater, l *zap.SugaredLogger) {
 	defer l.Info("Exec Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("go", ExecHandler))
 }

@@ -48,23 +48,24 @@ func IsUrlLink(link string) bool {
 }
 
 type ConfigJson struct {
-	BOT_TOKEN              string `json:"bot_token"`
-	SUDO_USERS             []int  `json:"sudo_users"`
-	AUTHORIZED_CHATS       []int  `json:"authorized_chats"`
-	OWNER_ID               int    `json:"owner_id"`
-	DOWNLOAD_DIR           string `json:"download_dir"`
-	IS_TEAM_DRIVE          bool   `json:"is_team_drive"`
-	GDRIVE_PARENT_ID       string `json:"gdrive_parent_id"`
-	STATUS_UPDATE_INTERVAL int    `json:"status_update_interval"`
-	AUTO_DELETE_TIMEOUT    int    `json:"auto_delete_timeout"`
-	DB_URI                 string `json:"db_uri"`
-	USE_SA                 bool   `json:"use_sa"`
-	INDEX_URL              string `json:"index_url"`
-	TG_APP_ID              string `json:"tg_app_id"`
-	TG_APP_HASH            string `json:"tg_app_hash"`
-	MegaEmail              string `json:"mega_email"`
-	MegaPassword           string `json:"mega_password"`
-	MegaAPIKey             string `json:"mega_api_key"`
+	BOT_TOKEN              string  `json:"bot_token"`
+	SUDO_USERS             []int64 `json:"sudo_users"`
+	AUTHORIZED_CHATS       []int64 `json:"authorized_chats"`
+	OWNER_ID               int64   `json:"owner_id"`
+	DOWNLOAD_DIR           string  `json:"download_dir"`
+	IS_TEAM_DRIVE          bool    `json:"is_team_drive"`
+	GDRIVE_PARENT_ID       string  `json:"gdrive_parent_id"`
+	STATUS_UPDATE_INTERVAL int     `json:"status_update_interval"`
+	AUTO_DELETE_TIMEOUT    int     `json:"auto_delete_timeout"`
+	DB_URI                 string  `json:"db_uri"`
+	USE_SA                 bool    `json:"use_sa"`
+	INDEX_URL              string  `json:"index_url"`
+	TG_APP_ID              string  `json:"tg_app_id"`
+	TG_APP_HASH            string  `json:"tg_app_hash"`
+	MegaEmail              string  `json:"mega_email"`
+	MegaPassword           string  `json:"mega_password"`
+	MegaAPIKey             string  `json:"mega_api_key"`
+	StatusMessagesPerPage  int     `json:"status_messages_per_page"`
 }
 
 var Config *ConfigJson = InitConfig()
@@ -88,11 +89,11 @@ func GetBotToken() string {
 	return Config.BOT_TOKEN
 }
 
-func GetSudoUsers() []int {
+func GetSudoUsers() []int64 {
 	return Config.SUDO_USERS
 }
 
-func GetAuthorizedChats() []int {
+func GetAuthorizedChats() []int64 {
 	return Config.AUTHORIZED_CHATS
 }
 
@@ -102,6 +103,13 @@ func GetTgAppId() string {
 
 func GetMegaEmail() string {
 	return Config.MegaEmail
+}
+
+func GetStatusMessagesPerPage() int {
+	if Config.StatusMessagesPerPage == 0 {
+		return 5
+	}
+	return Config.StatusMessagesPerPage
 }
 
 func GetMegaPasssword() string {
@@ -120,11 +128,11 @@ func UseSa() bool {
 	return Config.USE_SA
 }
 
-func IsUserOwner(userId int) bool {
+func IsUserOwner(userId int64) bool {
 	return Config.OWNER_ID == userId
 }
 
-func IsUserSudo(userId int) bool {
+func IsUserSudo(userId int64) bool {
 	for _, i := range Config.SUDO_USERS {
 		if i == userId {
 			return true
@@ -390,12 +398,24 @@ func ParseIntToString(i int) string {
 	return strconv.Itoa(i)
 }
 
+func ParseInt64ToString(i int64) string {
+	return strconv.FormatInt(i, 10)
+}
+
 func ParseInterfaceToInt(i interface{}) int {
 	tempType := reflect.TypeOf(i).Name()
 	if tempType == "int32" {
 		return int(i.(int32))
 	}
 	return int(i.(int64))
+}
+
+func ParseInterfaceToInt64(i interface{}) int64 {
+	tempType := reflect.TypeOf(i).Name()
+	if tempType == "int32" {
+		return int64(i.(int32))
+	}
+	return i.(int64)
 }
 
 func GetFileIdByGDriveLink(link string) string {

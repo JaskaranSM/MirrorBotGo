@@ -7,17 +7,17 @@ import (
 	"log"
 	"strings"
 
-	"github.com/PaulSonOfLars/gotgbot"
-	"github.com/PaulSonOfLars/gotgbot/ext"
-	"github.com/PaulSonOfLars/gotgbot/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"go.uber.org/zap"
 )
 
-func CloneHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !db.IsAuthorized(u.EffectiveMessage) {
+func CloneHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	message := u.EffectiveMessage
+	message := ctx.EffectiveMessage
 	link := utils.ParseMessageArgs(message.Text)
 	if link == "" {
 		_, err := engine.SendMessage(b, "Provide GDrive Shareable link to clone.", message)
@@ -40,7 +40,7 @@ func CloneHandler(b ext.Bot, u *gotgbot.Update) error {
 				log.Println("SendMessage: " + err.Error())
 			}
 		} else {
-			listener := engine.NewCloneListener(b, u, parentId)
+			listener := engine.NewCloneListener(b, ctx, parentId)
 			engine.NewGDriveClone(fileId, parentId, &listener)
 			engine.SendStatusMessage(b, message)
 			if !engine.Spinner.IsRunning() {
@@ -52,7 +52,7 @@ func CloneHandler(b ext.Bot, u *gotgbot.Update) error {
 	return nil
 }
 
-func LoadCloneHandler(updater *gotgbot.Updater, l *zap.SugaredLogger) {
+func LoadCloneHandler(updater *ext.Updater, l *zap.SugaredLogger) {
 	defer l.Info("Clone Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("clone", CloneHandler))
 }

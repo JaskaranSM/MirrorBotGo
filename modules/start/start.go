@@ -2,26 +2,28 @@ package start
 
 import (
 	"MirrorBotGo/db"
+	"MirrorBotGo/engine"
+	"log"
 
-	"github.com/PaulSonOfLars/gotgbot"
-	"github.com/PaulSonOfLars/gotgbot/ext"
-	"github.com/PaulSonOfLars/gotgbot/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"go.uber.org/zap"
 )
 
-func StartHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !db.IsAuthorized(u.EffectiveMessage) {
+func StartHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	msg := u.EffectiveMessage
-	_, err := msg.ReplyHTML("Hi I am mirror bot")
+	msg := ctx.EffectiveMessage
+	_, err := engine.SendMessage(b, "Hi I am mirror bot", msg)
 	if err != nil {
-		b.Logger.Error(err)
+		log.Println(err)
 	}
 	return nil
 }
 
-func LoadStartHandler(updater *gotgbot.Updater, l *zap.SugaredLogger) {
+func LoadStartHandler(updater *ext.Updater, l *zap.SugaredLogger) {
 	defer l.Info("Start Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("start", StartHandler))
 }

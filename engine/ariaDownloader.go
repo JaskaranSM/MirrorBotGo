@@ -191,7 +191,7 @@ func (t *AriaDownloadStatus) GetStatusType() string {
 }
 
 func (t *AriaDownloadStatus) Path() string {
-	return path.Join(utils.GetDownloadDir(), utils.ParseIntToString(t.GetListener().GetUid()), t.Name())
+	return path.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(t.GetListener().GetUid()), t.Name())
 }
 
 func (t *AriaDownloadStatus) GetListener() *MirrorListener {
@@ -221,7 +221,7 @@ type AriaDownloader struct {
 }
 
 func (t *AriaDownloader) AddDownload(link string, listener *MirrorListener) error {
-	pth := path.Join(utils.GetDownloadDir(), utils.ParseIntToString(listener.GetUid()))
+	pth := path.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(listener.GetUid()))
 	opt := make(map[string]string)
 	opt["dir"] = pth
 	fmt.Println("Adding download: ", link)

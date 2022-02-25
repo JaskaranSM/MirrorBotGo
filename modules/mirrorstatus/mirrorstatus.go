@@ -5,17 +5,17 @@ import (
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
 
-	"github.com/PaulSonOfLars/gotgbot"
-	"github.com/PaulSonOfLars/gotgbot/ext"
-	"github.com/PaulSonOfLars/gotgbot/handlers"
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"go.uber.org/zap"
 )
 
-func MirrorStatusHandler(b ext.Bot, u *gotgbot.Update) error {
-	if !db.IsAuthorized(u.EffectiveMessage) {
+func MirrorStatusHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	message := u.EffectiveMessage
+	message := ctx.EffectiveMessage
 	if engine.GetAllMirrorsCount() == 0 {
 		out, _ := engine.SendMessage(b, "No Active Mirrors.", message)
 		engine.AutoDeleteMessages(b, utils.GetAutoDeleteTimeOut(), out, message)
@@ -26,7 +26,41 @@ func MirrorStatusHandler(b ext.Bot, u *gotgbot.Update) error {
 	return nil
 }
 
-func LoadMirrorStatusHandler(updater *gotgbot.Updater, l *zap.SugaredLogger) {
+func MirrorStatusPreviousHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	cq := ctx.CallbackQuery
+	cq.Answer(b, nil)
+	status_msg := engine.GetMessageByChatId(ctx.EffectiveChat.Id)
+	if status_msg == nil {
+		return nil
+	}
+	if engine.GetAllMirrorsCount() > engine.STATUS_MESSAGE_CHUNKSIZE {
+		status_msg.Date = status_msg.Date - 1
+	}
+	engine.UpdateAllMessages(b)
+	return nil
+}
+
+func MirrorStatusNextHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	cq := ctx.CallbackQuery
+	cq.Answer(b, nil)
+	status_msg := engine.GetMessageByChatId(ctx.EffectiveChat.Id)
+	if status_msg == nil {
+		return nil
+	}
+	if engine.GetAllMirrorsCount() > engine.STATUS_MESSAGE_CHUNKSIZE {
+		status_msg.Date = status_msg.Date + 1
+	}
+	engine.UpdateAllMessages(b)
+	return nil
+}
+
+func LoadMirrorStatusHandler(updater *ext.Updater, l *zap.SugaredLogger) {
 	defer l.Info("MirrorStatus Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("status", MirrorStatusHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCallback(func(cq *gotgbot.CallbackQuery) bool {
+		return cq.Data == "previous"
+	}, MirrorStatusPreviousHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCallback(func(cq *gotgbot.CallbackQuery) bool {
+		return cq.Data == "next"
+	}, MirrorStatusNextHandler))
 }

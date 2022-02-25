@@ -26,7 +26,7 @@ func NewMegaClient() *megasdkgo.MegaClient {
 }
 
 func NewMegaDownload(link string, listener *MirrorListener) error {
-	dir := path.Join(utils.GetDownloadDir(), utils.ParseIntToString(listener.GetUid()))
+	dir := path.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(listener.GetUid()))
 	os.MkdirAll(dir, 0755)
 	megaMutex.Lock()
 	defer megaMutex.Unlock()
@@ -137,7 +137,7 @@ func (m *MegaDownloadStatus) GetStatusType() string {
 }
 
 func (m *MegaDownloadStatus) Path() string {
-	return path.Join(utils.GetDownloadDir(), utils.ParseIntToString(m.GetListener().GetUid()), m.Name())
+	return path.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(m.GetListener().GetUid()), m.Name())
 }
 
 func (m *MegaDownloadStatus) Percentage() float32 {
