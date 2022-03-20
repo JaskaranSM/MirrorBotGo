@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 	"path"
@@ -31,7 +30,7 @@ const SA_DIR string = "accounts"
 func GetSaCount() int {
 	sas, err := ioutil.ReadDir(SA_DIR)
 	if err != nil {
-		log.Println(err)
+		L().Error(err)
 	}
 	return len(sas)
 }
@@ -61,6 +60,7 @@ type GoogleDriveClient struct {
 	Listener            *MirrorListener
 	CloneListener       *CloneListener
 	isCloneCancelled    bool
+	SaLog               bool
 }
 
 func (G *GoogleDriveClient) Init(rootId string) {
@@ -95,13 +95,17 @@ func (G *GoogleDriveClient) SwitchServiceAccount() {
 		GLOBAL_SA_INDEX = 0
 	}
 	GLOBAL_SA_INDEX += 1
-	log.Printf("Switching to %d service account\n", GLOBAL_SA_INDEX)
+	if G.SaLog {
+		L().Infof("Switching to %d service account", GLOBAL_SA_INDEX)
+	}
 	G.Authorize()
 }
 
 func (G *GoogleDriveClient) Authorize() {
 	if utils.UseSa() {
-		log.Printf("Authorizing with %d service account.\n", GLOBAL_SA_INDEX)
+		if G.SaLog {
+			L().Infof("Authorizing with %d service account.", GLOBAL_SA_INDEX)
+		}
 		b, err := ioutil.ReadFile(fmt.Sprintf("%s/%d.json", SA_DIR, GLOBAL_SA_INDEX))
 		config, err := google.JWTConfigFromJSON(b, drive.DriveScope)
 		if err != nil {
@@ -110,13 +114,13 @@ func (G *GoogleDriveClient) Authorize() {
 				G.Listener.OnUploadError("failed to get JWT from JSON: " + err.Error())
 				return
 			} else {
-				log.Println(err)
+				L().Error(err)
 			}
 		}
 		client := config.Client(context.Background())
 		srv, err := drive.New(client)
 		if err != nil {
-			log.Println(err)
+			L().Error(err)
 		}
 		G.DriveSrv = srv
 	} else {
@@ -127,7 +131,7 @@ func (G *GoogleDriveClient) Authorize() {
 				G.Listener.OnUploadError("Unable to read client secret file: " + err.Error())
 				return
 			} else {
-				log.Println(err)
+				L().Error(err)
 			}
 		}
 		// If modifying these scopes, delete your previously saved token.json.
@@ -138,7 +142,7 @@ func (G *GoogleDriveClient) Authorize() {
 				G.Listener.OnUploadError("Unable to parse client secret file to config: " + err.Error())
 				return
 			} else {
-				log.Println(err)
+				L().Error(err)
 			}
 		}
 		client := G.getClient(config)
@@ -150,7 +154,7 @@ func (G *GoogleDriveClient) Authorize() {
 				G.Listener.OnUploadError("Unable to retrieve Drive client: " + err.Error())
 				return
 			} else {
-				log.Println(err)
+				L().Error(err)
 			}
 		}
 		G.DriveSrv = srv
@@ -164,12 +168,12 @@ func (G *GoogleDriveClient) getTokenFromWeb(config *oauth2.Config) *oauth2.Token
 
 	var authCode string
 	if _, err := fmt.Scan(&authCode); err != nil {
-		log.Fatalf("Unable to read authorization code %v", err)
+		L().Fatalf("Unable to read authorization code %v", err)
 	}
 
 	tok, err := config.Exchange(context.TODO(), authCode)
 	if err != nil {
-		log.Fatalf("Unable to retrieve token from web %v", err)
+		L().Fatalf("Unable to retrieve token from web %v", err)
 	}
 	return tok
 }
@@ -190,7 +194,7 @@ func (G *GoogleDriveClient) saveToken(path string, token *oauth2.Token) {
 	fmt.Printf("Saving credential file to: %s\n", path)
 	f, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
 	if err != nil {
-		log.Fatalf("Unable to cache oauth token: %v", err)
+		L().Fatalf("Unable to cache oauth token: %v", err)
 	}
 	defer f.Close()
 	json.NewEncoder(f).Encode(token)
@@ -209,23 +213,23 @@ func (G *GoogleDriveClient) CreateDir(name string, parentId string, retry int) (
 				G.SwitchServiceAccount()
 			}
 			if retry <= G.MaxRetries {
-				log.Println("Encountered: ", err.Error(), " retryin: ", retry)
+				L().Info("Encountered: ", err.Error(), " retryin: ", retry)
 				time.Sleep(G.SleepTime)
 				return G.CreateDir(name, parentId, retry+1)
 			} else {
-				log.Println("Could not create dir (even after retryin): " + err.Error())
+				L().Info("Could not create dir (even after retryin): " + err.Error())
 				return nil, err
 			}
 		} else {
-			log.Println("Could not create dir: " + err.Error())
+			L().Error("Could not create dir: " + err.Error())
 			return nil, err
 		}
 	}
-	log.Println("Created G-Drive Folder: ", file.Id)
+	L().Info("Created G-Drive Folder: ", file.Id)
 	if !utils.IsTeamDrive() {
 		err = G.SetPermissions(file.Id, 1)
 		if err != nil {
-			log.Println(err)
+			L().Error(err)
 		}
 	}
 	return file, nil
@@ -290,7 +294,7 @@ func (G *GoogleDriveClient) Download(fileId string, dir string) {
 		G.TotalLength = meta.Size
 	}
 	G.name = meta.Name
-	log.Println(G.name)
+	L().Info(G.name)
 	local := path.Join(dir, meta.Name)
 	if G.IsDir(meta) {
 		os.Mkdir(local, 0755)
@@ -371,16 +375,16 @@ func (G *GoogleDriveClient) DownloadFile(fileId string, local string, size int64
 				G.SwitchServiceAccount()
 			}
 			if retry <= G.MaxRetries {
-				log.Println("Encountered: ", err.Error(), " retryin: ", retry)
+				L().Warn("Encountered: ", err.Error(), " retryin: ", retry)
 				time.Sleep(G.SleepTime)
 				G.Clean()
 				return G.DownloadFile(fileId, local, size, retry+1)
 			} else {
-				log.Println("Could not download drive file (even after retryin): " + err.Error())
+				L().Error("Could not download drive file (even after retryin): " + err.Error())
 				return err
 			}
 		} else {
-			log.Println("Could not download drive file: " + err.Error())
+			L().Error("Could not download drive file: " + err.Error())
 			return err
 		}
 	}
@@ -419,7 +423,7 @@ func (G *GoogleDriveClient) UploadDirRec(directoryPath string, parentId string) 
 				G.Listener.OnUploadError(err.Error())
 				return false
 			} else {
-				log.Println("Uploaded File: ", file.Id)
+				L().Info("Uploaded File: ", file.Id)
 			}
 		}
 	}
@@ -465,15 +469,15 @@ func (G *GoogleDriveClient) SetPermissions(fileId string, retry int) error {
 				G.SwitchServiceAccount()
 			}
 			if retry <= G.MaxRetries {
-				log.Println("Encountered: ", err.Error(), " retryin: ", retry)
+				L().Warn("Encountered: ", err.Error(), " retryin: ", retry)
 				time.Sleep(G.SleepTime)
 				return G.SetPermissions(fileId, retry+1)
 			} else {
-				log.Println("Could not set file permissions (even after retryin): " + err.Error())
+				L().Error("Could not set file permissions (even after retryin): " + err.Error())
 				return err
 			}
 		} else {
-			log.Println("Could not set file permissions: " + err.Error())
+			L().Error("Could not set file permissions: " + err.Error())
 			return err
 		}
 	}
@@ -500,7 +504,7 @@ func (G *GoogleDriveClient) ListFilesByParentId(parentId string, name string, co
 		}
 		res, err := request.Do()
 		if err != nil {
-			log.Printf("Error : %v\n", err)
+			L().Errorf("Error : %v", err)
 			return files
 		}
 		for _, f := range res.Files {
@@ -537,10 +541,10 @@ func (G *GoogleDriveClient) CheckRetry(file *drive.File, err error) bool {
 }
 
 func (G *GoogleDriveClient) UploadFileNonResumable(parentId string, file_path string, retry int) (*drive.File, error) {
-	log.Printf("Uploading File with 0 bytes: %s\n", file_path)
+	L().Infof("Uploading File with 0 bytes: %s", file_path)
 	content, err := os.Open(file_path)
 	if err != nil {
-		log.Println("Error while opening file for upload: ", err.Error())
+		L().Error("Error while opening file for upload: ", err.Error())
 		return nil, err
 	}
 	contentType := "application/octet-stream"
@@ -551,7 +555,7 @@ func (G *GoogleDriveClient) UploadFileNonResumable(parentId string, file_path st
 		Name:     name,
 		Parents:  []string{parentId},
 	}
-	log.Printf("Uploading %s with mimeType: %s", f.Name, f.MimeType)
+	L().Infof("Uploading %s with mimeType: %s", f.Name, f.MimeType)
 	file, err := G.DriveSrv.Files.Create(f).Media(content).SupportsAllDrives(true).Do()
 	if err != nil {
 		if G.CheckRetry(file, err) {
@@ -559,22 +563,22 @@ func (G *GoogleDriveClient) UploadFileNonResumable(parentId string, file_path st
 				G.SwitchServiceAccount()
 			}
 			if retry <= G.MaxRetries {
-				log.Println("Encountered: ", err.Error(), " retryin: ", retry)
+				L().Warn("Encountered: ", err.Error(), " retryin: ", retry)
 				time.Sleep(G.SleepTime)
 				return G.UploadFileNonResumable(parentId, file_path, retry+1)
 			} else {
-				log.Println("[NonResumable] Could not create file (even after retryin): " + err.Error())
+				L().Error("[NonResumable] Could not create file (even after retryin): " + err.Error())
 				return nil, err
 			}
 		} else {
-			log.Println("[NonResumable] Could not create file: " + err.Error())
+			L().Error("[NonResumable] Could not create file: " + err.Error())
 			return nil, err
 		}
 	}
 	if !utils.IsTeamDrive() {
 		err = G.SetPermissions(file.Id, 1)
 		if err != nil {
-			log.Println(err)
+			L().Error(err)
 		}
 	}
 	return file, nil
@@ -584,12 +588,12 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 	defer G.Clean()
 	content, err := os.Open(file_path)
 	if err != nil {
-		log.Println("Error while opening file for upload: ", err.Error())
+		L().Error("Error while opening file for upload: ", err.Error())
 		return nil, err
 	}
 	stat, err := content.Stat()
 	if err != nil {
-		log.Println("Error while doing content.Stat()", err.Error())
+		L().Error("Error while doing content.Stat()", err.Error())
 		return nil, err
 	}
 	if stat.Size() == 0 {
@@ -598,7 +602,7 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 	}
 	contentType, err := utils.GetFileContentType(content)
 	if err != nil {
-		log.Println("Error while sniffing content type: ", err.Error())
+		L().Error("Error while sniffing content type: ", err.Error())
 		return nil, err
 	}
 	arr := strings.Split(file_path, "/")
@@ -609,7 +613,7 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 		Parents:  []string{parentId},
 	}
 	ctx := context.Background()
-	log.Printf("Uploading %s with mimeType: %s", f.Name, f.MimeType)
+	L().Infof("Uploading %s with mimeType: %s", f.Name, f.MimeType)
 	file, err := G.DriveSrv.Files.Create(f).ResumableMedia(ctx, content, stat.Size(), contentType).ProgressUpdater(G.OnTransferUpdate).SupportsAllDrives(true).Do()
 	if err != nil {
 		if G.CheckRetry(file, err) {
@@ -617,22 +621,22 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 				G.SwitchServiceAccount()
 			}
 			if retry <= G.MaxRetries {
-				log.Println("Encountered: ", err.Error(), " retryin: ", retry)
+				L().Warn("Encountered: ", err.Error(), " retryin: ", retry)
 				time.Sleep(G.SleepTime)
 				return G.UploadFile(parentId, file_path, retry+1)
 			} else {
-				log.Println("Could not create file (even after retryin): " + err.Error())
+				L().Error("Could not create file (even after retryin): " + err.Error())
 				return nil, err
 			}
 		} else {
-			log.Println("Could not create file: " + err.Error())
+			L().Error("Could not create file: " + err.Error())
 			return nil, err
 		}
 	}
 	if !utils.IsTeamDrive() {
 		err = G.SetPermissions(file.Id, 1)
 		if err != nil {
-			log.Println(err)
+			L().Error(err)
 		}
 	}
 	return file, nil
@@ -641,7 +645,7 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 func (G *GoogleDriveClient) Clone(fileId string, parentId string) {
 	_, err := G.GetFileMetadata(parentId)
 	if err != nil {
-		log.Println("Clone error while checking for user supplied parentId: " + err.Error())
+		L().Error("Clone error while checking for user supplied parentId: " + err.Error())
 		parentId = utils.GetGDriveParentId()
 	}
 	var link string
@@ -651,12 +655,12 @@ func (G *GoogleDriveClient) Clone(fileId string, parentId string) {
 		return
 	}
 	G.name = meta.Name
-	log.Println("Cloning: " + meta.Name)
+	L().Info("Cloning: " + meta.Name)
 	G.CloneListener.OnCloneStart(meta.Name)
 	if meta.MimeType == G.GDRIVE_DIR_MIMETYPE {
 		new_dir, err := G.CreateDir(meta.Name, parentId, 1)
 		if err != nil {
-			log.Println("GDriveCreateDir: " + err.Error())
+			L().Error("GDriveCreateDir: " + err.Error())
 			G.CloneListener.OnCloneError(err.Error())
 			return
 		} else {
@@ -684,7 +688,7 @@ func (G *GoogleDriveClient) Clone(fileId string, parentId string) {
 		G.CloneListener.OnCloneError("Cancelled by user.")
 		return
 	}
-	log.Println("CloneDone: " + meta.Name)
+	L().Info("CloneDone: " + meta.Name)
 	G.CloneListener.OnCloneComplete(link, meta.MimeType == G.GDRIVE_DIR_MIMETYPE)
 }
 
@@ -709,7 +713,7 @@ func (G *GoogleDriveClient) CopyFolder(folderId, parentId string, is_thread bool
 			}
 			new_dir, err := G.CreateDir(file.Name, parentId, 1)
 			if err != nil {
-				log.Println("GDriveCreateDir: " + err.Error())
+				L().Error("GDriveCreateDir: " + err.Error())
 			} else {
 				if is_thread {
 					if utils.UseSa() {
@@ -754,15 +758,15 @@ func (G *GoogleDriveClient) CopyFile(fileId, parentId string, retry int, is_thre
 				G.SwitchServiceAccount()
 			}
 			if retry <= G.MaxRetries {
-				log.Println("Encountered: ", err.Error(), " retryin: ", retry)
-				time.Sleep(G.SleepTime)
+				L().Warn("Encountered: ", err.Error(), " retryin: ", retry)
+				time.Sleep(G.SleepTime * time.Duration(retry))
 				return G.CopyFile(fileId, parentId, retry+1, false, size)
 			} else {
-				log.Println("Could not copy file (even after retryin): " + err.Error())
+				L().Error("Could not copy file (even after retryin): " + err.Error())
 				return nil, err
 			}
 		} else {
-			log.Println("Could not copy file: " + err.Error())
+			L().Error("Could not copy file: " + err.Error())
 			return nil, err
 		}
 	}
@@ -770,7 +774,7 @@ func (G *GoogleDriveClient) CopyFile(fileId, parentId string, retry int, is_thre
 	if !utils.IsTeamDrive() {
 		err = G.SetPermissions(file.Id, 1)
 		if err != nil {
-			log.Println(err)
+			L().Error(err)
 		}
 	}
 	return file, err
@@ -1017,7 +1021,7 @@ type ProgressContext struct {
 	isCancelled bool
 	completed   int64
 	total       int64
-	drive       *GoogleDriveClient
+	drive       TransferListener
 }
 
 func (p *ProgressContext) Write(b []byte) (int, error) {
@@ -1032,4 +1036,8 @@ func (p *ProgressContext) Write(b []byte) (int, error) {
 
 func (p *ProgressContext) Cancel() {
 	p.isCancelled = true
+}
+
+func NewProgressContext(size int64, t TransferListener) *ProgressContext {
+	return &ProgressContext{drive: t, total: size, completed: 0}
 }

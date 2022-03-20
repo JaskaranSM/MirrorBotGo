@@ -3,7 +3,6 @@ package start
 import (
 	"MirrorBotGo/db"
 	"MirrorBotGo/engine"
-	"log"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -18,7 +17,7 @@ func StartHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	msg := ctx.EffectiveMessage
 	_, err := engine.SendMessage(b, "Hi I am mirror bot", msg)
 	if err != nil {
-		log.Println(err)
+		engine.L().Error(err)
 	}
 	return nil
 }

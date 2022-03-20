@@ -5,7 +5,6 @@ import (
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
 	"fmt"
-	"log"
 	"runtime"
 	"time"
 
@@ -25,7 +24,7 @@ func GetMemoryUsage() string {
 	out := ""
 	memory, err := memory.Get()
 	if err != nil {
-		log.Println(err)
+		engine.L().Error(err)
 		return out
 	}
 	out += fmt.Sprintf("%d%%", memory.Free*100/memory.Total)
@@ -36,13 +35,13 @@ func GetCpuUsage() string {
 	out := ""
 	before, err := cpu.Get()
 	if err != nil {
-		log.Println(err)
+		engine.L().Error(err)
 		return out
 	}
 	time.Sleep(time.Duration(1) * time.Second)
 	after, err := cpu.Get()
 	if err != nil {
-		log.Println(err)
+		engine.L().Error(err)
 		return out
 	}
 	total := int(after.User-before.User) / runtime.NumCPU()

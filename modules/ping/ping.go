@@ -4,7 +4,6 @@ import (
 	"MirrorBotGo/db"
 	"MirrorBotGo/engine"
 	"fmt"
-	"log"
 	"math"
 	"time"
 
@@ -21,7 +20,7 @@ func PingHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	startTime := time.Now()
 	message, err := engine.SendMessage(b, "Starting ping", ctx.EffectiveMessage)
 	if err != nil {
-		log.Println(err)
+		engine.L().Error(err)
 	}
 	endTime := time.Now()
 	elapsed := int(math.Round(float64(endTime.Sub(startTime).Milliseconds())))

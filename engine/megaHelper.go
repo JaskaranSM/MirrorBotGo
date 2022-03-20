@@ -2,7 +2,6 @@ package engine
 
 import (
 	"MirrorBotGo/utils"
-	"log"
 	"os"
 	"path"
 	"sync"
@@ -20,7 +19,7 @@ func NewMegaClient() *megasdkgo.MegaClient {
 	defer megaMutex.Unlock()
 	err := client.Login(utils.GetMegaEmail(), utils.GetMegaPasssword())
 	if err != nil {
-		log.Printf("mega login failed: %s\n", err.Error())
+		L().Errorf("mega login failed: %s", err.Error())
 	}
 	return client
 }

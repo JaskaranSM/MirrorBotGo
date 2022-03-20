@@ -4,7 +4,6 @@ import (
 	"MirrorBotGo/db"
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
-	"log"
 	"strings"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -19,7 +18,7 @@ func Clone(b *gotgbot.Bot, ctx *ext.Context, sendStatusMessage bool) error {
 	if link == "" {
 		_, err := engine.SendMessage(b, "Provide GDrive Shareable link to clone.", message)
 		if err != nil {
-			log.Println("SendMessage: " + err.Error())
+			engine.L().Error("SendMessage: " + err.Error())
 		}
 	} else {
 		var parentId string
@@ -34,7 +33,7 @@ func Clone(b *gotgbot.Bot, ctx *ext.Context, sendStatusMessage bool) error {
 		if fileId == "" {
 			_, err := engine.SendMessage(b, "FileId extraction failed, make sure GDrive link is correct.", message)
 			if err != nil {
-				log.Println("SendMessage: " + err.Error())
+				engine.L().Error("SendMessage: " + err.Error())
 			}
 		} else {
 			listener := engine.NewCloneListener(b, ctx, parentId)

@@ -3,7 +3,6 @@ package engine
 import (
 	"MirrorBotGo/utils"
 	"fmt"
-	"log"
 	"path"
 	"sync"
 	"time"
@@ -42,11 +41,11 @@ type Aria2Listener struct {
 }
 
 func (a Aria2Listener) OnStart(gid string) {
-	log.Println("[OnDownloadStart]")
+	L().Infof("[OnDownloadStart]: %s", gid)
 }
 
 func (a Aria2Listener) OnStop(gid string) {
-	log.Println("[OnDownloadStop]")
+	L().Infof("[OnDownloadStop]: %s", gid)
 	dl := GetMirrorByGid(gid)
 	if dl != nil {
 		go dl.GetListener().OnDownloadError("Canceled by Stop event.")
@@ -54,7 +53,7 @@ func (a Aria2Listener) OnStop(gid string) {
 }
 
 func (a Aria2Listener) OnError(gid string) {
-	log.Println("[OnDownloadError]")
+	L().Infof("[OnDownloadError]: %s", gid)
 	dl := GetMirrorByGid(gid)
 	ariaMutex.Lock()
 	dlinfo := client.GetDownloadInfo(gid)
@@ -65,11 +64,11 @@ func (a Aria2Listener) OnError(gid string) {
 }
 
 func (a Aria2Listener) OnPause(gid string) {
-	log.Println("[OnDownloadPause]")
+	L().Infof("[OnDownloadPause]: %s", gid)
 }
 
 func (a Aria2Listener) OnComplete(gid string) {
-	log.Println("[OnDownloadComplete]: ", gid)
+	L().Infof("[OnDownloadComplete]: %s", gid)
 	ariaMutex.Lock()
 	dinfo := client.GetDownloadInfo(gid)
 	ariaMutex.Unlock()
@@ -90,8 +89,8 @@ func (a Aria2Listener) OnComplete(gid string) {
 func getSession() *aria2go.Aria2 {
 	args := utils.GetCommandLineArgs()
 	envArgs := utils.GetEnvironmentArgs("aria2")
-	log.Printf("CommandLine Args: %v\n", args)
-	log.Printf("Env Args: %v\n", envArgs)
+	L().Infof("CommandLine Args: %v", args)
+	L().Infof("Env Args: %v", envArgs)
 	notifier := Aria2Listener{}
 	opts := aria2go.Options{
 		"seed-time":                 "0.01",
@@ -110,7 +109,7 @@ func getSession() *aria2go.Aria2 {
 	for i, j := range envArgs {
 		opts[i] = j
 	}
-	log.Printf("Aria2 Opts: %v\n", opts)
+	L().Infof("Aria2 Opts: %v", opts)
 	a := aria2go.NewAria2(aria2go.Config{
 		Options: opts,
 	})

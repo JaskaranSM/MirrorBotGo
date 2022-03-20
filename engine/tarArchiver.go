@@ -2,7 +2,6 @@ package engine
 
 import (
 	"MirrorBotGo/utils"
-	"log"
 	"time"
 
 	"github.com/mholt/archiver"
@@ -126,7 +125,7 @@ func (t *TarArchiver) ProgressLoop() {
 //TarPath start tarring
 func (t *TarArchiver) TarPath(path string) string {
 	outPath := path + ".tar"
-	log.Printf("[TarPath]: %s -> %s\n", path, outPath)
+	L().Infof("[TarPath]: %s -> %s", path, outPath)
 	tar := archiver.NewTar()
 	tar.Prg = t.Prg
 	tar.ImplicitTopLevelFolder = true
@@ -134,7 +133,7 @@ func (t *TarArchiver) TarPath(path string) string {
 	err := tar.Archive([]string{path}, outPath)
 	t.isDone = true
 	if err != nil {
-		log.Printf("[TarError]: %v, uploading without tar.\n", err)
+		L().Errorf("[TarError]: %v, uploading without tar.", err)
 		return path
 	}
 	return outPath

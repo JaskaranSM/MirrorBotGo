@@ -5,7 +5,6 @@ import (
 	"MirrorBotGo/utils"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"reflect"
 	"strings"
@@ -34,7 +33,7 @@ func ExecHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 		if reflect.TypeOf(out).Kind() == reflect.Ptr {
 			out, err = json.MarshalIndent(out, "", " ")
 			if err != nil {
-				log.Println(err)
+				engine.L().Error(err)
 			}
 		}
 		str := SanitizeString(fmt.Sprintf("%s", out))

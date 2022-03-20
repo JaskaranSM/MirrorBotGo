@@ -3,7 +3,6 @@ package engine
 import (
 	"MirrorBotGo/utils"
 	"fmt"
-	"log"
 	"sync"
 	"time"
 
@@ -186,13 +185,13 @@ func SendStatusMessage(b *gotgbot.Bot, message *gotgbot.Message) error {
 	if GetAllMirrorsCount() > STATUS_MESSAGE_CHUNKSIZE {
 		newMsg, err = SendMessageMarkup(b, progress, message, GetPaginationMarkup(false, true, "0", utils.ParseIntToString(len(GetAllMirrorsChunked(STATUS_MESSAGE_CHUNKSIZE))-1)))
 		if err != nil {
-			log.Println(err)
+			L().Error(err)
 			return err
 		}
 	} else {
 		newMsg, err = SendMessage(b, progress, message)
 		if err != nil {
-			log.Println(err)
+			L().Error(err)
 			return err
 		}
 	}

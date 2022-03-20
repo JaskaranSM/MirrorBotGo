@@ -4,7 +4,6 @@ import (
 	"MirrorBotGo/db"
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
-	"log"
 	"strings"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -23,7 +22,7 @@ func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, send
 		if doc.MimeType == "application/x-bittorrent" {
 			file, err := b.GetFile(doc.FileId)
 			if err != nil {
-				log.Println(err)
+				engine.L().Error(err)
 			}
 			if strings.Contains(message.Text, "|") {
 				data := strings.SplitN(message.Text, "|", 2)
@@ -59,7 +58,7 @@ func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, send
 		parentId = utils.GetFileIdByGDriveLink(strings.TrimSpace(data[1]))
 		link = strings.TrimSpace(data[0])
 	}
-	log.Println("ALT: ", parentId)
+	engine.L().Info("ALT: ", parentId)
 	fileId := utils.GetFileIdByGDriveLink(link)
 	listener := engine.NewMirrorListener(b, ctx, isTar, doUnArchive, parentId)
 	if isTgDownload {

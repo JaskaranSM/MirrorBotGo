@@ -66,6 +66,7 @@ type ConfigJson struct {
 	MegaPassword           string  `json:"mega_password"`
 	MegaAPIKey             string  `json:"mega_api_key"`
 	StatusMessagesPerPage  int     `json:"status_messages_per_page"`
+	EncryptionPassword     string  `json:"encryption_password"`
 }
 
 var Config *ConfigJson = InitConfig()
@@ -110,6 +111,13 @@ func GetStatusMessagesPerPage() int {
 		return 5
 	}
 	return Config.StatusMessagesPerPage
+}
+
+func GetEncryptionPassword() string {
+	if Config.EncryptionPassword == "" {
+		return "zerocool"
+	}
+	return Config.EncryptionPassword
 }
 
 func GetMegaPasssword() string {

@@ -3,7 +3,6 @@ package engine
 import (
 	"MirrorBotGo/utils"
 	"fmt"
-	"log"
 	"path"
 	"runtime"
 	"strings"
@@ -31,7 +30,7 @@ func (m *MirrorListener) GetDownload() MirrorStatus {
 }
 
 func (m *MirrorListener) OnDownloadStart(text string) {
-	log.Println(text)
+	L().Info(text)
 	UpdateAllMessages(m.bot)
 }
 
@@ -50,7 +49,7 @@ func (m *MirrorListener) OnDownloadComplete() {
 	name := dl.Name()
 	size := dl.TotalLength()
 	path := dl.Path()
-	log.Printf("[DownloadComplete]: %s (%d)\n", name, size)
+	L().Infof("[DownloadComplete]: %s (%d)", name, size)
 	if m.isTar {
 		archiver := NewTarArchiver(NewProgress(), dl.TotalLength())
 		tarStatus := NewTarStatus(dl.Gid(), dl.Name(), nil, archiver)
@@ -61,7 +60,7 @@ func (m *MirrorListener) OnDownloadComplete() {
 	if m.doUnArchive {
 		cntSize, err := GetArchiveContentSize(path)
 		if err != nil {
-			log.Printf("cannot get archive content size: %v,uploading without unarchive\n", err)
+			L().Warnf("cannot get archive content size: %v,uploading without unarchive", err)
 		} else {
 			size = cntSize
 			unarchiver := NewUnArchiver(NewProgress(), size)
@@ -82,7 +81,7 @@ func (m *MirrorListener) OnDownloadComplete() {
 	if m.parentId != "" {
 		_, err := drive.GetFileMetadata(m.parentId)
 		if err != nil {
-			log.Println("Error while checking for user supplied parentId so uploading to main parentId: ", err)
+			L().Warn("Error while checking for user supplied parentId so uploading to main parentId: ", err)
 			parentId = utils.GetGDriveParentId()
 		} else {
 			parentId = m.parentId
@@ -99,11 +98,10 @@ func (m *MirrorListener) OnDownloadError(err string) {
 		return
 	}
 	m.isCanceled = true
-	fmt.Println("DownloadError: " + err)
 	dl := m.GetDownload()
 	name := dl.Name()
 	size := dl.TotalLength()
-	log.Printf("[DownloadError]: %s (%d)\n", name, size)
+	L().Errorf("[DownloadError]: %s (%d)", name, size)
 	m.Clean()
 	msg := "Your download has been stopped due to: %s"
 	SendMessage(m.bot, fmt.Sprintf(msg, err), m.Update.Message)
@@ -114,7 +112,7 @@ func (m *MirrorListener) OnUploadError(err string) {
 	dl := m.GetDownload()
 	name := dl.Name()
 	size := dl.TotalLength()
-	log.Printf("[UploadError]: %s (%d)\n", name, size)
+	L().Errorf("[UploadError]: %s (%d)", name, size)
 	m.Clean()
 	msg := "Your upload has been stopped due to: %s"
 	SendMessage(m.bot, fmt.Sprintf(msg, err), m.Update.Message)
@@ -125,7 +123,7 @@ func (m *MirrorListener) OnUploadComplete(link string) {
 	dl := m.GetDownload()
 	name := dl.Name()
 	size := dl.TotalLength()
-	log.Printf("[UploadComplete]: %s (%d)\n", name, size)
+	L().Infof("[UploadComplete]: %s (%d)", name, size)
 	link = strings.ReplaceAll(link, "'", "")
 	msg := fmt.Sprintf("<a href='%s'>%s</a> (%s)", link, dl.Name(), utils.GetHumanBytes(dl.TotalLength()))
 	in_url := utils.GetIndexUrl()
@@ -165,7 +163,7 @@ func (m *CloneListener) GetDownload() MirrorStatus {
 }
 
 func (m *CloneListener) OnCloneStart(text string) {
-	log.Println(text)
+	L().Info(text)
 	UpdateAllMessages(m.bot)
 }
 
@@ -187,7 +185,7 @@ func (m *CloneListener) OnCloneError(err string) {
 	dl := m.GetDownload()
 	name := dl.Name()
 	size := dl.TotalLength()
-	log.Printf("[onCloneError]: %s (%d) %s\n", name, size, err)
+	L().Infof("[onCloneError]: %s (%d) %s", name, size, err)
 	m.Clean()
 	msg := "Your clone has been stopped due to: %s"
 	SendMessage(m.bot, fmt.Sprintf(msg, err), m.Update.Message)
@@ -198,7 +196,7 @@ func (m *CloneListener) OnCloneComplete(link string, is_dir bool) {
 	dl := m.GetDownload()
 	name := dl.Name()
 	size := dl.TotalLength()
-	log.Printf("[CloneComplete]: %s (%d)\n", name, size)
+	L().Infof("[CloneComplete]: %s (%d)", name, size)
 	link = strings.ReplaceAll(link, "'", "")
 	msg := fmt.Sprintf("<a href='%s'>%s</a> (%s)", link, dl.Name(), utils.GetHumanBytes(dl.TotalLength()))
 	in_url := utils.GetIndexUrl()
@@ -232,4 +230,8 @@ type MirrorStatus interface {
 	GetListener() *MirrorListener
 	GetCloneListener() *CloneListener
 	CancelMirror() bool
+}
+
+type TransferListener interface {
+	OnTransferUpdate(int64, int64)
 }

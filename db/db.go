@@ -1,9 +1,9 @@
 package db
 
 import (
+	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
 	"context"
-	"log"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -17,16 +17,16 @@ var AuthorizedUsers []int64
 var AuthorizedChats []int64
 
 func getDbClient() *mongo.Client {
-	log.Printf("[DB] Connection: %s\n", utils.GetDbUri())
+	engine.L().Infof("[DB] Connection: %s", utils.GetDbUri())
 	client, err := mongo.NewClient(options.Client().ApplyURI(utils.GetDbUri()))
 	if err != nil {
-		log.Fatal(err)
+		engine.L().Fatal(err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 	err = client.Connect(ctx)
 	if err != nil {
-		log.Fatal(err)
+		engine.L().Fatal(err)
 	}
 	return client
 }
@@ -117,10 +117,10 @@ func AuthorizeChatDb(chatId int64) bool {
 		"chatId": chatId,
 	})
 	if err != nil {
-		log.Println(err)
+		engine.L().Error(err)
 		return false
 	}
-	log.Println(res)
+	engine.L().Info(res)
 	AuthorizeChatLocal(chatId)
 	return true
 }
@@ -133,10 +133,10 @@ func UnAuthorizeChatDb(chatId int64) bool {
 		"chatId": chatId,
 	})
 	if err != nil {
-		log.Println(err)
+		engine.L().Error(err)
 		return false
 	}
-	log.Println(res)
+	engine.L().Info(res)
 	UnAuthorizeChatLocal(chatId)
 	return true
 }
@@ -149,10 +149,10 @@ func AuthorizeUserDb(userId int64) bool {
 		"userId": userId,
 	})
 	if err != nil {
-		log.Println(err)
+		engine.L().Error(err)
 		return false
 	}
-	log.Println(res)
+	engine.L().Info(res)
 	AuthorizeUserLocal(userId)
 	return true
 }
@@ -165,10 +165,10 @@ func UnAuthorizeUserDb(userId int64) bool {
 		"userId": userId,
 	})
 	if err != nil {
-		log.Println(err)
+		engine.L().Info(err)
 		return false
 	}
-	log.Println(res)
+	engine.L().Info(res)
 	UnAuthorizeUserLocal(userId)
 	return true
 }
@@ -190,7 +190,7 @@ func InitChats() bool {
 	collection := dbClient.Database("mirrorBot").Collection("AUTHORIZEDCHATS")
 	cur, err := collection.Find(Ctx, bson.D{})
 	if err != nil {
-		log.Println(err)
+		engine.L().Error(err)
 		return false
 	}
 	defer cur.Close(Ctx)
@@ -198,12 +198,12 @@ func InitChats() bool {
 		var result bson.M
 		err := cur.Decode(&result)
 		if err != nil {
-			log.Println(err)
+			engine.L().Error(err)
 		} else {
 			if result["chatId"] != nil {
 				chatId := utils.ParseInterfaceToInt64(result["chatId"])
 				AuthorizeChatLocal(chatId)
-				log.Printf("Added %d in AuthorizedChats\n", chatId)
+				engine.L().Infof("Added %d in AuthorizedChats", chatId)
 			}
 		}
 	}
@@ -216,7 +216,7 @@ func InitUsers() bool {
 	collection := dbClient.Database("mirrorBot").Collection("AUTHORIZEDUSERS")
 	cur, err := collection.Find(Ctx, bson.D{})
 	if err != nil {
-		log.Println(err)
+		engine.L().Error(err)
 		return false
 	}
 	defer cur.Close(Ctx)
@@ -224,12 +224,12 @@ func InitUsers() bool {
 		var result bson.M
 		err := cur.Decode(&result)
 		if err != nil {
-			log.Println(err)
+			engine.L().Error(err)
 		} else {
 			if result["userId"] != nil {
 				userId := utils.ParseInterfaceToInt64(result["userId"])
 				AuthorizeUserLocal(userId)
-				log.Printf("Added %d in AuthorizedUsers\n", userId)
+				engine.L().Infof("Added %d in AuthorizedUsers", userId)
 			}
 		}
 	}

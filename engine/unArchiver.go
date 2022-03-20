@@ -6,7 +6,6 @@ import (
 	"archive/zip"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -123,12 +122,12 @@ func (t *UnArchiver) ProgressLoop() {
 func (t *UnArchiver) UnArchivePath(path string) string {
 	outPath := utils.TrimExt(path)
 	os.MkdirAll(outPath, 0755)
-	log.Printf("[UnArchivePath]: %s -> %s\n", path, outPath)
+	L().Infof("[UnArchivePath]: %s -> %s", path, outPath)
 	go t.ProgressLoop()
 	err := Unarchive(path, outPath, true, t.Prg)
 	t.isDone = true
 	if err != nil {
-		log.Printf("[UnArchiveError]: %v, uploading without unarchive.\n", err)
+		L().Errorf("[UnArchiveError]: %v, uploading without unarchive.", err)
 		return path
 	}
 	return outPath

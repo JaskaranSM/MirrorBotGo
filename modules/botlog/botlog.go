@@ -3,6 +3,7 @@ package botlog
 import (
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
+	"os"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -16,15 +17,21 @@ func LogHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	chat := ctx.EffectiveChat
 	msg := ctx.EffectiveMessage
-	b.SendDocument(
-		chat.Id, engine.LogFile, &gotgbot.SendDocumentOpts{
+	handle, err := os.Open(engine.LogFile)
+	if err != nil {
+		engine.L().Error(err)
+		return nil
+	}
+	_, err = b.SendDocument(
+		chat.Id, handle, &gotgbot.SendDocumentOpts{
 			ReplyToMessageId: msg.MessageId,
 		},
 	)
+	engine.L().Error(err)
 	return nil
 }
 
 func LoadLogHandler(updater *ext.Updater, l *zap.SugaredLogger) {
-	defer l.Info("Start Module Loaded.")
+	defer l.Info("Log Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("log", LogHandler))
 }

@@ -3,8 +3,6 @@ package engine
 import (
 	"MirrorBotGo/utils"
 	"errors"
-	"fmt"
-	"log"
 	"os"
 	pathlib "path"
 	"time"
@@ -42,17 +40,17 @@ func getMtProtoClient() *tdlib.Client {
 	for {
 		currentState, err := client.Authorize()
 		if err != nil {
-			log.Println("TG AUTH ERROR: ", err.Error())
+			L().Info("TG AUTH ERROR: ", err.Error())
 			return client
 		}
 		if currentState.GetAuthorizationStateEnum() == tdlib.AuthorizationStateWaitPhoneNumberType {
 			_, err := client.CheckAuthenticationBotToken(utils.GetBotToken())
 			if err != nil {
-				fmt.Printf("Error check bot token: %v", err)
+				L().Errorf("Error check bot token: %v", err)
 				return nil
 			}
 		} else if currentState.GetAuthorizationStateEnum() == tdlib.AuthorizationStateReadyType {
-			fmt.Println("MtProto Client Connected: ", utils.GetBotToken())
+			L().Info("MtProto Client Connected: ", utils.GetBotToken())
 			break
 		}
 	}
@@ -92,7 +90,7 @@ func (t *TgMtProtoListener) SetTotal(total int64) {
 
 func (t *TgMtProtoListener) OnDownloadComplete(fileId int32, path string) {
 	newPath := pathlib.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(t.uid))
-	log.Printf("[MtprotoOnDownloadComplete]: %d | %s | %d\n", fileId, path, t.eventReceiver.ID)
+	L().Infof("[MtprotoOnDownloadComplete]: %d | %s | %d", fileId, path, t.eventReceiver.ID)
 	os.MkdirAll(newPath, 0755)
 	newPath = pathlib.Join(newPath, utils.GetFileBaseName(path))
 	os.Rename(path, newPath)
@@ -144,7 +142,7 @@ func GetFileIdByMessageContent(content tdlib.MessageContent) (string, int32) {
 }
 
 func (t *TgMtprotoDownloader) AddDownload(msg *gotgbot.Message, listener *MirrorListener) error {
-	log.Println("Adding Telegram Download.")
+	L().Info("Adding Telegram Download.")
 	tgMsg, err := tgMtProtoClient.GetMessage(int64(msg.Chat.Id), int64(msg.MessageId)*1048576)
 	if err != nil {
 		return err
@@ -164,7 +162,7 @@ func (t *TgMtprotoDownloader) AddDownload(msg *gotgbot.Message, listener *Mirror
 		return false
 	})
 	mtprotoListener.eventReceiver = &reciever
-	log.Printf("MtprotoDetails: %d | %s | %d\n", fileId, name, mtprotoListener.eventReceiver.ID)
+	L().Infof("MtprotoDetails: %d | %s | %d", fileId, name, mtprotoListener.eventReceiver.ID)
 	go func() {
 		for event := range reciever.Chan {
 			updateMsg := (event).(*tdlib.UpdateFile)
