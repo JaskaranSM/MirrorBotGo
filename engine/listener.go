@@ -79,7 +79,7 @@ func (m *MirrorListener) OnDownloadComplete() {
 	UpdateAllMessages(m.bot)
 	var parentId string
 	if m.parentId != "" {
-		_, err := drive.GetFileMetadata(m.parentId)
+		_, err := drive.GetFileMetadata(m.parentId, 1)
 		if err != nil {
 			L().Warn("Error while checking for user supplied parentId so uploading to main parentId: ", err)
 			parentId = utils.GetGDriveParentId()

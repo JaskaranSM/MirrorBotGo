@@ -101,6 +101,9 @@ func (t *TgMtProtoListener) OnDownloadComplete(fileId int32, path string) {
 func (t *TgMtProtoListener) OnDownloadProgress(fileId int32, current int64, total int64, path string, isQueued bool) {
 	t.path = path
 	t.current = current
+	if t.total != total {
+		LOGGER.Infof("Total changed on %d to %d | path: %s fileId: %s current: %d", t.total, total, path, fileId, current)
+	}
 	t.total = total
 	t.isQueued = isQueued
 	now := time.Now()
@@ -121,24 +124,28 @@ type TgMtprotoDownloader struct {
 	IsListenerRunning bool
 }
 
-func GetFileIdByMessageContent(content tdlib.MessageContent) (string, int32) {
+func GetFileIdByMessageContent(content tdlib.MessageContent) (string, int64, int32) {
 	var fileId int32
 	var name string = "unknown"
+	var size int64
 	switch content.GetMessageContentEnum() {
 	case tdlib.MessageAudioType:
 		audio := (content).(*tdlib.MessageAudio)
 		name = audio.Audio.FileName
 		fileId = audio.Audio.Audio.ID
+		size = int64(audio.Audio.Audio.ExpectedSize)
 	case tdlib.MessageVideoType:
 		video := (content).(*tdlib.MessageVideo)
 		name = video.Video.FileName
 		fileId = video.Video.Video.ID
+		size = int64(video.Video.Video.ExpectedSize)
 	case tdlib.MessageDocumentType:
 		document := (content).(*tdlib.MessageDocument)
 		name = document.Document.FileName
 		fileId = document.Document.Document.ID
+		size = int64(document.Document.Document.ExpectedSize)
 	}
-	return name, fileId
+	return name, size, fileId
 }
 
 func (t *TgMtprotoDownloader) AddDownload(msg *gotgbot.Message, listener *MirrorListener) error {
@@ -148,7 +155,7 @@ func (t *TgMtprotoDownloader) AddDownload(msg *gotgbot.Message, listener *Mirror
 		return err
 	}
 	content := tgMsg.Content
-	name, fileId := GetFileIdByMessageContent(content)
+	name, _, fileId := GetFileIdByMessageContent(content)
 	if fileId == 0 {
 		return errors.New("Not a downloadable content")
 	}
@@ -156,10 +163,7 @@ func (t *TgMtprotoDownloader) AddDownload(msg *gotgbot.Message, listener *Mirror
 	mtprotoListener.uid = listener.GetUid()
 	reciever := tgMtProtoClient.AddEventReceiver(&tdlib.UpdateFile{}, func(msg *tdlib.TdMessage) bool {
 		updateMsg := (*msg).(*tdlib.UpdateFile)
-		if updateMsg.File.ID == mtprotoListener.FileId {
-			return true
-		}
-		return false
+		return updateMsg.File.ID == fileId
 	})
 	mtprotoListener.eventReceiver = &reciever
 	L().Infof("MtprotoDetails: %d | %s | %d", fileId, name, mtprotoListener.eventReceiver.ID)
@@ -168,15 +172,13 @@ func (t *TgMtprotoDownloader) AddDownload(msg *gotgbot.Message, listener *Mirror
 			updateMsg := (event).(*tdlib.UpdateFile)
 			var isQueued bool = false
 			if updateMsg.File.Local.IsDownloadingCompleted {
-				reciever.GetUpdates = false
-				tgMtProtoClient.RemoveEventReceiver(reciever)
 				mtprotoListener.OnDownloadComplete(updateMsg.File.ID, updateMsg.File.Local.Path)
 				return
 			}
 			if !updateMsg.File.Local.IsDownloadingActive && !updateMsg.File.Local.IsDownloadingCompleted {
 				isQueued = true
 			}
-			mtprotoListener.OnDownloadProgress(updateMsg.File.ID, int64(updateMsg.File.Local.DownloadedSize), int64(updateMsg.File.Size), updateMsg.File.Local.Path, isQueued)
+			mtprotoListener.OnDownloadProgress(updateMsg.File.ID, int64(updateMsg.File.Local.DownloadedSize), int64(updateMsg.File.ExpectedSize), updateMsg.File.Local.Path, isQueued)
 		}
 	}()
 	gid := utils.RandString(16)

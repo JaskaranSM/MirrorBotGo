@@ -75,6 +75,7 @@ func (G *GoogleDriveClient) Init(rootId string) {
 	if utils.UseSa() {
 		G.MaxRetries = GetSaCount()
 	}
+	G.SaLog = true
 }
 
 // Retrieve a token, saves the token, then returns the generated client.
@@ -200,6 +201,14 @@ func (G *GoogleDriveClient) saveToken(path string, token *oauth2.Token) {
 	json.NewEncoder(f).Encode(token)
 }
 
+func (G *GoogleDriveClient) Sleep(d time.Duration) {
+	if utils.UseSa() {
+		return
+	}
+	L().Infof("Sleeping for %s", d)
+	time.Sleep(d)
+}
+
 func (G *GoogleDriveClient) CreateDir(name string, parentId string, retry int) (*drive.File, error) {
 	d := &drive.File{
 		Name:     name,
@@ -214,7 +223,7 @@ func (G *GoogleDriveClient) CreateDir(name string, parentId string, retry int) (
 			}
 			if retry <= G.MaxRetries {
 				L().Info("Encountered: ", err.Error(), " retryin: ", retry)
-				time.Sleep(G.SleepTime)
+				G.Sleep(G.SleepTime)
 				return G.CreateDir(name, parentId, retry+1)
 			} else {
 				L().Info("Could not create dir (even after retryin): " + err.Error())
@@ -283,7 +292,7 @@ func (G *GoogleDriveClient) IsDir(file *drive.File) bool {
 
 func (G *GoogleDriveClient) Download(fileId string, dir string) {
 	G.name = "getting metadata"
-	meta, err := G.GetFileMetadata(fileId)
+	meta, err := G.GetFileMetadata(fileId, 1)
 	if err != nil {
 		G.Listener.OnDownloadError(err.Error())
 		return
@@ -376,7 +385,7 @@ func (G *GoogleDriveClient) DownloadFile(fileId string, local string, size int64
 			}
 			if retry <= G.MaxRetries {
 				L().Warn("Encountered: ", err.Error(), " retryin: ", retry)
-				time.Sleep(G.SleepTime)
+				G.Sleep(G.SleepTime)
 				G.Clean()
 				return G.DownloadFile(fileId, local, size, retry+1)
 			} else {
@@ -470,7 +479,7 @@ func (G *GoogleDriveClient) SetPermissions(fileId string, retry int) error {
 			}
 			if retry <= G.MaxRetries {
 				L().Warn("Encountered: ", err.Error(), " retryin: ", retry)
-				time.Sleep(G.SleepTime)
+				G.Sleep(G.SleepTime)
 				return G.SetPermissions(fileId, retry+1)
 			} else {
 				L().Error("Could not set file permissions (even after retryin): " + err.Error())
@@ -521,11 +530,27 @@ func (G *GoogleDriveClient) ListFilesByParentId(parentId string, name string, co
 	return files
 }
 
-func (G *GoogleDriveClient) GetFileMetadata(fileId string) (*drive.File, error) {
-	if utils.UseSa() {
-		G.SwitchServiceAccount()
+func (G *GoogleDriveClient) GetFileMetadata(fileId string, retry int) (*drive.File, error) {
+	file, err := G.DriveSrv.Files.Get(fileId).Fields("name,mimeType,size,id,md5Checksum").SupportsAllDrives(true).Do()
+	if err != nil {
+		if G.CheckRetry(file, err) {
+			if utils.UseSa() {
+				G.SwitchServiceAccount()
+			}
+			if retry <= G.MaxRetries {
+				L().Warn("Encountered: ", err.Error(), " retryin: ", retry)
+				G.Sleep(G.SleepTime)
+				return G.GetFileMetadata(fileId, retry+1)
+			} else {
+				L().Error("[GetFileMetadata] Could not get file metadata (even after retryin): " + err.Error())
+				return nil, err
+			}
+		} else {
+			L().Error("[GetFileMetadata] Could not get file metdata: " + err.Error())
+			return nil, err
+		}
 	}
-	return G.DriveSrv.Files.Get(fileId).Fields("name,mimeType,size,id,md5Checksum").SupportsAllDrives(true).Do()
+	return file, err
 }
 
 func (G *GoogleDriveClient) CheckRetry(file *drive.File, err error) bool {
@@ -564,7 +589,7 @@ func (G *GoogleDriveClient) UploadFileNonResumable(parentId string, file_path st
 			}
 			if retry <= G.MaxRetries {
 				L().Warn("Encountered: ", err.Error(), " retryin: ", retry)
-				time.Sleep(G.SleepTime)
+				G.Sleep(G.SleepTime)
 				return G.UploadFileNonResumable(parentId, file_path, retry+1)
 			} else {
 				L().Error("[NonResumable] Could not create file (even after retryin): " + err.Error())
@@ -622,7 +647,7 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 			}
 			if retry <= G.MaxRetries {
 				L().Warn("Encountered: ", err.Error(), " retryin: ", retry)
-				time.Sleep(G.SleepTime)
+				G.Sleep(G.SleepTime)
 				return G.UploadFile(parentId, file_path, retry+1)
 			} else {
 				L().Error("Could not create file (even after retryin): " + err.Error())
@@ -643,13 +668,13 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 }
 
 func (G *GoogleDriveClient) Clone(fileId string, parentId string) {
-	_, err := G.GetFileMetadata(parentId)
+	_, err := G.GetFileMetadata(parentId, 1)
 	if err != nil {
 		L().Error("Clone error while checking for user supplied parentId: " + err.Error())
 		parentId = utils.GetGDriveParentId()
 	}
 	var link string
-	meta, err := G.GetFileMetadata(fileId)
+	meta, err := G.GetFileMetadata(fileId, 1)
 	if err != nil {
 		G.CloneListener.OnCloneError(err.Error())
 		return
@@ -759,7 +784,7 @@ func (G *GoogleDriveClient) CopyFile(fileId, parentId string, retry int, is_thre
 			}
 			if retry <= G.MaxRetries {
 				L().Warn("Encountered: ", err.Error(), " retryin: ", retry)
-				time.Sleep(G.SleepTime * time.Duration(retry))
+				G.Sleep(G.SleepTime * time.Duration(retry))
 				return G.CopyFile(fileId, parentId, retry+1, false, size)
 			} else {
 				L().Error("Could not copy file (even after retryin): " + err.Error())
