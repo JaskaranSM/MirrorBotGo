@@ -36,12 +36,14 @@ type AnacrolixTorrentDownloadListener struct {
 	torrentHandle     *torrent.Torrent
 	listener          *MirrorListener
 	IsListenerRunning bool
+	IsQueued          bool
 	haveInfo          bool
 }
 
 func (a *AnacrolixTorrentDownloadListener) OnDownloadComplete() {
 	L().Infof("[ALXTorrent]: OnDownloadComplete: %s", a.torrentHandle.Name())
 	a.StopListener()
+	a.torrentHandle.Drop()
 	a.listener.OnDownloadComplete()
 }
 
@@ -203,6 +205,9 @@ func (a *AnacrolixTorrentDownloadStatus) ETA() *time.Duration {
 }
 
 func (a *AnacrolixTorrentDownloadStatus) GetStatusType() string {
+	if a.anacrolixListener.IsQueued {
+		return MirrorStatusWaiting
+	}
 	return MirrorStatusDownloading
 }
 
