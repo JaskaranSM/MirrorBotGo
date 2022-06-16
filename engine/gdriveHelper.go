@@ -26,6 +26,16 @@ var concurrent_uploads int = 10
 
 var upload_limit_chan chan int = make(chan int, concurrent_uploads)
 
+var UploadChunkSize int = 50 * 1024 * 1024
+
+func SetUploadChunkSize(size int) {
+	UploadChunkSize = size
+}
+
+func GetUploadChunkSize() int {
+	return UploadChunkSize
+}
+
 const SA_DIR string = "accounts"
 
 func GetSaCount() int {
@@ -638,8 +648,8 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 		Name:     name,
 		Parents:  []string{parentId},
 	}
-	L().Infof("Uploading %s with mimeType: %s", f.Name, f.MimeType)
-	file, err := G.DriveSrv.Files.Create(f).Media(content, googleapi.ChunkSize(50*1024*1024)).ProgressUpdater(func(current, _ int64) {
+	L().Infof("Uploading %s with mimeType: %s | chunksize: %s", f.Name, f.MimeType, utils.GetHumanBytes(int64(UploadChunkSize)))
+	file, err := G.DriveSrv.Files.Create(f).Media(content, googleapi.ChunkSize(UploadChunkSize)).ProgressUpdater(func(current, _ int64) {
 		G.OnTransferUpdate(current, stat.Size())
 	}).SupportsAllDrives(true).Do()
 	if err != nil {

@@ -8,6 +8,7 @@ import (
 	"MirrorBotGo/modules/botlog"
 	"MirrorBotGo/modules/cancelmirror"
 	"MirrorBotGo/modules/clone"
+	"MirrorBotGo/modules/configuration"
 	"MirrorBotGo/modules/goexec"
 	"MirrorBotGo/modules/list"
 	"MirrorBotGo/modules/mirror"
@@ -35,6 +36,7 @@ func RegisterAllHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 	ping.LoadPingHandler(updater, l)
 	clone.LoadCloneHandler(updater, l)
 	botlog.LoadLogHandler(updater, l)
+	configuration.LoadConfigurationHandlers(updater, l)
 }
 
 func main() {
