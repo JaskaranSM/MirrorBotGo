@@ -35,10 +35,10 @@ func CancelMirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 		return nil
 	}
 	status := dl.GetStatusType()
-	if status == engine.MirrorStatusDownloading || status == engine.MirrorStatusWaiting || status == engine.MirrorStatusFailed || status == engine.MirrorStatusCloning {
+	if status == engine.MirrorStatusDownloading || status == engine.MirrorStatusWaiting || status == engine.MirrorStatusFailed || status == engine.MirrorStatusCloning || status == engine.MirrorStatusSeeding {
 		dl.CancelMirror()
 	} else {
-		engine.SendMessage(b, "Can only cancel downloads/clones.", message)
+		engine.SendMessage(b, "Can only cancel downloads/seeds/clones.", message)
 		return nil
 	}
 	return nil
@@ -56,7 +56,7 @@ func CancelAllMirrorsHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	for _, dl := range engine.GetAllMirrors() {
 		status := dl.GetStatusType()
-		if status == engine.MirrorStatusDownloading || status == engine.MirrorStatusWaiting || status == engine.MirrorStatusFailed || status == engine.MirrorStatusCloning {
+		if status == engine.MirrorStatusDownloading || status == engine.MirrorStatusWaiting || status == engine.MirrorStatusFailed || status == engine.MirrorStatusCloning || status == engine.MirrorStatusSeeding {
 			dl.CancelMirror()
 			count += 1
 		}

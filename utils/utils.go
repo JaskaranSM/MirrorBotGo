@@ -67,6 +67,7 @@ type ConfigJson struct {
 	MegaAPIKey             string  `json:"mega_api_key"`
 	StatusMessagesPerPage  int     `json:"status_messages_per_page"`
 	EncryptionPassword     string  `json:"encryption_password"`
+	Seed                   bool    `json:"seed"`
 }
 
 var Config *ConfigJson = InitConfig()
@@ -151,6 +152,10 @@ func IsUserSudo(userId int64) bool {
 
 func GetMegaAPIKey() string {
 	return Config.MegaAPIKey
+}
+
+func GetSeed() bool {
+	return Config.Seed
 }
 
 func GetDownloadDir() string {

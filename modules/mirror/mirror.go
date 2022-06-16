@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, sendStatusMessage bool, anacrolixTorrent bool) error {
+func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, sendStatusMessage bool, anacrolixTorrent bool, isSeed bool) error {
 	message := ctx.EffectiveMessage
 	var link string
 	var isTgDownload bool = false
@@ -76,7 +76,7 @@ func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, send
 			return nil
 		}
 	} else if anacrolixTorrent {
-		err := engine.NewAnacrolixTorrentDownload(link, &listener)
+		err := engine.NewAnacrolixTorrentDownload(link, &listener, isSeed)
 		if err != nil {
 			engine.SendMessage(b, err.Error(), message)
 			return nil
@@ -105,84 +105,91 @@ func MirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, false, true, false)
+	return Mirror(b, ctx, false, false, true, false, false)
 }
 
 func SilentMirrorhandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, false, false, false)
+	return Mirror(b, ctx, false, false, false, false, false)
 }
 
 func TarMirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, true, false, true, false)
+	return Mirror(b, ctx, true, false, true, false, false)
 }
 
 func SilentTarMirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, true, false, false, false)
+	return Mirror(b, ctx, true, false, false, false, false)
 }
 
 func UnArchMirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, true, true, false)
+	return Mirror(b, ctx, false, true, true, false, false)
 }
 
 func SilentUnArchMirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, true, false, false)
+	return Mirror(b, ctx, false, true, false, false, false)
 }
 
 func TorrentHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, false, true, true)
+	return Mirror(b, ctx, false, false, true, true, false)
 }
 
 func SilentTorrenthandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, false, false, true)
+	return Mirror(b, ctx, false, false, false, true, false)
 }
 
 func TarTorrentHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, true, false, true, true)
+	return Mirror(b, ctx, true, false, true, true, false)
 }
 
 func SilentTarTorrentHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, true, false, false, true)
+	return Mirror(b, ctx, true, false, false, true, false)
 }
 
 func UnArchTorrentHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, true, true, true)
+	return Mirror(b, ctx, false, true, true, true, false)
 }
 
 func SilentUnArchTorrentHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, true, false, true)
+	return Mirror(b, ctx, false, true, false, true, false)
+}
+
+func SeedTorrentHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
+		return nil
+	}
+	return Mirror(b, ctx, false, false, true, true, true)
 }
 
 func LoadMirrorHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
@@ -200,4 +207,5 @@ func LoadMirrorHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 	updater.Dispatcher.AddHandler(handlers.NewCommand("torrents", SilentTorrenthandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("tartorrents", SilentTarTorrentHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("unarchtorrents", SilentUnArchTorrentHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("seedtorrent", SeedTorrentHandler))
 }

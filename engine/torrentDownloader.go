@@ -3,6 +3,7 @@ package engine
 import (
 	"MirrorBotGo/utils"
 	"errors"
+	"fmt"
 	"os"
 	"path"
 	"time"
@@ -12,15 +13,16 @@ import (
 	"github.com/anacrolix/torrent/storage"
 )
 
-var anacrolixClient *torrent.Client = getAnacrolixTorrentClient()
+var anacrolixClient *torrent.Client = getAnacrolixTorrentClient(utils.GetSeed())
 var anacrolixDownloader *AnacrolixTorrentDownloader = getAnacrolixTorrentDownloader()
 
-func getAnacrolixTorrentClient() *torrent.Client {
+func getAnacrolixTorrentClient(seed bool) *torrent.Client {
 	config := torrent.NewDefaultClientConfig()
 	config.EstablishedConnsPerTorrent = 100
 	config.HTTPUserAgent = "qBittorrent/4.3.8"
 	config.Bep20 = "-qB4380-"
 	config.UpnpID = "qBittorrent/4.3.8"
+	config.Seed = seed
 	client, err := torrent.NewClient(config)
 	if err != nil {
 		L().Fatal(err)
@@ -38,24 +40,49 @@ type AnacrolixTorrentDownloadListener struct {
 	IsListenerRunning bool
 	IsQueued          bool
 	haveInfo          bool
+	isSeed            bool
+	IsSeeding         bool
+	IsComplete        bool
+	SeedingSpeed      int64
+	UploadedBytes     int64
+	IsObserverRunning bool
 }
 
 func (a *AnacrolixTorrentDownloadListener) OnDownloadComplete() {
 	L().Infof("[ALXTorrent]: OnDownloadComplete: %s", a.torrentHandle.Name())
-	a.StopListener()
-	a.torrentHandle.Drop()
+	if !a.isSeed {
+		a.torrentHandle.Drop()
+		a.StopListener()
+	} else {
+		a.IsSeeding = true
+		a.OnSeedingStart()
+	}
 	a.listener.OnDownloadComplete()
 }
 
 func (a *AnacrolixTorrentDownloadListener) OnMetadataDownloadComplete() {
 	L().Infof("[ALXTorrent]: OnMetadataDownloadComplete: %s", a.torrentHandle.Name())
 	a.torrentHandle.DownloadAll()
+	a.StartSeedingSpeedObserver()
 }
 
 func (a *AnacrolixTorrentDownloadListener) OnDownloadStop() {
 	L().Infof("[ALXTorrent]: OnDownloadStop: %s", a.torrentHandle.Name())
+	a.StopSeedingSpeedObserver()
 	a.StopListener()
 	a.listener.OnDownloadError("Canceled by user.")
+}
+
+func (a *AnacrolixTorrentDownloadListener) OnSeedingStart() {
+	L().Infof("[ALXTorrent]: OnSeedingStart: %s", a.torrentHandle.Name())
+	a.listener.OnSeedingStart(a.listener.GetDownload().Gid())
+}
+
+func (a *AnacrolixTorrentDownloadListener) OnSeedingError() {
+	L().Infof("[ALXTorrent]: OnSeedingError: %s", a.torrentHandle.Name())
+	a.StopSeedingSpeedObserver()
+	a.StopListener()
+	a.listener.OnSeedingError(fmt.Errorf("Cancelled by user."))
 }
 
 func (a *AnacrolixTorrentDownloadListener) ListenForEvents() {
@@ -67,12 +94,43 @@ func (a *AnacrolixTorrentDownloadListener) ListenForEvents() {
 				a.OnMetadataDownloadComplete()
 			}
 		case <-a.torrentHandle.Closed():
-			a.OnDownloadStop()
+			if a.IsSeeding {
+				a.OnSeedingError()
+			} else {
+				a.OnDownloadStop()
+			}
 		case <-a.torrentHandle.Complete.On():
-			a.OnDownloadComplete()
+			if !a.IsComplete {
+				a.IsComplete = true
+				a.OnDownloadComplete()
+			}
 		}
 		time.Sleep(500 * time.Millisecond)
 	}
+}
+
+func (a *AnacrolixTorrentDownloadListener) SeedingSpeedObserver() {
+	last := a.torrentHandle.Stats()
+	for range time.Tick(1 * time.Second) {
+		if !a.IsObserverRunning {
+			return
+		}
+		stats := a.torrentHandle.Stats()
+		chunk := stats.BytesWrittenData.Int64() - last.BytesWrittenData.Int64()
+		a.SeedingSpeed = chunk
+		a.UploadedBytes += chunk
+		//L().Infof("Seeding speed: %d | Uploaded: %d", a.SeedingSpeed, a.UploadedBytes)
+		last = stats
+	}
+}
+
+func (a *AnacrolixTorrentDownloadListener) StartSeedingSpeedObserver() {
+	a.IsObserverRunning = true
+	go a.SeedingSpeedObserver()
+}
+
+func (a *AnacrolixTorrentDownloadListener) StopSeedingSpeedObserver() {
+	a.IsObserverRunning = false
 }
 
 func (a *AnacrolixTorrentDownloadListener) StartListener() {
@@ -84,11 +142,12 @@ func (a *AnacrolixTorrentDownloadListener) StopListener() {
 	a.IsListenerRunning = false
 }
 
-func NewAnacrolixTorrentDownloadListener(t *torrent.Torrent, listener *MirrorListener) *AnacrolixTorrentDownloadListener {
+func NewAnacrolixTorrentDownloadListener(t *torrent.Torrent, listener *MirrorListener, isSeed bool) *AnacrolixTorrentDownloadListener {
 	return &AnacrolixTorrentDownloadListener{
 		torrentHandle:     t,
 		listener:          listener,
 		IsListenerRunning: false,
+		isSeed:            isSeed,
 	}
 }
 
@@ -128,7 +187,7 @@ func (a *AnacrolixTorrentDownloader) GetTorrentSpec(link string) (*torrent.Torre
 	return spec, err
 }
 
-func (a *AnacrolixTorrentDownloader) AddDownload(link string, listener *MirrorListener) error {
+func (a *AnacrolixTorrentDownloader) AddDownload(link string, listener *MirrorListener, isSeed bool) error {
 	dir := path.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(listener.GetUid()))
 	spec, err := a.GetTorrentSpec(link)
 	if err != nil {
@@ -140,7 +199,9 @@ func (a *AnacrolixTorrentDownloader) AddDownload(link string, listener *MirrorLi
 	if err != nil {
 		return err
 	}
-	anacrolixListener := NewAnacrolixTorrentDownloadListener(t, listener)
+	listener.isTorrent = true
+	listener.isSeed = isSeed
+	anacrolixListener := NewAnacrolixTorrentDownloadListener(t, listener, isSeed)
 	anacrolixListener.StartListener()
 	gid := utils.RandString(16)
 	status := NewAnacrolixTorrentDownloadStatus(gid, listener, anacrolixListener, t)
@@ -150,8 +211,8 @@ func (a *AnacrolixTorrentDownloader) AddDownload(link string, listener *MirrorLi
 	return nil
 }
 
-func NewAnacrolixTorrentDownload(link string, listener *MirrorListener) error {
-	return anacrolixDownloader.AddDownload(link, listener)
+func NewAnacrolixTorrentDownload(link string, listener *MirrorListener, isSeed bool) error {
+	return anacrolixDownloader.AddDownload(link, listener, isSeed)
 }
 
 type AnacrolixTorrentDownloadStatus struct {
@@ -174,6 +235,9 @@ func (a *AnacrolixTorrentDownloadStatus) TotalLength() int64 {
 }
 
 func (a *AnacrolixTorrentDownloadStatus) CompletedLength() int64 {
+	if a.anacrolixListener.IsSeeding {
+		return a.anacrolixListener.UploadedBytes
+	}
 	return a.torrentHandle.BytesCompleted()
 }
 
@@ -182,6 +246,9 @@ func (a *AnacrolixTorrentDownloadStatus) GetListener() *MirrorListener {
 }
 
 func (a *AnacrolixTorrentDownloadStatus) Speed() int64 {
+	if a.anacrolixListener.IsSeeding {
+		return a.anacrolixListener.SeedingSpeed
+	}
 	var speed float64
 	for _, peer := range a.torrentHandle.PeerConns() {
 		speed += peer.DownloadRate()
@@ -208,6 +275,9 @@ func (a *AnacrolixTorrentDownloadStatus) ETA() *time.Duration {
 func (a *AnacrolixTorrentDownloadStatus) GetStatusType() string {
 	if a.anacrolixListener.IsQueued {
 		return MirrorStatusWaiting
+	}
+	if a.anacrolixListener.IsSeeding {
+		return MirrorStatusSeeding
 	}
 	return MirrorStatusDownloading
 }

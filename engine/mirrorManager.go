@@ -9,6 +9,7 @@ var dlMutex sync.Mutex
 var indexMutex sync.Mutex
 var AllMirrors map[int64]MirrorStatus = getMap()
 var CanceledMirrors map[int64]MirrorStatus = getMap()
+var SeedingMirrors map[int64]MirrorStatus = getMap()
 var GlobalMirrorIndex int = 0
 
 const (
@@ -19,6 +20,7 @@ const (
 	MirrorStatusEncrypting   = "Encrypting"
 	MirrorStatusDecrypting   = "Decrypting"
 	MirrorStatusCloning      = "Cloning"
+	MirrorStatusSeeding      = "Seeding"
 	MirrorStatusWaiting      = "Queued"
 	MirrorStatusFailed       = "Failed"
 	MirrorStatusCanceled     = "Canceled"
@@ -40,6 +42,14 @@ func GetAllMirrors() []MirrorStatus {
 	return dls
 }
 
+func GetAllSeedingMirrors() []MirrorStatus {
+	var dls []MirrorStatus
+	for _, dl := range SeedingMirrors {
+		dls = append(dls, dl)
+	}
+	return dls
+}
+
 func GetMirrorByGid(gid string) MirrorStatus {
 	for _, dl := range AllMirrors {
 		if dl.Gid() == gid {
@@ -58,8 +68,21 @@ func GetMirrorByUid(uid int64) MirrorStatus {
 	return nil
 }
 
+func GetSeedingMirrorByUid(uid int64) MirrorStatus {
+	for i, dl := range SeedingMirrors {
+		if i == uid {
+			return dl
+		}
+	}
+	return nil
+}
+
 func GetAllMirrorsCount() int {
 	return len(GetAllMirrors())
+}
+
+func GetAllSeedingMirrorsCount() int {
+	return len(GetAllSeedingMirrors())
 }
 
 func AddMirrorLocal(messageId int64, dl MirrorStatus) {
@@ -72,6 +95,21 @@ func MoveMirrorToCancel(messageId int64, dl MirrorStatus) {
 	dlMutex.Lock()
 	defer dlMutex.Unlock()
 	CanceledMirrors[messageId] = dl
+}
+
+func MoveMirrorToSeeding(messageId int64, dl MirrorStatus) {
+	dlMutex.Lock()
+	defer dlMutex.Unlock()
+	SeedingMirrors[messageId] = dl
+}
+
+func RemoveMirrorSeeding(messageId int64) {
+	dlMutex.Lock()
+	defer dlMutex.Unlock()
+	_, ok := SeedingMirrors[messageId]
+	if ok {
+		delete(SeedingMirrors, messageId)
+	}
 }
 
 func RemoveMirrorLocal(messageId int64) {

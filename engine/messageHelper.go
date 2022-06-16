@@ -247,7 +247,7 @@ func (p *ProgressSpinner) IsRunning() bool {
 
 func (p *ProgressSpinner) SpinProgress(b *gotgbot.Bot) {
 	for p.IsRunning() {
-		if GetAllMirrorsCount() == 0 {
+		if GetAllMirrorsCount()+GetAllSeedingMirrorsCount() == 0 {
 			DeleteAllMessages(b)
 			p.Stop()
 			break

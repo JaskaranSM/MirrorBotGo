@@ -16,6 +16,8 @@ type MirrorListener struct {
 	Update      *ext.Context
 	bot         *gotgbot.Bot
 	isTar       bool
+	isSeed      bool
+	isTorrent   bool
 	doUnArchive bool
 	parentId    string
 	isCanceled  bool
@@ -37,7 +39,7 @@ func (m *MirrorListener) OnDownloadStart(text string) {
 func (m *MirrorListener) Clean() {
 	MoveMirrorToCancel(m.GetUid(), GetMirrorByUid(m.GetUid()))
 	RemoveMirrorLocal(m.GetUid())
-	if GetAllMirrorsCount() == 0 {
+	if GetAllMirrorsCount()+GetAllSeedingMirrorsCount() == 0 {
 		DeleteAllMessages(m.bot)
 	}
 	UpdateAllMessages(m.bot)
@@ -50,6 +52,9 @@ func (m *MirrorListener) OnDownloadComplete() {
 	size := dl.TotalLength()
 	path := dl.Path()
 	L().Infof("[DownloadComplete]: %s (%d)", name, size)
+	if m.isSeed {
+		MoveMirrorToSeeding(m.GetUid(), m.GetDownload())
+	}
 	if m.isTar {
 		archiver := NewTarArchiver(NewProgress(), dl.TotalLength())
 		tarStatus := NewTarStatus(dl.Gid(), dl.Name(), nil, archiver)
@@ -113,10 +118,21 @@ func (m *MirrorListener) OnUploadError(err string) {
 	name := dl.Name()
 	size := dl.TotalLength()
 	L().Errorf("[UploadError]: %s (%d)", name, size)
-	m.Clean()
 	msg := "Your upload has been stopped due to: %s"
 	SendMessage(m.bot, fmt.Sprintf(msg, err), m.Update.Message)
-	m.CleanDownload()
+	if m.isSeed {
+		seedStatus := GetSeedingMirrorByUid(m.GetUid())
+		AddMirrorLocal(m.GetUid(), seedStatus)
+		RemoveMirrorSeeding(m.GetUid())
+		UpdateAllMessages(m.bot)
+	}
+	if !m.isSeed {
+		m.Clean()
+	}
+	SendMessage(m.bot, msg, m.Update.Message)
+	if !m.isSeed {
+		m.CleanDownload()
+	}
 }
 
 func (m *MirrorListener) OnUploadComplete(link string) {
@@ -134,8 +150,37 @@ func (m *MirrorListener) OnUploadComplete(link string) {
 		}
 		msg += fmt.Sprintf("\n\n Shareable Link: <a href='%s'>here</a>", in_url)
 	}
-	m.Clean()
+	if m.isSeed {
+		seedStatus := GetSeedingMirrorByUid(m.GetUid())
+		AddMirrorLocal(m.GetUid(), seedStatus)
+		RemoveMirrorSeeding(m.GetUid())
+		UpdateAllMessages(m.bot)
+	}
+	if !m.isSeed {
+		m.Clean()
+	}
 	SendMessage(m.bot, msg, m.Update.Message)
+	if !m.isSeed {
+		m.CleanDownload()
+	}
+}
+
+func (m *MirrorListener) OnSeedingStart(text string) {
+	L().Info(text)
+}
+
+func (m *MirrorListener) OnSeedingError(err error) {
+	if m.isCanceled {
+		return
+	}
+	m.isCanceled = true
+	dl := m.GetDownload()
+	name := dl.Name()
+	size := dl.TotalLength()
+	L().Errorf("[SeedError]: %s (%d)", name, size)
+	m.Clean()
+	msg := "Your seeding has been stopped due to: %s"
+	SendMessage(m.bot, fmt.Sprintf(msg, err.Error()), m.Update.Message)
 	m.CleanDownload()
 }
 
@@ -170,7 +215,7 @@ func (m *CloneListener) OnCloneStart(text string) {
 func (m *CloneListener) Clean() {
 	MoveMirrorToCancel(m.GetUid(), GetMirrorByUid(m.GetUid()))
 	RemoveMirrorLocal(m.GetUid())
-	if GetAllMirrorsCount() == 0 {
+	if GetAllMirrorsCount()+GetAllSeedingMirrorsCount() == 0 {
 		DeleteAllMessages(m.bot)
 	}
 	UpdateAllMessages(m.bot)
