@@ -53,7 +53,7 @@ func (a *AnacrolixTorrentDownloadListener) OnMetadataDownloadComplete() {
 }
 
 func (a *AnacrolixTorrentDownloadListener) OnDownloadStop() {
-	L().Infof("[AnacrolixTorrent]: OnDownloadStop: %s", a.torrentHandle.Name())
+	L().Infof("[ALXTorrent]: OnDownloadStop: %s", a.torrentHandle.Name())
 	a.StopListener()
 	a.listener.OnDownloadError("Canceled by user.")
 }
@@ -115,6 +115,7 @@ func (a *AnacrolixTorrentDownloader) GetTorrentSpec(link string) (*torrent.Torre
 		if err != nil {
 			return spec, err
 		}
+		defer reader.Close()
 		meta, err := metainfo.Load(reader)
 		if err != nil {
 			return spec, err

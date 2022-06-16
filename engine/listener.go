@@ -30,7 +30,7 @@ func (m *MirrorListener) GetDownload() MirrorStatus {
 }
 
 func (m *MirrorListener) OnDownloadStart(text string) {
-	L().Info(text)
+	L().Infof("Initiated Download: %s | %s | %d | %s | %s ", m.Update.Message.From.FirstName, m.Update.Message.From.Username, m.Update.Message.From.Id, text, m.Update.Message.Text)
 	UpdateAllMessages(m.bot)
 }
 
@@ -163,7 +163,7 @@ func (m *CloneListener) GetDownload() MirrorStatus {
 }
 
 func (m *CloneListener) OnCloneStart(text string) {
-	L().Info(text)
+	L().Infof("Initiated Clone: %s | %s | %d | %s | %s ", m.Update.Message.From.FirstName, m.Update.Message.From.Username, m.Update.Message.From.Id, text, m.Update.Message.Text)
 	UpdateAllMessages(m.bot)
 }
 

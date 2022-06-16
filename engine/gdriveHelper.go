@@ -18,6 +18,7 @@ import (
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/drive/v3"
+	"google.golang.org/api/googleapi"
 )
 
 var GLOBAL_SA_INDEX int = 0
@@ -625,7 +626,7 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 		content.Close()
 		return G.UploadFileNonResumable(parentId, file_path, retry)
 	}
-	contentType, err := utils.GetFileContentType(content)
+	contentType, err := utils.GetFileContentTypePath(file_path)
 	if err != nil {
 		L().Error("Error while sniffing content type: ", err.Error())
 		return nil, err
@@ -637,9 +638,10 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 		Name:     name,
 		Parents:  []string{parentId},
 	}
-	ctx := context.Background()
 	L().Infof("Uploading %s with mimeType: %s", f.Name, f.MimeType)
-	file, err := G.DriveSrv.Files.Create(f).ResumableMedia(ctx, content, stat.Size(), contentType).ProgressUpdater(G.OnTransferUpdate).SupportsAllDrives(true).Do()
+	file, err := G.DriveSrv.Files.Create(f).Media(content, googleapi.ChunkSize(50*1024*1024)).ProgressUpdater(func(current, _ int64) {
+		G.OnTransferUpdate(current, stat.Size())
+	}).SupportsAllDrives(true).Do()
 	if err != nil {
 		if G.CheckRetry(file, err) {
 			if utils.UseSa() {

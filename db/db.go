@@ -174,6 +174,7 @@ func UnAuthorizeUserDb(userId int64) bool {
 }
 
 func Init() {
+	engine.L().Info("Initializing database..")
 	InitChats()
 	InitUsers()
 	for _, i := range utils.GetSudoUsers() {
@@ -182,9 +183,11 @@ func Init() {
 	for _, i := range utils.GetAuthorizedChats() {
 		AuthorizeChatLocal(i)
 	}
+	engine.L().Info("Database initialized.")
 }
 
 func InitChats() bool {
+	engine.L().Info("Initializing chats..")
 	Ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 	collection := dbClient.Database("mirrorBot").Collection("AUTHORIZEDCHATS")
@@ -211,6 +214,7 @@ func InitChats() bool {
 }
 
 func InitUsers() bool {
+	engine.L().Info("Initializing users..")
 	Ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
 	defer cancel()
 	collection := dbClient.Database("mirrorBot").Collection("AUTHORIZEDUSERS")

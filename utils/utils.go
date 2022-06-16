@@ -214,6 +214,15 @@ func RemoveByPath(pth string) error {
 	return os.RemoveAll(pth)
 }
 
+func GetFileContentTypePath(file_path string) (string, error) {
+	file, err := os.Open(file_path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+	return GetFileContentType(file)
+}
+
 func GetFileContentType(out *os.File) (string, error) {
 	buffer := make([]byte, 512)
 
@@ -373,7 +382,7 @@ func CalculateETA(bytesLeft, speed int64) time.Duration {
 	return eta
 }
 
-func GetReaderHandleByUrl(link string) (io.Reader, error) {
+func GetReaderHandleByUrl(link string) (io.ReadCloser, error) {
 	resp, err := http.Get(link)
 	if err != nil {
 		return nil, err
