@@ -271,6 +271,9 @@ type MirrorStatus interface {
 	Path() string
 	Percentage() float32
 	GetStatusType() string
+	IsTorrent() bool
+	GetPeers() int
+	GetSeeders() int
 	Index() int
 	GetListener() *MirrorListener
 	GetCloneListener() *CloneListener

@@ -21,8 +21,10 @@ func getAnacrolixTorrentClient(seed bool) *torrent.Client {
 	config.EstablishedConnsPerTorrent = 100
 	config.HTTPUserAgent = "qBittorrent/4.3.8"
 	config.Bep20 = "-qB4380-"
-	config.UpnpID = "qBittorrent/4.3.8"
+	config.UpnpID = "qBittorrent 4.3.8"
+	config.ExtendedHandshakeClientVersion = "qBittorrent/4.3.8"
 	config.Seed = seed
+	config.ListenPort = 62642
 	client, err := torrent.NewClient(config)
 	if err != nil {
 		L().Fatal(err)
@@ -45,6 +47,7 @@ type AnacrolixTorrentDownloadListener struct {
 	IsComplete        bool
 	SeedingSpeed      int64
 	UploadedBytes     int64
+	SeedStartTime     time.Time
 	IsObserverRunning bool
 }
 
@@ -75,6 +78,7 @@ func (a *AnacrolixTorrentDownloadListener) OnDownloadStop() {
 
 func (a *AnacrolixTorrentDownloadListener) OnSeedingStart() {
 	L().Infof("[ALXTorrent]: OnSeedingStart: %s", a.torrentHandle.Name())
+	a.SeedStartTime = time.Now()
 	a.listener.OnSeedingStart(a.listener.GetDownload().Gid())
 }
 
@@ -82,7 +86,9 @@ func (a *AnacrolixTorrentDownloadListener) OnSeedingError() {
 	L().Infof("[ALXTorrent]: OnSeedingError: %s", a.torrentHandle.Name())
 	a.StopSeedingSpeedObserver()
 	a.StopListener()
-	a.listener.OnSeedingError(fmt.Errorf("Cancelled by user."))
+	ratio := float64(a.UploadedBytes) / float64(a.torrentHandle.Length())
+	seedTime := time.Now().Sub(a.SeedStartTime)
+	a.listener.OnSeedingError(fmt.Errorf("Cancelled by user. Ratio: %.2f, SeedTime: %s", ratio, utils.HumanizeDuration(seedTime)))
 }
 
 func (a *AnacrolixTorrentDownloadListener) ListenForEvents() {
@@ -195,8 +201,15 @@ func (a *AnacrolixTorrentDownloader) AddDownload(link string, listener *MirrorLi
 	}
 	os.MkdirAll(dir, 0755)
 	spec.Storage = storage.NewFile(dir)
+	for _, tor := range anacrolixClient.Torrents() {
+		if tor.InfoHash().HexString() == spec.InfoHash.HexString() {
+			os.RemoveAll(dir)
+			return fmt.Errorf("Infohash %s is already registered in the client", tor.InfoHash().HexString())
+		}
+	}
 	t, _, err := anacrolixClient.AddTorrentSpec(spec)
 	if err != nil {
+		os.RemoveAll(dir)
 		return err
 	}
 	listener.isTorrent = true
@@ -268,6 +281,12 @@ func (a *AnacrolixTorrentDownloadStatus) Percentage() float32 {
 }
 
 func (a *AnacrolixTorrentDownloadStatus) ETA() *time.Duration {
+	if a.anacrolixListener.IsSeeding {
+		if a.CompletedLength() >= a.TotalLength() {
+			dur := time.Now().Sub(a.anacrolixListener.SeedStartTime)
+			return &dur
+		}
+	}
 	dur := utils.CalculateETA(a.TotalLength()-a.CompletedLength(), a.Speed())
 	return &dur
 }
@@ -284,6 +303,18 @@ func (a *AnacrolixTorrentDownloadStatus) GetStatusType() string {
 
 func (a *AnacrolixTorrentDownloadStatus) Path() string {
 	return path.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(a.GetListener().GetUid()), a.Name())
+}
+
+func (a *AnacrolixTorrentDownloadStatus) IsTorrent() bool {
+	return true
+}
+
+func (a *AnacrolixTorrentDownloadStatus) GetPeers() int {
+	return a.torrentHandle.Stats().ActivePeers
+}
+
+func (a *AnacrolixTorrentDownloadStatus) GetSeeders() int {
+	return a.torrentHandle.Stats().ConnectedSeeders
 }
 
 func (a *AnacrolixTorrentDownloadStatus) GetCloneListener() *CloneListener {

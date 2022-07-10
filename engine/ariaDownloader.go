@@ -197,6 +197,20 @@ func (t *AriaDownloadStatus) GetListener() *MirrorListener {
 	return t.listener
 }
 
+func (t *AriaDownloadStatus) IsTorrent() bool {
+	stats := t.GetStats()
+	return stats.InfoHash != ""
+}
+
+func (t *AriaDownloadStatus) GetPeers() int {
+	stats := t.GetStats()
+	return stats.Connections
+}
+
+func (t *AriaDownloadStatus) GetSeeders() int {
+	return t.GetPeers() //libaria2 does not seem to expose num_seeders
+}
+
 func (t *AriaDownloadStatus) GetCloneListener() *CloneListener {
 	return nil
 }

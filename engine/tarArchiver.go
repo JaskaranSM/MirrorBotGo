@@ -56,6 +56,18 @@ func (t *TarStatus) Index() int {
 	return t.Index_
 }
 
+func (t *TarStatus) IsTorrent() bool {
+	return false
+}
+
+func (t *TarStatus) GetPeers() int {
+	return 0
+}
+
+func (t *TarStatus) GetSeeders() int {
+	return 0
+}
+
 func (t *TarStatus) GetListener() *MirrorListener {
 	return t.listener
 }

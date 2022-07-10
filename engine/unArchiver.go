@@ -68,6 +68,18 @@ func (t *UnArchiverStatus) GetListener() *MirrorListener {
 	return t.listener
 }
 
+func (t *UnArchiverStatus) IsTorrent() bool {
+	return false
+}
+
+func (t *UnArchiverStatus) GetPeers() int {
+	return 0
+}
+
+func (t *UnArchiverStatus) GetSeeders() int {
+	return 0
+}
+
 func (t *UnArchiverStatus) GetCloneListener() *CloneListener {
 	return nil
 }

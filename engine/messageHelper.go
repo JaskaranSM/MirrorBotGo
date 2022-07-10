@@ -134,11 +134,19 @@ func GetReadableProgressMessage(page int) string {
 			msg += fmt.Sprintf("%s at ", utils.GetHumanBytes(dl.TotalLength()))
 			msg += fmt.Sprintf("%s/s, ", utils.GetHumanBytes(int64(dl.Speed())))
 			if dl.ETA() != nil {
-				msg += fmt.Sprintf("ETA: %s", dl.ETA()) //utils.HumanizeDuration(*dls[i].ETA()))
+				if dl.GetStatusType() == MirrorStatusSeeding && dl.CompletedLength() > dl.TotalLength() {
+					msg += fmt.Sprintf("ST: %s", dl.ETA())
+				} else {
+					msg += fmt.Sprintf("ETA: %s", dl.ETA())
+				}
 			} else {
 				msg += "ETA: -"
 			}
+			if dl.IsTorrent() {
+				msg += fmt.Sprintf(" | P: %d | S: %d", dl.GetPeers(), dl.GetSeeders())
+			}
 			msg += fmt.Sprintf("\nGID: <code>%s</code>", dls[i].Gid())
+
 		}
 		msg += "\n\n"
 	}

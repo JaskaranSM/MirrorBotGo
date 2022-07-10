@@ -891,6 +891,18 @@ func (g *GoogleDriveDownloadStatus) Percentage() float32 {
 	return float32(g.CompletedLength()*100) / float32(g.TotalLength())
 }
 
+func (g *GoogleDriveDownloadStatus) IsTorrent() bool {
+	return false
+}
+
+func (g *GoogleDriveDownloadStatus) GetPeers() int {
+	return 0
+}
+
+func (g *GoogleDriveDownloadStatus) GetSeeders() int {
+	return 0
+}
+
 func (g *GoogleDriveDownloadStatus) GetListener() *MirrorListener {
 	return g.DriveObj.Listener
 }
@@ -957,6 +969,18 @@ func (g *GoogleDriveStatus) Path() string {
 
 func (g *GoogleDriveStatus) Percentage() float32 {
 	return float32(g.CompletedLength()*100) / float32(g.TotalLength())
+}
+
+func (g *GoogleDriveStatus) IsTorrent() bool {
+	return false
+}
+
+func (g *GoogleDriveStatus) GetPeers() int {
+	return 0
+}
+
+func (g *GoogleDriveStatus) GetSeeders() int {
+	return 0
 }
 
 func (g *GoogleDriveStatus) GetListener() *MirrorListener {
@@ -1031,6 +1055,18 @@ func (g *GoogleDriveCloneStatus) Path() string {
 
 func (g *GoogleDriveCloneStatus) Percentage() float32 {
 	return float32(g.CompletedLength()*100) / float32(g.TotalLength())
+}
+
+func (g *GoogleDriveCloneStatus) IsTorrent() bool {
+	return false
+}
+
+func (g *GoogleDriveCloneStatus) GetPeers() int {
+	return 0
+}
+
+func (g *GoogleDriveCloneStatus) GetSeeders() int {
+	return 0
 }
 
 func (g *GoogleDriveCloneStatus) GetListener() *MirrorListener {

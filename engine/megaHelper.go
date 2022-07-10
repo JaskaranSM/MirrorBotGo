@@ -143,6 +143,18 @@ func (m *MegaDownloadStatus) Percentage() float32 {
 	return float32(m.CompletedLength()*100) / float32(m.TotalLength())
 }
 
+func (m *MegaDownloadStatus) IsTorrent() bool {
+	return false
+}
+
+func (m *MegaDownloadStatus) GetPeers() int {
+	return 0
+}
+
+func (m *MegaDownloadStatus) GetSeeders() int {
+	return 0
+}
+
 func (m *MegaDownloadStatus) GetListener() *MirrorListener {
 	return m.listener
 }

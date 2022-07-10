@@ -14,6 +14,7 @@ import (
 	"MirrorBotGo/modules/mirror"
 	"MirrorBotGo/modules/mirrorstatus"
 	"MirrorBotGo/modules/ping"
+	"MirrorBotGo/modules/shell"
 	"MirrorBotGo/modules/start"
 	"MirrorBotGo/modules/stats"
 	"MirrorBotGo/utils"
@@ -36,6 +37,7 @@ func RegisterAllHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 	ping.LoadPingHandler(updater, l)
 	clone.LoadCloneHandler(updater, l)
 	botlog.LoadLogHandler(updater, l)
+	shell.LoadShellHandlers(updater, l)
 	configuration.LoadConfigurationHandlers(updater, l)
 }
 
@@ -52,7 +54,11 @@ func main() {
 	if err != nil {
 		l.Fatal(err)
 	}
-	updater := ext.NewUpdater(&ext.UpdaterOpts{})
+	updater := ext.NewUpdater(&ext.UpdaterOpts{
+		DispatcherOpts: ext.DispatcherOpts{
+			MaxRoutines: -1,
+		},
+	})
 	l.Info("Starting updater")
 	RegisterAllHandlers(&updater, l)
 	db.Init()

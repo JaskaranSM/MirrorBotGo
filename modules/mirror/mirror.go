@@ -192,6 +192,13 @@ func SeedTorrentHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	return Mirror(b, ctx, false, false, true, true, true)
 }
 
+func SilentSeedTorrentHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
+		return nil
+	}
+	return Mirror(b, ctx, false, false, false, true, true)
+}
+
 func LoadMirrorHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 	defer l.Info("Mirror Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("mirror", MirrorHandler))
@@ -208,4 +215,5 @@ func LoadMirrorHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 	updater.Dispatcher.AddHandler(handlers.NewCommand("tartorrents", SilentTarTorrentHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("unarchtorrents", SilentUnArchTorrentHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("seedtorrent", SeedTorrentHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("seedtorrents", SilentSeedTorrentHandler))
 }
