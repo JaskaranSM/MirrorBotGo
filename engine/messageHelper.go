@@ -3,6 +3,8 @@ package engine
 import (
 	"MirrorBotGo/utils"
 	"fmt"
+	"runtime"
+	"runtime/pprof"
 	"sync"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 var StatusMessageStorage map[int64]*gotgbot.Message // chatId : message
 var Spinner *ProgressSpinner = getSpinner()
 var mutex sync.Mutex
+var threadProfile = pprof.Lookup("threadcreate")
 
 var STATUS_MESSAGE_CHUNKSIZE int = utils.GetStatusMessagesPerPage()
 
@@ -109,6 +112,18 @@ func DeleteAllMessages(b *gotgbot.Bot) {
 	}
 }
 
+func GetStatsString() string {
+	var outStr string
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+	outStr += fmt.Sprintf("Alloc: %s | ", utils.GetHumanBytes(int64(mem.Alloc)))
+	outStr += fmt.Sprintf("TAlloc: %s | ", utils.GetHumanBytes(int64(mem.TotalAlloc)))
+	outStr += fmt.Sprintf("GC: %d | ", mem.NumGC)
+	outStr += fmt.Sprintf("GR: %d | ", runtime.NumGoroutine())
+	outStr += fmt.Sprintf("TH: %d", threadProfile.Count())
+	return outStr
+}
+
 func GetReadableProgressMessage(page int) string {
 	msg := ""
 	chunks := GetAllMirrorsChunked(STATUS_MESSAGE_CHUNKSIZE)
@@ -135,7 +150,7 @@ func GetReadableProgressMessage(page int) string {
 			msg += fmt.Sprintf("%s/s, ", utils.GetHumanBytes(int64(dl.Speed())))
 			if dl.ETA() != nil {
 				if dl.GetStatusType() == MirrorStatusSeeding && dl.CompletedLength() > dl.TotalLength() {
-					msg += fmt.Sprintf("ST: %s", dl.ETA())
+					msg += fmt.Sprintf("ST: %s", utils.HumanizeDuration(*dl.ETA()))
 				} else {
 					msg += fmt.Sprintf("ETA: %s", dl.ETA())
 				}
@@ -150,6 +165,7 @@ func GetReadableProgressMessage(page int) string {
 		}
 		msg += "\n\n"
 	}
+	msg += GetStatsString()
 	return msg
 }
 

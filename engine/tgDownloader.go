@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path"
 	"strconv"
@@ -21,10 +20,19 @@ import (
 	"github.com/gotd/td/tg"
 )
 
-var gotdClient *telegram.Client = getTgClient()
+var gotdClient *telegram.Client
 var gotdDownloader *GotdDownloader = getGotdDownloader()
+var gotdDownloadThreads int = 4
 
 var accessHashesCache map[int64]int64 = make(map[int64]int64)
+
+func GetGotdDownloadThreadsCount() int {
+	return gotdDownloadThreads
+}
+
+func SetGotdDownloadThreadsCount(c int) {
+	gotdDownloadThreads = c
+}
 
 func GetChatIdFromPeerClass(c tg.PeerClass) int64 {
 	switch m := c.(type) {
@@ -66,6 +74,9 @@ func getTgClient() *telegram.Client {
 	opts := telegram.Options{
 		UpdateHandler:  dispatcher,
 		SessionStorage: &session.FileStorage{Path: "file.session"},
+		Logger:         L().Desugar().Named("GOTD"),
+		RetryInterval:  10 * time.Second,
+		MaxRetries:     20,
 	}
 	client := telegram.NewClient(appIDInt, utils.GetTgAppHash(), opts)
 	dispatcher.OnNewChannelMessage(func(ctx context.Context, e tg.Entities, u *tg.UpdateNewChannelMessage) error {
@@ -77,22 +88,6 @@ func getTgClient() *telegram.Client {
 		}
 		return nil
 	})
-	_, err = bg.Connect(client)
-	if err != nil {
-		L().Fatal(err)
-		return client
-	}
-	ctx := context.Background()
-
-	status, err := client.Auth().Status(ctx)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if !status.Authorized {
-		if _, err := client.Auth().Bot(ctx, utils.GetBotToken()); err != nil {
-			log.Fatal(err)
-		}
-	}
 	return client
 }
 
@@ -137,7 +132,7 @@ func (g *GotdDownloadListener) Cancel() {
 }
 
 func (g *GotdDownloadListener) OnDownloadStart() {
-	L().Infof("[GotdDownload] %s | %d -> %s", g.filename, g.document.Size, g.filePath)
+	L().Infof("[GotdDownload] (threads: %d) %s | %d -> %s", gotdDownloadThreads, g.filename, g.document.Size, g.filePath)
 	g.StartSpeedObserver()
 }
 
@@ -217,7 +212,7 @@ func (g *GotdDownloader) Download(ctx context.Context, api *tg.Client, document 
 	d := downloader.NewDownloader()
 	errorChannel := make(chan error)
 	go func() {
-		_, err := d.Download(api, document.AsInputDocumentFileLocation()).WithThreads(8).Parallel(ctx, writer)
+		_, err := d.Download(api, document.AsInputDocumentFileLocation()).WithThreads(gotdDownloadThreads).Parallel(ctx, writer)
 		if err != nil {
 			errorChannel <- err
 		}
@@ -288,7 +283,12 @@ func (g *GotdDownloader) PrepareDocumentForDownload(ctx context.Context, api *tg
 }
 
 func (g *GotdDownloader) AddDownload(msg *gotgbot.Message, listener *MirrorListener) error {
-	api := tg.NewClient(gotdClient)
+	client := getTgClient()
+	stop, err := bg.Connect(client)
+	if err != nil {
+		return err
+	}
+	api := tg.NewClient(client)
 	ctx := context.Background()
 	document, err := g.PrepareDocumentForDownload(ctx, api, int(msg.MessageId), msg.Chat.Id, msg.Chat.Type == "private")
 	if err != nil {
@@ -316,6 +316,9 @@ func (g *GotdDownloader) AddDownload(msg *gotgbot.Message, listener *MirrorListe
 	errChannel := g.Download(ctx, api, document, prg)
 	status.GetListener().OnDownloadStart(status.Gid())
 	go func() {
+		defer func() {
+			stop()
+		}()
 		for err := range errChannel {
 			if err != nil {
 				gotdListener.OnDownloadStop(err)
