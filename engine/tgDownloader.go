@@ -79,7 +79,7 @@ func getTgClient() *telegram.Client {
 		MaxRetries:     20,
 	}
 	client := telegram.NewClient(appIDInt, utils.GetTgAppHash(), opts)
-	dispatcher.OnNewChannelMessage(func(ctx context.Context, e tg.Entities, u *tg.UpdateNewChannelMessage) error {
+	dispatcher.OnNewChannelMessage(func(_ context.Context, e tg.Entities, _ *tg.UpdateNewChannelMessage) error {
 		for _, channel := range e.Channels {
 			AddAccessHashCache(channel.ID, channel.AccessHash)
 		}

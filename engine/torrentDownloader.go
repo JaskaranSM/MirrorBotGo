@@ -2,7 +2,6 @@ package engine
 
 import (
 	"MirrorBotGo/utils"
-	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -169,13 +168,6 @@ func (a *AnacrolixTorrentDownloader) GetTorrentSpec(link string) (*torrent.Torre
 			return spec, err
 		}
 	} else {
-		isTorrent, err := utils.IsTorrentLink(link)
-		if err != nil {
-			return spec, err
-		}
-		if !isTorrent {
-			return spec, errors.New("Not a torrent/magnet link")
-		}
 		reader, err := utils.GetReaderHandleByUrl(link)
 		if err != nil {
 			return spec, err

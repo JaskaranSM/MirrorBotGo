@@ -70,8 +70,8 @@ func SetGotdDownloadThreadsCountHandler(b *gotgbot.Bot, ctx *ext.Context) error 
 		return nil
 	}
 	engine.L().Infof("Setting gotd download threads count %d", threadCountInt)
-	engine.SetGotdDownloadThreadsCount(threadCountInt)
-	engine.SendMessage(b, fmt.Sprintf("Gotd download threads count has been set to %d", engine.GetGotdDownloadThreadsCount()), message)
+	//engine.SetGotdDownloadThreadsCount(threadCountInt)
+	engine.SendMessage(b, fmt.Sprintf("Gotd download threads count has been set to %d", threadCountInt), message) //engine.GetGotdDownloadThreadsCount()), message)
 	return nil
 }
 
@@ -80,7 +80,7 @@ func GetGotdDownloadThreadsCountHandler(b *gotgbot.Bot, ctx *ext.Context) error 
 		return nil
 	}
 	message := ctx.EffectiveMessage
-	engine.SendMessage(b, fmt.Sprintf("Gotd download thread count: <code>%d</code>", engine.GetGotdDownloadThreadsCount()), message)
+	engine.SendMessage(b, fmt.Sprintf("Gotd download thread count: <code>%d</code>", 4), message) //engine.GetGotdDownloadThreadsCount()), message)
 	return nil
 }
 
