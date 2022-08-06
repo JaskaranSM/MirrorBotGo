@@ -1,3 +1,6 @@
+//go:build !disable_mega
+// +build !disable_mega
+
 package engine
 
 import (

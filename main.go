@@ -18,7 +18,14 @@ import (
 	"MirrorBotGo/modules/start"
 	"MirrorBotGo/modules/stats"
 	"MirrorBotGo/utils"
+	"log"
 	"net/http"
+	"os"
+	"runtime"
+	"runtime/pprof"
+	"time"
+
+	_ "net/http/pprof"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -42,14 +49,27 @@ func RegisterAllHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 }
 
 func main() {
+	runtime.SetBlockProfileRate(1)
+	go func() {
+		log.Println(http.ListenAndServe("localhost:6060", nil))
+	}()
+
+	go func() {
+		for range time.Tick(1 * time.Second) {
+			file, err := os.Create("goroutineTrace.txt")
+			if err != nil {
+				return
+			}
+			defer file.Close()
+			pprof.Lookup("goroutine").WriteTo(file, 1)
+		}
+	}()
 	l := engine.GetLogger()
 	token := utils.GetBotToken()
 	l.Info("Starting Bot.")
 	l.Info("token: ", token)
 	b, err := gotgbot.NewBot(token, &gotgbot.BotOpts{
-		Client:      http.Client{},
-		GetTimeout:  gotgbot.DefaultGetTimeout,
-		PostTimeout: gotgbot.DefaultPostTimeout,
+		Client: http.Client{},
 	})
 	if err != nil {
 		l.Fatal(err)

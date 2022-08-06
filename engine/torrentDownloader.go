@@ -23,7 +23,7 @@ func getAnacrolixTorrentClient(seed bool) *torrent.Client {
 	config.UpnpID = "qBittorrent 4.3.8"
 	config.ExtendedHandshakeClientVersion = "qBittorrent/4.3.8"
 	config.Seed = seed
-	config.ListenPort = 62642
+	config.MinDialTimeout = 10 * time.Second
 	client, err := torrent.NewClient(config)
 	if err != nil {
 		L().Fatal(err)
@@ -110,22 +110,20 @@ func (a *AnacrolixTorrentDownloadListener) ListenForEvents() {
 				a.OnDownloadComplete()
 			}
 		}
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(1 * time.Second)
 	}
 }
 
 func (a *AnacrolixTorrentDownloadListener) SeedingSpeedObserver() {
 	last := a.torrentHandle.Stats()
-	for range time.Tick(1 * time.Second) {
-		if !a.IsObserverRunning {
-			return
-		}
+	for a.IsObserverRunning {
 		stats := a.torrentHandle.Stats()
 		chunk := stats.BytesWrittenData.Int64() - last.BytesWrittenData.Int64()
 		a.SeedingSpeed = chunk
 		a.UploadedBytes += chunk
 		//L().Infof("Seeding speed: %d | Uploaded: %d", a.SeedingSpeed, a.UploadedBytes)
 		last = stats
+		time.Sleep(1 * time.Second)
 	}
 }
 
@@ -192,7 +190,7 @@ func (a *AnacrolixTorrentDownloader) AddDownload(link string, listener *MirrorLi
 		return err
 	}
 	os.MkdirAll(dir, 0755)
-	spec.Storage = storage.NewFile(dir)
+	spec.Storage = storage.NewMMap(dir)
 	for _, tor := range anacrolixClient.Torrents() {
 		if tor.InfoHash().HexString() == spec.InfoHash.HexString() {
 			os.RemoveAll(dir)

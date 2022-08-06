@@ -5,7 +5,9 @@ import (
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
 	"fmt"
+	"os"
 	"runtime"
+	"runtime/pprof"
 	"time"
 
 	"github.com/mackerelio/go-osstat/cpu"
@@ -60,6 +62,14 @@ func GetMemoryStats() string {
 	return outStr
 }
 
+func ProfileHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
+		return nil
+	}
+	pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
+	return nil
+}
+
 func StatsHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
@@ -86,4 +96,5 @@ func StatsHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 func LoadStatsHandler(updater *ext.Updater, l *zap.SugaredLogger) {
 	defer l.Info("Stats Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("stats", StatsHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("profile", ProfileHandler))
 }

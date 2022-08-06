@@ -102,7 +102,7 @@ func EditMessageMarkup(b *gotgbot.Bot, messageText string, message *gotgbot.Mess
 }
 
 func DeleteMessage(b *gotgbot.Bot, message *gotgbot.Message) (bool, error) {
-	return b.DeleteMessage(message.Chat.Id, message.MessageId)
+	return b.DeleteMessage(message.Chat.Id, message.MessageId, nil)
 }
 
 func DeleteAllMessages(b *gotgbot.Bot) {

@@ -21,7 +21,7 @@ func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, send
 	if message.ReplyToMessage != nil && message.ReplyToMessage.Document != nil {
 		doc := message.ReplyToMessage.Document
 		if doc.MimeType == "application/x-bittorrent" {
-			file, err := b.GetFile(doc.FileId)
+			file, err := b.GetFile(doc.FileId, nil)
 			if err != nil {
 				engine.L().Error(err)
 			}
@@ -31,7 +31,7 @@ func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, send
 					parentId = utils.GetFileIdByGDriveLink(strings.TrimSpace(data[1]))
 				}
 			}
-			link = utils.FormatTGFileLink(file.FilePath, b.Token)
+			link = utils.FormatTGFileLink(file.FilePath, b.GetToken())
 		} else {
 			isTgDownload = true
 		}
@@ -75,6 +75,7 @@ func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, send
 	} else if fileId != "" {
 		engine.NewGDriveDownload(fileId, &listener)
 	} else if utils.IsMegaLink(link) {
+		//err := fmt.Errorf("mega isnt supported in this build")
 		err := engine.NewMegaDownload(link, &listener)
 		if err != nil {
 			engine.SendMessage(b, err.Error(), message)
