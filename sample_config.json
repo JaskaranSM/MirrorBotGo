@@ -1,0 +1,17 @@
+{   
+    "bot_token": "",
+    "sudo_users":[608750088],
+    "owner_id" : 596701090,
+    "download_dir" : "/app/downloads",
+    "status_update_interval" : 5,
+    "gdrive_parent_id" :"",
+    "is_team_drive":true,
+    "auto_delete_timeout":40,
+    "db_uri":"mongodb://",
+    "tg_app_id": "",
+    "use_sa": true,
+    "tg_app_hash": "",
+    "mega_email": "",
+    "mega_password": "",
+    "mega_api_key": ""
+}
