@@ -2,9 +2,12 @@ package engine
 
 import (
 	"MirrorBotGo/utils"
+	"context"
+	"io"
+	"os"
 	"time"
 
-	"github.com/mholt/archiver"
+	"github.com/mholt/archiver/v4"
 )
 
 type TarStatus struct {
@@ -86,7 +89,6 @@ func NewTarStatus(gid string, name string, listener *MirrorListener, archiver *T
 
 //TarArchiver struct
 type TarArchiver struct {
-	Prg       *archiver.Progress
 	Speed     int64
 	StartTime time.Time
 	Completed int64
@@ -95,57 +97,59 @@ type TarArchiver struct {
 	ETA       time.Duration
 }
 
-func NewProgress() *archiver.Progress {
-	return &archiver.Progress{}
-}
-
 //NewTarArchiver constructor
-func NewTarArchiver(p *archiver.Progress, total int64) *TarArchiver {
-	return &TarArchiver{Prg: p, Total: total, StartTime: time.Now()}
+func NewTarArchiver(total int64) *TarArchiver {
+	return &TarArchiver{Total: total, StartTime: time.Now()}
 }
 
-//OnTarProgress progress function
-func (t *TarArchiver) OnTarProgress() {
-	t.Completed = t.Prg.Get()
-	if t.Completed == 0 {
+func (t *TarArchiver) OnTransferUpdate(completed int64, total int64) {
+	t.Completed = completed
+	t.Total = total
+	if completed == 0 {
 		return
 	}
 	now := time.Now()
 	diff := int64(now.Sub(t.StartTime).Seconds())
 	if diff != 0 {
-		t.Speed = t.Completed / diff
+		t.Speed = completed / diff
 	} else {
 		t.Speed = 0
 	}
 	if t.Speed != 0 {
-		t.ETA = utils.CalculateETA(t.Total-t.Completed, t.Speed)
+		t.ETA = utils.CalculateETA(total-completed, t.Speed)
 	} else {
 		t.ETA = time.Duration(0)
 	}
 }
 
-func (t *TarArchiver) ProgressLoop() {
-	for {
-		if t.isDone {
-			break
-		}
-		t.OnTarProgress()
-		time.Sleep(1 * time.Second)
-	}
+func (t *TarArchiver) Write(b []byte) (int, error) {
+	length := len(b)
+	completed := t.Completed + int64(length)
+	t.OnTransferUpdate(completed, t.Total)
+	return length, nil
 }
 
 //TarPath start tarring
 func (t *TarArchiver) TarPath(path string) string {
 	outPath := path + ".tar"
 	L().Infof("[TarPath]: %s -> %s", path, outPath)
-	tar := archiver.NewTar()
-	tar.Prg = t.Prg
-	tar.ImplicitTopLevelFolder = true
-	go t.ProgressLoop()
-	err := tar.Archive([]string{path}, outPath)
-	t.isDone = true
+	tar := archiver.Tar{}
+	writer, err := os.Create(outPath)
 	if err != nil {
-		L().Errorf("[TarError]: %v, uploading without tar.", err)
+		L().Errorf("[TarPath]: %v", err)
+		return path
+	}
+	ctx := context.Background()
+	var filesMap map[string]string = make(map[string]string)
+	filesMap[path] = ""
+	files, err := archiver.FilesFromDisk(&archiver.FromDiskOptions{}, filesMap)
+	if err != nil {
+		L().Errorf("[TarPath]: %v", err)
+		return path
+	}
+	err = tar.Archive(ctx, io.MultiWriter(writer, t), files)
+	if err != nil {
+		L().Errorf("[TarPath]: %v", err)
 		return path
 	}
 	return outPath

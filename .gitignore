@@ -1,3 +1,2 @@
-*.json
+build/*.json
 MirrorBotGo
-modules/goexec

@@ -116,10 +116,6 @@ func (h *HTTPDownloadListener) OnDownloadStop(dl *httpdl.HTTPDownload) {
 }
 
 func (h *HTTPDownloadListener) OnDownloadComplete(dl *httpdl.HTTPDownload) {
-	if dl.IsCancelled() || dl.IsFailed() {
-		h.OnDownloadStop(dl)
-		return
-	}
 	h.listener.OnDownloadComplete()
 }
 

@@ -56,23 +56,26 @@ func (m *MirrorListener) OnDownloadComplete() {
 		MoveMirrorToSeeding(m.GetUid(), m.GetDownload())
 	}
 	if m.isTar {
-		archiver := NewTarArchiver(NewProgress(), dl.TotalLength())
+		archiver := NewTarArchiver(dl.TotalLength())
 		tarStatus := NewTarStatus(dl.Gid(), dl.Name(), nil, archiver)
 		tarStatus.Index_ = dl.Index()
 		AddMirrorLocal(m.GetUid(), tarStatus)
 		path = archiver.TarPath(path)
 	}
 	if m.doUnArchive {
-		cntSize, err := GetArchiveContentSize(path)
+		unarchiver := NewUnArchiver()
+		totalSize, err := unarchiver.CalculateTotalSize(path)
 		if err != nil {
-			L().Warnf("cannot get archive content size: %v,uploading without unarchive", err)
+			L().Errorf("Failed to get archive contents size, uploading as it is: %s: %v", path, err)
 		} else {
-			size = cntSize
-			unarchiver := NewUnArchiver(NewProgress(), size)
+			unarchiver.SetTotal(totalSize)
 			unArchiverStatus := NewUnArchiverStatus(dl.Gid(), dl.Name(), nil, unarchiver)
 			unArchiverStatus.Index_ = dl.Index()
 			AddMirrorLocal(m.GetUid(), unArchiverStatus)
-			path = unarchiver.UnArchivePath(path)
+			path, err = unarchiver.UnArchivePath(path)
+			if err != nil {
+				L().Errorf("Failed to unarchive the contents, uploading as it is: %s: %v", path, err)
+			}
 		}
 	}
 	drive := NewGDriveClient(size, dl.GetListener())

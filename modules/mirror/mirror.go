@@ -16,6 +16,8 @@ func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, send
 	message := ctx.EffectiveMessage
 	var link string
 	var isTgDownload bool = false
+	var isUsenetDownload bool = false
+	var nzbFileName string
 	var isTorrent bool = false
 	var parentId string
 	if message.ReplyToMessage != nil && message.ReplyToMessage.Document != nil {
@@ -32,6 +34,20 @@ func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, send
 				}
 			}
 			link = utils.FormatTGFileLink(file.FilePath, b.GetToken())
+		} else if doc.MimeType == "application/x-nzb" {
+			file, err := b.GetFile(doc.FileId, nil)
+			if err != nil {
+				engine.L().Error(err)
+			}
+			if strings.Contains(message.Text, "|") {
+				data := strings.SplitN(message.Text, "|", 2)
+				if len(data) > 1 {
+					parentId = utils.GetFileIdByGDriveLink(strings.TrimSpace(data[1]))
+				}
+			}
+			link = utils.FormatTGFileLink(file.FilePath, b.GetToken())
+			nzbFileName = doc.FileName
+			isUsenetDownload = true
 		} else {
 			isTgDownload = true
 		}
@@ -68,6 +84,12 @@ func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, send
 	if isTgDownload {
 		err := engine.NewTelegramDownload(message.ReplyToMessage, &listener)
 		//err := fmt.Errorf("Tg download not supported in this build")
+		if err != nil {
+			engine.SendMessage(b, err.Error(), message)
+			return nil
+		}
+	} else if isUsenetDownload {
+		err := engine.NewUsenetDownload(nzbFileName, link, &listener)
 		if err != nil {
 			engine.SendMessage(b, err.Error(), message)
 			return nil

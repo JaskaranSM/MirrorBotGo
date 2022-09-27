@@ -125,6 +125,8 @@ func GetStatsString() string {
 }
 
 func GetReadableProgressMessage(page int) string {
+	var globalDownloadSpeed int64
+	var globalUploadSpeed int64
 	msg := ""
 	chunks := GetAllMirrorsChunked(STATUS_MESSAGE_CHUNKSIZE)
 	if len(chunks)-1 < page {
@@ -135,6 +137,12 @@ func GetReadableProgressMessage(page int) string {
 		dl := dls[i]
 		msg += fmt.Sprintf("<i>%s</i> -", dl.Name())
 		msg += fmt.Sprintf(" %s\n", dl.GetStatusType())
+		if dl.GetStatusType() == MirrorStatusDownloading {
+			globalDownloadSpeed += dl.Speed()
+		}
+		if dl.GetStatusType() == MirrorStatusSeeding || dl.GetStatusType() == MirrorStatusUploading {
+			globalUploadSpeed += dl.Speed()
+		}
 		if dl.GetStatusType() == MirrorStatusCloning {
 			msg += fmt.Sprintf("%s of ", utils.GetHumanBytes(dl.CompletedLength()))
 			msg += fmt.Sprintf("%s at ", utils.GetHumanBytes(dl.TotalLength()))
@@ -166,6 +174,8 @@ func GetReadableProgressMessage(page int) string {
 		msg += "\n\n"
 	}
 	msg += GetStatsString()
+	msg += fmt.Sprintf(" | DL: %s", utils.GetHumanBytes(globalDownloadSpeed))
+	msg += fmt.Sprintf(" | UP: %s", utils.GetHumanBytes(globalUploadSpeed))
 	return msg
 }
 

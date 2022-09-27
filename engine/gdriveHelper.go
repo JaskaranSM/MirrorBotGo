@@ -8,12 +8,14 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	u "net/url"
 	"os"
 	"path"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/jaskaranSM/go-httpdl"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -113,7 +115,8 @@ func (G *GoogleDriveClient) SwitchServiceAccount() {
 	G.Authorize()
 }
 
-func (G *GoogleDriveClient) Authorize() {
+func (G *GoogleDriveClient) getAuthorizedHTTPClient() (*http.Client, error) {
+	var client *http.Client
 	if utils.UseSa() {
 		if G.SaLog {
 			L().Infof("Authorizing with %d service account.", GLOBAL_SA_INDEX)
@@ -121,56 +124,46 @@ func (G *GoogleDriveClient) Authorize() {
 		b, err := ioutil.ReadFile(fmt.Sprintf("%s/%d.json", SA_DIR, GLOBAL_SA_INDEX))
 		config, err := google.JWTConfigFromJSON(b, drive.DriveScope)
 		if err != nil {
-			if G.Listener != nil {
-				G.err = err
-				G.Listener.OnUploadError("failed to get JWT from JSON: " + err.Error())
-				return
-			} else {
-				L().Error(err)
-			}
+			return nil, err
 		}
-		client := config.Client(context.Background())
-		srv, err := drive.New(client)
-		if err != nil {
-			L().Error(err)
-		}
-		G.DriveSrv = srv
+		client = config.Client(context.Background())
 	} else {
 		b, err := ioutil.ReadFile(G.CredentialFile)
 		if err != nil {
-			if G.Listener != nil {
-				G.err = err
-				G.Listener.OnUploadError("Unable to read client secret file: " + err.Error())
-				return
-			} else {
-				L().Error(err)
-			}
+			return nil, err
 		}
 		// If modifying these scopes, delete your previously saved token.json.
 		config, err := google.ConfigFromJSON(b, drive.DriveScope)
 		if err != nil {
-			if G.Listener != nil {
-				G.err = err
-				G.Listener.OnUploadError("Unable to parse client secret file to config: " + err.Error())
-				return
-			} else {
-				L().Error(err)
-			}
+			return nil, err
 		}
-		client := G.getClient(config)
-
-		srv, err := drive.New(client)
-		if err != nil {
-			if G.Listener != nil {
-				G.err = err
-				G.Listener.OnUploadError("Unable to retrieve Drive client: " + err.Error())
-				return
-			} else {
-				L().Error(err)
-			}
-		}
-		G.DriveSrv = srv
+		client = G.getClient(config)
 	}
+	return client, nil
+}
+
+func (G *GoogleDriveClient) Authorize() {
+	client, err := G.getAuthorizedHTTPClient()
+	if err != nil {
+		if G.Listener != nil {
+			G.err = err
+			G.Listener.OnUploadError("Unable to get authorized HTTP client: " + err.Error())
+			return
+		} else {
+			L().Error(err)
+		}
+	}
+	srv, err := drive.New(client)
+	if err != nil {
+		if G.Listener != nil {
+			G.err = err
+			G.Listener.OnUploadError("Unable to create DriveService: " + err.Error())
+			return
+		} else {
+			L().Error(err)
+		}
+	}
+	G.DriveSrv = srv
 }
 
 func (G *GoogleDriveClient) getTokenFromWeb(config *oauth2.Config) *oauth2.Token {
@@ -320,7 +313,7 @@ func (G *GoogleDriveClient) Download(fileId string, dir string) {
 		os.Mkdir(local, 0755)
 		G.DownloadFolder(meta.Id, local)
 	} else {
-		err := G.DownloadFile(meta.Id, local, meta.Size, 1)
+		err := G.DownloadFileMultiConnection(meta, dir, 1)
 		G.Clean()
 		if err != nil {
 			G.Listener.OnDownloadError(err.Error())
@@ -362,7 +355,7 @@ func (G *GoogleDriveClient) DownloadFolder(folderId string, local string) bool {
 			os.Mkdir(current_path, 0755)
 			G.DownloadFolder(file.Id, current_path)
 		} else {
-			err := G.DownloadFile(file.Id, current_path, file.Size, 1)
+			err := G.DownloadFileMultiConnection(file, local, 1)
 			G.Clean()
 			if err != nil {
 				G.doNothing = true
@@ -379,6 +372,63 @@ func (G *GoogleDriveClient) CancelDownload() {
 	if G.prg != nil {
 		G.prg.Cancel()
 	}
+}
+
+func (G *GoogleDriveClient) DownloadFileMultiConnection(file *drive.File, dir string, retry int) error {
+	client, err := G.getAuthorizedHTTPClient()
+	if err != nil {
+		return err
+	}
+	qs := u.Values{
+		"includeItemsFromAllDrives": []string{"true"},
+		"supportsAllDrives":         []string{"true"},
+		"alt":                       []string{"media"},
+	}
+	url := fmt.Sprintf("https://www.googleapis.com/drive/v3/files/%s?%s", file.Id, qs.Encode())
+	downloader := httpdl.NewHTTPDownloader(client)
+	dl, err := downloader.AddDownload(url, &httpdl.AddDownloadOpts{
+		Connections: 10,
+		Filename:    file.Name,
+		Dir:         dir,
+		Size:        file.Size,
+	})
+	run := true
+	for run {
+		if G.isCancelled {
+			dl.CancelDownload()
+		}
+		if dl.IsCancelled() || dl.IsFailed() || dl.IsCompleted() {
+			run = false
+		}
+		if dl.IsFailed() {
+			err = dl.GetFailureError()
+		}
+		G.Speed = dl.Speed()
+		chunkTransferred := dl.CompletedLength() - G.LastTransferred
+		G.CompletedLength += chunkTransferred
+		G.LastTransferred = dl.CompletedLength()
+		if G.Speed != 0 {
+			G.ETA = utils.CalculateETA(G.TotalLength-G.CompletedLength, G.Speed)
+		} else {
+			G.ETA = time.Duration(0)
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if err != nil {
+		if utils.UseSa() {
+			G.SwitchServiceAccount()
+		}
+		if retry <= G.MaxRetries {
+			L().Warn(" (GDDL-MultiConn) Encountered: ", err.Error(), " retryin: ", retry)
+			G.Sleep(G.SleepTime)
+			G.Clean()
+			return G.DownloadFileMultiConnection(file, dir, retry+1)
+		} else {
+			L().Error("(GDDL-MultiConn) Could not download drive file (even after retryin): " + err.Error())
+			return err
+		}
+	}
+	return nil
 }
 
 func (G *GoogleDriveClient) DownloadFile(fileId string, local string, size int64, retry int) error {

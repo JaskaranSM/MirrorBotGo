@@ -2,17 +2,14 @@ package engine
 
 import (
 	"MirrorBotGo/utils"
-	"archive/tar"
-	"archive/zip"
-	"fmt"
+	"context"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
-	"github.com/mholt/archiver"
-	"github.com/nwaples/rardecode"
+	"github.com/mholt/archiver/v4"
 )
 
 type UnArchiverStatus struct {
@@ -93,7 +90,6 @@ func NewUnArchiverStatus(gid string, name string, listener *MirrorListener, unar
 }
 
 type UnArchiver struct {
-	Prg       *archiver.Progress
 	Speed     int64
 	StartTime time.Time
 	Completed int64
@@ -102,8 +98,20 @@ type UnArchiver struct {
 	ETA       time.Duration
 }
 
-func (t *UnArchiver) OnUnArchiveProgress() {
-	t.Completed = t.Prg.Get()
+func (t *UnArchiver) SetTotal(total int64) {
+	t.Total = total
+}
+
+func (t *UnArchiver) Write(b []byte) (int, error) {
+	length := len(b)
+	completed := t.Completed + int64(length)
+	t.OnTransferUpdate(completed, t.Total)
+	return length, nil
+}
+
+func (t *UnArchiver) OnTransferUpdate(completed int64, total int64) {
+	t.Completed = completed
+	t.Total = total
 	if t.Completed == 0 {
 		return
 	}
@@ -121,94 +129,77 @@ func (t *UnArchiver) OnUnArchiveProgress() {
 	}
 }
 
-func (t *UnArchiver) ProgressLoop() {
-	for {
-		if t.isDone {
-			break
-		}
-		t.OnUnArchiveProgress()
-		time.Sleep(1 * time.Second)
-	}
-}
-
-func (t *UnArchiver) UnArchivePath(path string) string {
-	outPath := utils.TrimExt(path)
-	os.MkdirAll(outPath, 0755)
-	L().Infof("[UnArchivePath]: %s -> %s", path, outPath)
-	go t.ProgressLoop()
-	err := Unarchive(path, outPath, true, t.Prg)
-	t.isDone = true
+func (t *UnArchiver) CalculateTotalSize(path string) (int64, error) {
+	reader, err := os.Open(path)
 	if err != nil {
-		L().Errorf("[UnArchiveError]: %v, uploading without unarchive.", err)
-		return path
+		return 0, err
 	}
-	return outPath
-}
-
-func createFilesSizeWalker(accumulator *int64) func(archiver.File) error {
-	return func(f archiver.File) error {
-		if f.IsDir() {
-			return nil
-		}
-		*accumulator += f.Size()
-		return nil
+	format, archiveReader, err := archiver.Identify(path, reader)
+	if err != nil {
+		return 0, err
 	}
-}
-
-func GetArchiveContentSize(path string) (int64, error) {
+	ctx := context.Background()
 	var size int64
-	walker := createFilesSizeWalker(&size)
-	err := archiver.Walk(path, walker)
-	return size, err
-}
-
-func NewUnArchiver(p *archiver.Progress, total int64) *UnArchiver {
-	return &UnArchiver{Prg: p, Total: total, StartTime: time.Now()}
-}
-
-func Unarchive(inputFile string, outputDir string, archiveHasBaseDir bool, prg *archiver.Progress) error {
-	inputFile = filepath.ToSlash(inputFile)
-	outputDir = filepath.ToSlash(outputDir)
-	extractFilesWalker := createExtractFilesWalker(prg, archiveHasBaseDir, outputDir)
-	return archiver.Walk(inputFile, extractFilesWalker)
-}
-
-func createExtractFilesWalker(prg *archiver.Progress, archiveHasBaseDir bool, outputDir string) func(archiver.File) error {
-	pathSeparator := fmt.Sprintf("%c", os.PathSeparator)
-	return func(f archiver.File) error {
-		name := f.Name()
-		switch h := f.Header.(type) {
-		case zip.FileHeader:
-			name = h.Name
-		case *tar.Header:
-			name = h.Name
-		case *rardecode.FileHeader:
-			name = h.Name
-		default:
-			return fmt.Errorf("Unable to process %v", h)
-		}
-
-		dirname := filepath.ToSlash(filepath.Join(outputDir, filepath.Dir(name)))
-		if archiveHasBaseDir {
-			namePathParts := strings.Split(filepath.Dir(name), pathSeparator)
-			dirname = filepath.ToSlash(filepath.Join(outputDir, filepath.Join(namePathParts[1:]...)))
-			os.MkdirAll(dirname, 0755)
-		}
-
-		if f.IsDir() {
-			os.MkdirAll(dirname, 0755)
+	if ex, ok := format.(archiver.Extractor); ok {
+		ex.Extract(ctx, archiveReader, nil, func(ctx context.Context, f archiver.File) error {
+			size += f.Size()
 			return nil
-		}
-
-		outFile := filepath.Join(dirname, filepath.Base(name))
-		outf, err := os.Create(outFile)
-		if err != nil {
-			return err
-		}
-		_, err = io.Copy(outf, io.TeeReader(f, prg))
-		if err != nil {
-			fmt.Println("error lol: ", err)
-		}
-		return err
+		})
+	} else {
+		return 0, errors.New("Unsupported archive")
 	}
+	return size, nil
+}
+
+func fileNameWithoutExtSliceNotation(fileName string) string {
+	return fileName[:len(fileName)-len(filepath.Ext(fileName))]
+}
+
+func (t *UnArchiver) UnArchivePath(path string) (string, error) {
+	L().Infof("[Unarchive] starting unarchive: %s", path)
+	outPath := fileNameWithoutExtSliceNotation(path)
+	os.MkdirAll(outPath, 0755)
+	reader, err := os.Open(path)
+	if err != nil {
+		return path, err
+	}
+	format, archiveReader, err := archiver.Identify(path, reader)
+	if err != nil {
+		return path, err
+	}
+	ctx := context.Background()
+	if ex, ok := format.(archiver.Extractor); ok {
+		err = ex.Extract(ctx, archiveReader, nil, func(ctx context.Context, f archiver.File) error {
+			if f.IsDir() {
+				return nil
+			}
+			writerPath := filepath.Join(outPath, f.NameInArchive)
+			dir := filepath.Dir(writerPath)
+			os.MkdirAll(dir, 0755)
+			writer, err := os.Create(writerPath)
+			if err != nil {
+				return err
+			}
+			reader, err := f.Open()
+			defer reader.Close()
+			if err != nil {
+				return err
+			}
+			_, err = io.Copy(io.MultiWriter(writer, t), reader)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if err != nil {
+			return path, err
+		}
+	} else {
+		return path, errors.New("Unsupported archive")
+	}
+	return outPath, nil
+}
+
+func NewUnArchiver() *UnArchiver {
+	return &UnArchiver{StartTime: time.Now()}
 }
