@@ -49,8 +49,6 @@ archives:
 release:
   footer: |
     **Full Changelog**: https://github.com/jaskaranSM/MirrorBotGo/compare/{{ .PreviousTag }}...{{ .Tag }}
-    
-    ## This is a pre-release
 
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # vim: set ts=2 sw=2 tw=0 fo=jcroql
