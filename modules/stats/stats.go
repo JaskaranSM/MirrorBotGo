@@ -10,8 +10,8 @@ import (
 	"runtime/pprof"
 	"time"
 
-	"github.com/mackerelio/go-osstat/cpu"
-	"github.com/mackerelio/go-osstat/memory"
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -24,30 +24,21 @@ var startTime time.Time = time.Now()
 
 func GetMemoryUsage() string {
 	out := ""
-	memory, err := memory.Get()
+	memoryStat, err := mem.VirtualMemory()
 	if err != nil {
-		engine.L().Error(err)
-		return out
+		return "NA"
 	}
-	out += fmt.Sprintf("%d%%", memory.Free*100/memory.Total)
+	out += fmt.Sprintf("%.2f", memoryStat.UsedPercent) + "%"
 	return out
 }
 
 func GetCpuUsage() string {
 	out := ""
-	before, err := cpu.Get()
+	data, err := cpu.Percent(time.Second, false)
 	if err != nil {
-		engine.L().Error(err)
-		return out
+		return "NA"
 	}
-	time.Sleep(time.Duration(1) * time.Second)
-	after, err := cpu.Get()
-	if err != nil {
-		engine.L().Error(err)
-		return out
-	}
-	total := int(after.User-before.User) / runtime.NumCPU()
-	out += fmt.Sprintf("%d%%", total)
+	out += fmt.Sprintf("%.2f", data[0]) + "%"
 	return out
 }
 
