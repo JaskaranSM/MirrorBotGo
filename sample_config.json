@@ -1,8 +1,8 @@
-{   
+{
     "bot_token": "",
     "sudo_users":[608750088],
     "owner_id" : 596701090,
-    "download_dir" : "/app/downloads",
+    "download_dir" : "./downloads",
     "status_update_interval" : 5,
     "gdrive_parent_id" :"",
     "is_team_drive":true,
