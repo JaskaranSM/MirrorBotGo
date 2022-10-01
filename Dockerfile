@@ -7,7 +7,5 @@ COPY MirrorBotGo .
 VOLUME [ "/app" ]
 CMD ["./MirrorBotGo"]
 
-HEALTHCHECK NONE
-
-# HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-#   CMD curl --fail http://localhost:7870/status || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl --fail http://localhost:7870/health || exit 1

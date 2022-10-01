@@ -48,26 +48,27 @@ func IsUrlLink(link string) bool {
 }
 
 type ConfigJson struct {
-	BOT_TOKEN              string  `json:"bot_token"`
-	SUDO_USERS             []int64 `json:"sudo_users"`
-	AUTHORIZED_CHATS       []int64 `json:"authorized_chats"`
-	OWNER_ID               int64   `json:"owner_id"`
-	DOWNLOAD_DIR           string  `json:"download_dir"`
-	IS_TEAM_DRIVE          bool    `json:"is_team_drive"`
-	GDRIVE_PARENT_ID       string  `json:"gdrive_parent_id"`
-	STATUS_UPDATE_INTERVAL int     `json:"status_update_interval"`
-	AUTO_DELETE_TIMEOUT    int     `json:"auto_delete_timeout"`
-	DB_URI                 string  `json:"db_uri"`
-	USE_SA                 bool    `json:"use_sa"`
-	INDEX_URL              string  `json:"index_url"`
-	TG_APP_ID              string  `json:"tg_app_id"`
-	TG_APP_HASH            string  `json:"tg_app_hash"`
-	MegaEmail              string  `json:"mega_email"`
-	MegaPassword           string  `json:"mega_password"`
-	MegaAPIKey             string  `json:"mega_api_key"`
-	StatusMessagesPerPage  int     `json:"status_messages_per_page"`
-	EncryptionPassword     string  `json:"encryption_password"`
-	Seed                   bool    `json:"seed"`
+	BOT_TOKEN               string  `json:"bot_token"`
+	SUDO_USERS              []int64 `json:"sudo_users"`
+	AUTHORIZED_CHATS        []int64 `json:"authorized_chats"`
+	OWNER_ID                int64   `json:"owner_id"`
+	DOWNLOAD_DIR            string  `json:"download_dir"`
+	IS_TEAM_DRIVE           bool    `json:"is_team_drive"`
+	GDRIVE_PARENT_ID        string  `json:"gdrive_parent_id"`
+	STATUS_UPDATE_INTERVAL  int     `json:"status_update_interval"`
+	AUTO_DELETE_TIMEOUT     int     `json:"auto_delete_timeout"`
+	DB_URI                  string  `json:"db_uri"`
+	USE_SA                  bool    `json:"use_sa"`
+	INDEX_URL               string  `json:"index_url"`
+	TG_APP_ID               string  `json:"tg_app_id"`
+	TG_APP_HASH             string  `json:"tg_app_hash"`
+	MegaEmail               string  `json:"mega_email"`
+	MegaPassword            string  `json:"mega_password"`
+	MegaAPIKey              string  `json:"mega_api_key"`
+	StatusMessagesPerPage   int     `json:"status_messages_per_page"`
+	EncryptionPassword      string  `json:"encryption_password"`
+	Seed                    bool    `json:"seed"`
+	TorrentClientListenPort int     `json:"torrent_client_listen_port"`
 }
 
 var Config *ConfigJson = InitConfig()
@@ -105,6 +106,13 @@ func GetTgAppId() string {
 
 func GetMegaEmail() string {
 	return Config.MegaEmail
+}
+
+func GetTorrentClientListenPort() int {
+	if Config.TorrentClientListenPort == 0 {
+		return 42069
+	}
+	return Config.TorrentClientListenPort
 }
 
 func GetStatusMessagesPerPage() int {
