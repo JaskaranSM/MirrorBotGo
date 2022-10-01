@@ -3,7 +3,9 @@ env:
 
 before:
   hooks:
-    - go mod download
+    - go mod tidy -compat=1.17
+    - /bin/bash -c "echo -e $COSIGN_KEY > cosign.key"
+    - /bin/bash -c "echo -e $COSIGN_PUB > cosign.pub"
 
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
@@ -16,12 +18,16 @@ builds:
     goos:
       - linux
       - windows
+      - darwin
     goarch:
       - amd64
       - arm64
     mod_timestamp: '{{ .CommitTimestamp }}'
     ldflags:
       - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }} -X main.builtBy=goreleaser
+
+universal_binaries:
+  - replace: false
 
 checksum:
   name_template: 'checksums.txt'
@@ -33,9 +39,51 @@ changelog:
       - '^docs:'
       - '^test:'
 
+dockers:
+  - image_templates:
+      - 'ghcr.io/jaskaransm/mirrorbotgo:{{ .Tag }}-amd64'
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--pull"
+      - "--platform=linux/amd64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.name={{.ProjectName}}"
+      - "--label=org.opencontainers.image.description=Mirror Stuff"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+
+  - image_templates:
+      - 'ghcr.io/jaskaransm/mirrorbotgo:{{ .Tag }}-arm64'
+    goarch: arm64
+    dockerfile: Dockerfile
+    use: buildx
+    build_flag_templates:
+      - "--pull"
+      - "--platform=linux/arm64"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.name={{.ProjectName}}"
+      - "--label=org.opencontainers.image.description=Mirror Stuff"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+
+docker_manifests:
+  - name_template: 'ghcr.io/jaskaransm/mirrorbotgo:{{ .Tag }}'
+    image_templates:
+      - "ghcr.io/jaskaransm/mirrorbotgo:{{ .Tag }}-amd64"
+      - "ghcr.io/jaskaransm/mirrorbotgo:{{ .Tag }}-arm64"
+
+  - name_template: 'ghcr.io/jaskaransm/mirrorbotgo:latest'
+    image_templates:
+      - "ghcr.io/jaskaransm/mirrorbotgo:{{ .Tag }}-amd64"
+      - "ghcr.io/jaskaransm/mirrorbotgo:{{ .Tag }}-arm64"
+
 archives:
   - name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
     replacements:
+      darwin: Darwin
       linux: Linux
       windows: Windows
       amd64: x86_64
@@ -46,9 +94,32 @@ archives:
       - README.md
       - sample_config.json
 
+signs:
+  - cmd: cosign
+    stdin: '{{ .Env.COSIGN_PWD }}'
+    artifacts: checksum
+    args:
+      - sign-blob
+      - '--key=cosign.key'
+      - '--output-signature=${signature}'
+      - '${artifact}'
+
+docker_signs:
+- cmd: cosign
+  stdin: '{{ .Env.COSIGN_PWD }}'
+  artifacts: manifests
+  args:
+  - 'sign'
+  - '--key=cosign.key'
+  - '${artifact}'
+
 release:
   footer: |
     **Full Changelog**: https://github.com/jaskaranSM/MirrorBotGo/compare/{{ .PreviousTag }}...{{ .Tag }}
+  
+  extra_files:
+    - glob: "cosign.pub"
+
 
 # yaml-language-server: $schema=https://goreleaser.com/static/schema.json
 # vim: set ts=2 sw=2 tw=0 fo=jcroql

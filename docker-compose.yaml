@@ -1,0 +1,11 @@
+version: "3.9"
+
+services:
+  bot:
+    image: ghcr.io/jaskaransm/mirrorbotgo:latest
+    container_name: MirrorBotGo
+    restart: unless-stopped
+    volumes:
+      - ./config/accounts:/app/accounts:ro
+      - ./config/config.json:/app/config.json:ro
+    # network_mode: container:vpn
