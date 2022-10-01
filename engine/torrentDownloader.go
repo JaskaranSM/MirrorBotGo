@@ -24,6 +24,8 @@ func getAnacrolixTorrentClient(seed bool) *torrent.Client {
 	config.ExtendedHandshakeClientVersion = "qBittorrent/4.3.8"
 	config.Seed = seed
 	config.MinDialTimeout = 10 * time.Second
+	config.ListenPort = utils.GetTorrentClientListenPort()
+	L().Infof("[ALXTorrent]: starting client on port: %d", config.ListenPort)
 	client, err := torrent.NewClient(config)
 	if err != nil {
 		L().Fatal(err)
