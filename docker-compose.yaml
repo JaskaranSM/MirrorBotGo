@@ -5,6 +5,8 @@ services:
     image: ghcr.io/jaskaransm/mirrorbotgo:latest
     container_name: MirrorBotGo
     restart: unless-stopped
+    # environment:
+    #   - TZ=
     volumes:
       - ./config/accounts:/app/accounts:ro
       - ./config/config.json:/app/config.json:ro
