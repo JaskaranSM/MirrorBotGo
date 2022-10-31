@@ -5,6 +5,8 @@ services:
     image: ghcr.io/jaskaransm/mirrorbotgo:latest
     container_name: MirrorBotGo
     restart: unless-stopped
+    # environment:
+    #   - TZ=
     volumes:
       - ./config/accounts:/app/accounts:ro
       - ./config/config.json:/app/config.json:ro
@@ -13,3 +15,12 @@ services:
       # - ./config/credentials.json:/app/credentials.json:ro 
       # - ./config/token.json:/app/token.json:ro  
     # network_mode: container:vpn
+
+  db:
+    image: mongo:6
+    container_name: Mongo
+    restart: unless-stopped
+    volumes:
+      - ./data/db:/data/db
+    expose:
+      - "27017"
