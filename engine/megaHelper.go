@@ -1,5 +1,5 @@
-//go:build !disable_mega
-// +build !disable_mega
+//go:build enable_mega
+// +build enable_mega
 
 package engine
 

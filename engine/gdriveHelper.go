@@ -677,6 +677,7 @@ func (G *GoogleDriveClient) UploadFile(parentId string, file_path string, retry 
 		L().Error("Error while opening file for upload: ", err.Error())
 		return nil, err
 	}
+	defer content.Close()
 	stat, err := content.Stat()
 	if err != nil {
 		L().Error("Error while doing content.Stat()", err.Error())
