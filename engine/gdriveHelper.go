@@ -618,8 +618,16 @@ func (G *GoogleDriveClient) CheckRetry(file *drive.File, err error) bool {
 	if strings.Contains(strings.ToLower(err.Error()), "rate") || strings.Contains(strings.ToLower(err.Error()), "500") {
 		return true
 	}
+	checkResponseCodes := func(statusCode int) bool {
+		for code := range []int{403, 429} {
+			if statusCode == code {
+				return true
+			}
+		}
+		return false
+	}
 	if file != nil {
-		if file.ServerResponse.HTTPStatusCode >= 500 {
+		if file.ServerResponse.HTTPStatusCode >= 500 || checkResponseCodes(file.ServerResponse.HTTPStatusCode) {
 			return true
 		}
 	}

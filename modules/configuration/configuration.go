@@ -84,10 +84,27 @@ func GetGotdDownloadThreadsCountHandler(b *gotgbot.Bot, ctx *ext.Context) error 
 	return nil
 }
 
+func MegaLoginHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
+		return nil
+	}
+	message := ctx.EffectiveMessage
+	out := ""
+	err := engine.PerfomMegaLogin()
+	if err != nil {
+		out = fmt.Sprintf("Mega login failed: %s", err.Error())
+	} else {
+		out = "Mega login success."
+	}
+	engine.SendMessage(b, out, message)
+	return nil
+}
+
 func LoadConfigurationHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 	defer l.Info("Configuration Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("setuploadchunksize", SetUploadChunkSizeHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("getuploadchunksize", GetUploadChunkSizeHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("setgotdthreads", SetGotdDownloadThreadsCountHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("getgotdthreads", GetGotdDownloadThreadsCountHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("megalogin", MegaLoginHandler))
 }

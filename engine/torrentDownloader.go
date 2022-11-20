@@ -2,6 +2,7 @@ package engine
 
 import (
 	"MirrorBotGo/utils"
+	"bytes"
 	"fmt"
 	"os"
 	"path"
@@ -14,6 +15,12 @@ import (
 
 var anacrolixClient *torrent.Client = getAnacrolixTorrentClient(utils.GetSeed())
 var anacrolixDownloader *AnacrolixTorrentDownloader = getAnacrolixTorrentDownloader()
+
+func GetAnacrolixTorrentClientStatus() bytes.Buffer {
+	var buffer bytes.Buffer
+	anacrolixClient.WriteStatus(&buffer)
+	return buffer
+}
 
 func getAnacrolixTorrentClient(seed bool) *torrent.Client {
 	config := torrent.NewDefaultClientConfig()
@@ -46,7 +53,6 @@ type AnacrolixTorrentDownloadListener struct {
 	isSeed            bool
 	IsSeeding         bool
 	IsComplete        bool
-	DownloadSpeed     int64
 	SeedingSpeed      int64
 	UploadedBytes     int64
 	SeedStartTime     time.Time
@@ -68,12 +74,12 @@ func (a *AnacrolixTorrentDownloadListener) OnDownloadComplete() {
 func (a *AnacrolixTorrentDownloadListener) OnMetadataDownloadComplete() {
 	L().Infof("[ALXTorrent]: OnMetadataDownloadComplete: %s", a.torrentHandle.Name())
 	a.torrentHandle.DownloadAll()
-	a.StartSpeedObserver()
+	a.StartSeedingSpeedObserver()
 }
 
 func (a *AnacrolixTorrentDownloadListener) OnDownloadStop() {
 	L().Infof("[ALXTorrent]: OnDownloadStop: %s", a.torrentHandle.Name())
-	a.StopSpeedObserver()
+	a.StopSeedingSpeedObserver()
 	a.StopListener()
 	a.listener.OnDownloadError("Canceled by user.")
 }
@@ -86,7 +92,7 @@ func (a *AnacrolixTorrentDownloadListener) OnSeedingStart() {
 
 func (a *AnacrolixTorrentDownloadListener) OnSeedingError() {
 	L().Infof("[ALXTorrent]: OnSeedingError: %s", a.torrentHandle.Name())
-	a.StopSpeedObserver()
+	a.StopSeedingSpeedObserver()
 	a.StopListener()
 	ratio := float64(a.UploadedBytes) / float64(a.torrentHandle.Length())
 	seedTime := time.Now().Sub(a.SeedStartTime)
@@ -117,30 +123,25 @@ func (a *AnacrolixTorrentDownloadListener) ListenForEvents() {
 	}
 }
 
-func (a *AnacrolixTorrentDownloadListener) SpeedObserver() {
+func (a *AnacrolixTorrentDownloadListener) SeedingSpeedObserver() {
 	last := a.torrentHandle.Stats()
-	completedLast := a.torrentHandle.BytesCompleted()
 	for a.IsObserverRunning {
 		stats := a.torrentHandle.Stats()
-		currentRead := a.torrentHandle.BytesCompleted()
-		readChunk := currentRead - completedLast
 		chunk := stats.BytesWrittenData.Int64() - last.BytesWrittenData.Int64()
-		a.DownloadSpeed = readChunk
 		a.SeedingSpeed = chunk
 		a.UploadedBytes += chunk
 		//L().Infof("Seeding speed: %d | Uploaded: %d", a.SeedingSpeed, a.UploadedBytes)
 		last = stats
-		completedLast = currentRead
 		time.Sleep(1 * time.Second)
 	}
 }
 
-func (a *AnacrolixTorrentDownloadListener) StartSpeedObserver() {
+func (a *AnacrolixTorrentDownloadListener) StartSeedingSpeedObserver() {
 	a.IsObserverRunning = true
-	go a.SpeedObserver()
+	go a.SeedingSpeedObserver()
 }
 
-func (a *AnacrolixTorrentDownloadListener) StopSpeedObserver() {
+func (a *AnacrolixTorrentDownloadListener) StopSeedingSpeedObserver() {
 	a.IsObserverRunning = false
 }
 
@@ -260,7 +261,11 @@ func (a *AnacrolixTorrentDownloadStatus) Speed() int64 {
 	if a.anacrolixListener.IsSeeding {
 		return a.anacrolixListener.SeedingSpeed
 	}
-	return a.anacrolixListener.DownloadSpeed
+	var speed float64
+	for _, peer := range a.torrentHandle.PeerConns() {
+		speed += peer.DownloadRate()
+	}
+	return int64(speed)
 }
 
 func (a *AnacrolixTorrentDownloadStatus) Gid() string {
