@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"path"
 	"strings"
 	"sync"
@@ -26,6 +27,8 @@ const (
 	MegaSDKRestStateCancelled  = 7
 	MegaSDKRestStateFailed     = 8
 )
+
+var megaLoggedIn bool = false
 
 type MegaSDKRestLogin struct {
 	Login   string `json:"login"`
@@ -82,6 +85,17 @@ func (m *MegaSDKRestClient) checkAndRaiseError(resData []byte) error {
 	return nil
 }
 
+func (m *MegaSDKRestClient) checkLogin() {
+	if megaLoggedIn {
+		return
+	}
+	_, err := m.Login(utils.GetMegaEmail(), utils.GetMegaPasssword())
+	if err != nil {
+		L().Errorf("MegaSDKRest Login: ", err.Error())
+	}
+	megaLoggedIn = true
+}
+
 func (m *MegaSDKRestClient) Login(email string, password string) (*MegaSDKRestLogin, error) {
 	res, err := http.PostForm(m.apiURL+"/login", url.Values{
 		"email":    []string{email},
@@ -107,6 +121,7 @@ func (m *MegaSDKRestClient) Login(email string, password string) (*MegaSDKRestLo
 }
 
 func (m *MegaSDKRestClient) AddDl(link string, dir string) (*MegaSDKRestAddDl, error) {
+	m.checkLogin()
 	res, err := http.PostForm(m.apiURL+"/adddl", url.Values{
 		"link": []string{link},
 		"dir":  []string{dir},
@@ -170,7 +185,7 @@ func (m *MegaSDKRestClient) GetDownloadInfo(gid string) (*MegaSDKRestDownloadInf
 var megaMutex sync.Mutex
 var megaClient *MegaSDKRestClient = NewMegaSDKRestClient("http://localhost:6090")
 
-func PerfomMegaLogin() error {
+func PerformMegaLogin() error {
 	_, err := megaClient.Login(utils.GetMegaEmail(), utils.GetMegaPasssword())
 	if err != nil {
 		L().Errorf("MegaSDKRest: %s", err.Error())
@@ -179,7 +194,7 @@ func PerfomMegaLogin() error {
 }
 
 func init() {
-	PerfomMegaLogin()
+	StartMegaSDKRestServer(utils.GetMegaAPIKey())
 }
 
 func NewMegaDownload(link string, listener *MirrorListener) error {
@@ -346,5 +361,15 @@ func NewMegaDownloadStatus(gid string, listener *MirrorListener) *MegaDownloadSt
 	return &MegaDownloadStatus{
 		gid:      gid,
 		listener: listener,
+	}
+}
+
+func StartMegaSDKRestServer(apiKey string) {
+	cmd := exec.Command("megasdkrest", "--apikey", apiKey)
+	err := cmd.Start()
+	if err != nil {
+		L().Errorf("MegaSDKRest: %s", err.Error())
+	} else {
+		L().Info("MegaSDKRest: server started")
 	}
 }

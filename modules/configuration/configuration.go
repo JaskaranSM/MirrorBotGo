@@ -90,7 +90,7 @@ func MegaLoginHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	message := ctx.EffectiveMessage
 	out := ""
-	err := engine.PerfomMegaLogin()
+	err := engine.PerformMegaLogin()
 	if err != nil {
 		out = fmt.Sprintf("Mega login failed: %s", err.Error())
 	} else {
