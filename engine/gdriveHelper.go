@@ -619,13 +619,20 @@ func (G *GoogleDriveClient) CheckRetry(file *drive.File, err error) bool {
 		return true
 	}
 	checkResponseCodes := func(statusCode int) bool {
-		for code := range []int{403, 429} {
+		for code := range []int{403, 429, 500, 501, 502, 503, 504, 505, 506, 507} {
 			if statusCode == code {
 				return true
 			}
 		}
 		return false
 	}
+	googleError, ok := err.(*googleapi.Error)
+	if ok {
+		if checkResponseCodes(googleError.Code) {
+			return true
+		}
+	}
+
 	if file != nil {
 		if file.ServerResponse.HTTPStatusCode >= 500 || checkResponseCodes(file.ServerResponse.HTTPStatusCode) {
 			return true
