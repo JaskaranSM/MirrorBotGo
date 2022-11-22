@@ -75,6 +75,7 @@ func NewMegaSDKRestClient(apiURL string) *MegaSDKRestClient {
 
 type MegaSDKRestClient struct {
 	apiURL string
+	mut    sync.Mutex
 }
 
 func (m *MegaSDKRestClient) checkAndRaiseError(resData []byte) error {
@@ -91,7 +92,7 @@ func (m *MegaSDKRestClient) checkLogin() {
 	}
 	_, err := m.Login(utils.GetMegaEmail(), utils.GetMegaPasssword())
 	if err != nil {
-		L().Errorf("MegaSDKRest Login: ", err.Error())
+		L().Errorf("MegaSDKRest Login: %s", err.Error())
 	}
 	megaLoggedIn = true
 }
@@ -121,6 +122,8 @@ func (m *MegaSDKRestClient) Login(email string, password string) (*MegaSDKRestLo
 }
 
 func (m *MegaSDKRestClient) AddDl(link string, dir string) (*MegaSDKRestAddDl, error) {
+	m.mut.Lock()
+	defer m.mut.Unlock()
 	m.checkLogin()
 	res, err := http.PostForm(m.apiURL+"/adddl", url.Values{
 		"link": []string{link},
@@ -146,6 +149,8 @@ func (m *MegaSDKRestClient) AddDl(link string, dir string) (*MegaSDKRestAddDl, e
 }
 
 func (m *MegaSDKRestClient) CancelDl(gid string) error {
+	m.mut.Lock()
+	defer m.mut.Unlock()
 	res, err := http.PostForm(m.apiURL+"/canceldl", url.Values{
 		"gid": []string{gid},
 	})
@@ -161,6 +166,8 @@ func (m *MegaSDKRestClient) CancelDl(gid string) error {
 }
 
 func (m *MegaSDKRestClient) GetDownloadInfo(gid string) (*MegaSDKRestDownloadInfo, error) {
+	m.mut.Lock()
+	defer m.mut.Unlock()
 	res, err := http.Get(m.apiURL + fmt.Sprintf("/dlinfo/%s", gid))
 	if err != nil {
 		return nil, err
@@ -182,7 +189,6 @@ func (m *MegaSDKRestClient) GetDownloadInfo(gid string) (*MegaSDKRestDownloadInf
 	return downloadInfo, nil
 }
 
-var megaMutex sync.Mutex
 var megaClient *MegaSDKRestClient = NewMegaSDKRestClient("http://localhost:6090")
 
 func PerformMegaLogin() error {
@@ -200,8 +206,6 @@ func init() {
 func NewMegaDownload(link string, listener *MirrorListener) error {
 	dir := path.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(listener.GetUid()))
 	os.MkdirAll(dir, 0755)
-	megaMutex.Lock()
-	defer megaMutex.Unlock()
 	adddl, err := megaClient.AddDl(link, dir)
 	if err != nil {
 		return err
@@ -218,27 +222,21 @@ func NewMegaDownload(link string, listener *MirrorListener) error {
 			case MegaSDKRestStateCompleted:
 				do = false
 			}
-			megaMutex.Lock()
 			dlinfo, err := megaClient.GetDownloadInfo(adddl.Gid)
 			if err != nil {
 				state = MegaSDKRestStateFailed
 				do = false
-				megaMutex.Unlock()
 				continue
 			}
-			megaMutex.Unlock()
 			state = dlinfo.State
 			time.Sleep(500 * time.Millisecond)
 		}
 		if state == MegaSDKRestStateFailed || state == MegaSDKRestStateCancelled {
-			megaMutex.Lock()
 			dlinfo, err := megaClient.GetDownloadInfo(adddl.Gid)
 			if err != nil {
 				state = MegaSDKRestStateFailed
 				do = false
-				megaMutex.Unlock()
 			}
-			megaMutex.Unlock()
 			dl := GetMirrorByGid(dlinfo.Gid)
 			if dl != nil {
 				if state == MegaSDKRestStateCancelled {
