@@ -28,7 +28,11 @@ func ListHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	drive := engine.NewGDriveClient(0, nil)
 	drive.Init("")
 	drive.Authorize()
-	files := drive.ListFilesByParentId(utils.GetGDriveParentId(), name, 20)
+	files, err := drive.ListFilesByParentId(utils.GetGDriveParentId(), name, 20, 1)
+	if err != nil {
+		engine.SendMessage(b, err.Error(), message)
+		return nil
+	}
 	if len(files) == 0 {
 		outMsg += "No Result Found."
 	}

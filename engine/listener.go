@@ -122,7 +122,6 @@ func (m *MirrorListener) OnUploadError(err string) {
 	size := dl.TotalLength()
 	L().Errorf("[UploadError]: %s (%d)", name, size)
 	msg := "Your upload has been stopped due to: %s"
-	SendMessage(m.bot, fmt.Sprintf(msg, err), m.Update.Message)
 	if m.isSeed {
 		seedStatus := GetSeedingMirrorByUid(m.GetUid())
 		AddMirrorLocal(m.GetUid(), seedStatus)
@@ -132,7 +131,7 @@ func (m *MirrorListener) OnUploadError(err string) {
 	if !m.isSeed {
 		m.Clean()
 	}
-	SendMessage(m.bot, msg, m.Update.Message)
+	SendMessage(m.bot, fmt.Sprintf(msg, err), m.Update.Message)
 	if !m.isSeed {
 		m.CleanDownload()
 	}

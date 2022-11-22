@@ -331,7 +331,7 @@ func (G *GoogleDriveClient) Download(fileId string, dir string) {
 }
 
 func (G *GoogleDriveClient) GetFolderSize(folderId string, size *int64) {
-	files := G.ListFilesByParentId(folderId, "", -1)
+	files, _ := G.ListFilesByParentId(folderId, "", -1, 1)
 	for _, file := range files {
 		if G.isCancelled {
 			return
@@ -345,7 +345,12 @@ func (G *GoogleDriveClient) GetFolderSize(folderId string, size *int64) {
 }
 
 func (G *GoogleDriveClient) DownloadFolder(folderId string, local string) bool {
-	files := G.ListFilesByParentId(folderId, "", -1)
+	files, err := G.ListFilesByParentId(folderId, "", -1, 1)
+	if err != nil {
+		G.doNothing = true
+		G.Listener.OnDownloadError(err.Error())
+		return false
+	}
 	for _, file := range files {
 		if G.isCancelled {
 			return false
@@ -559,7 +564,7 @@ func (G *GoogleDriveClient) FormatLink(fileId string) string {
 }
 
 //count = -1 for disabling limit
-func (G *GoogleDriveClient) ListFilesByParentId(parentId string, name string, count int) []*drive.File {
+func (G *GoogleDriveClient) ListFilesByParentId(parentId string, name string, count int, retry int) ([]*drive.File, error) {
 	var files []*drive.File
 	pageToken := ""
 	query := fmt.Sprintf("'%s' in parents", parentId)
@@ -574,12 +579,26 @@ func (G *GoogleDriveClient) ListFilesByParentId(parentId string, name string, co
 		}
 		res, err := request.Do()
 		if err != nil {
-			L().Errorf("Error : %v", err)
-			return files
+			if G.CheckRetry(nil, err) {
+				if utils.UseSa() {
+					G.SwitchServiceAccount()
+				}
+				if retry <= G.MaxRetries {
+					L().Warn("Encountered: ", err.Error(), " retryin: ", retry)
+					G.Sleep(G.SleepTime)
+					return G.ListFilesByParentId(parentId, name, count, retry+1)
+				} else {
+					L().Error("[ListFilesByParentId] Could not list files (even after retryin): " + err.Error())
+					return files, err
+				}
+			} else {
+				L().Error("[ListFilesByParentId] Could not list files: " + err.Error())
+				return files, err
+			}
 		}
 		for _, f := range res.Files {
 			if count != -1 && len(files) == count {
-				return files
+				return files, nil
 			}
 			files = append(files, f)
 		}
@@ -588,7 +607,7 @@ func (G *GoogleDriveClient) ListFilesByParentId(parentId string, name string, co
 			break
 		}
 	}
-	return files
+	return files, nil
 }
 
 func (G *GoogleDriveClient) GetFileMetadata(fileId string, retry int) (*drive.File, error) {
@@ -615,11 +634,12 @@ func (G *GoogleDriveClient) GetFileMetadata(fileId string, retry int) (*drive.Fi
 }
 
 func (G *GoogleDriveClient) CheckRetry(file *drive.File, err error) bool {
+	L().Errorf("Checking if %s and %v are retryable", err.Error(), file)
 	if strings.Contains(strings.ToLower(err.Error()), "rate") || strings.Contains(strings.ToLower(err.Error()), "500") {
 		return true
 	}
 	checkResponseCodes := func(statusCode int) bool {
-		for code := range []int{403, 429, 500, 501, 502, 503, 504, 505, 506, 507} {
+		for _, code := range []int{403, 429, 500, 501, 502, 503, 504, 505, 506, 507} {
 			if statusCode == code {
 				return true
 			}
@@ -628,9 +648,12 @@ func (G *GoogleDriveClient) CheckRetry(file *drive.File, err error) bool {
 	}
 	googleError, ok := err.(*googleapi.Error)
 	if ok {
+		L().Error(googleError.Code)
 		if checkResponseCodes(googleError.Code) {
 			return true
 		}
+	} else {
+		L().Error("couldnt cast error to googleapi.Error")
 	}
 
 	if file != nil {
@@ -799,7 +822,7 @@ func (G *GoogleDriveClient) CopyFolder(folderId, parentId string, is_thread bool
 	if is_thread {
 		defer G.wg.Done()
 	}
-	files := G.ListFilesByParentId(folderId, "", -1)
+	files, _ := G.ListFilesByParentId(folderId, "", -1, 1)
 	for _, file := range files {
 		if file.MimeType == G.GDRIVE_DIR_MIMETYPE {
 			continue
