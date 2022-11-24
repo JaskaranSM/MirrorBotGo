@@ -70,6 +70,7 @@ type GoogleDriveClient struct {
 	StartTime           time.Time
 	ETA                 time.Duration
 	DriveSrv            *drive.Service
+	SaFiles             []string
 	Listener            *MirrorListener
 	CloneListener       *CloneListener
 	isCloneCancelled    bool
@@ -89,6 +90,16 @@ func (G *GoogleDriveClient) Init(rootId string) {
 		G.MaxRetries = GetSaCount()
 	}
 	G.SaLog = true
+	if utils.UseSa() {
+		files, err := os.ReadDir(SA_DIR)
+		if err != nil {
+			L().Errorf("Error while reading SA_DIR: %s", err.Error())
+			return
+		}
+		for i := range files {
+			G.SaFiles = append(G.SaFiles, path.Join(SA_DIR, files[i].Name()))
+		}
+	}
 }
 
 // Retrieve a token, saves the token, then returns the generated client.
@@ -121,7 +132,10 @@ func (G *GoogleDriveClient) getAuthorizedHTTPClient() (*http.Client, error) {
 		if G.SaLog {
 			L().Infof("Authorizing with %d service account.", GLOBAL_SA_INDEX)
 		}
-		b, err := ioutil.ReadFile(fmt.Sprintf("%s/%d.json", SA_DIR, GLOBAL_SA_INDEX))
+		b, err := ioutil.ReadFile(G.SaFiles[GLOBAL_SA_INDEX])
+		if err != nil {
+			return nil, err
+		}
 		config, err := google.JWTConfigFromJSON(b, drive.DriveScope)
 		if err != nil {
 			return nil, err
