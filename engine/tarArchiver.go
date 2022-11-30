@@ -130,27 +130,24 @@ func (t *TarArchiver) Write(b []byte) (int, error) {
 }
 
 //TarPath start tarring
-func (t *TarArchiver) TarPath(path string) string {
+func (t *TarArchiver) TarPath(path string) (string, error) {
 	outPath := path + ".tar"
 	L().Infof("[TarPath]: %s -> %s", path, outPath)
 	tar := archiver.Tar{}
 	writer, err := os.Create(outPath)
 	if err != nil {
-		L().Errorf("[TarPath]: %v", err)
-		return path
+		return path, err
 	}
 	ctx := context.Background()
 	var filesMap map[string]string = make(map[string]string)
 	filesMap[path] = ""
 	files, err := archiver.FilesFromDisk(&archiver.FromDiskOptions{}, filesMap)
 	if err != nil {
-		L().Errorf("[TarPath]: %v", err)
-		return path
+		return path, err
 	}
 	err = tar.Archive(ctx, io.MultiWriter(writer, t), files)
 	if err != nil {
-		L().Errorf("[TarPath]: %v", err)
-		return path
+		return path, err
 	}
-	return outPath
+	return outPath, nil
 }

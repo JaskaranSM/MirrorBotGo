@@ -60,13 +60,19 @@ func (m *MirrorListener) OnDownloadComplete() {
 		tarStatus := NewTarStatus(dl.Gid(), dl.Name(), nil, archiver)
 		tarStatus.Index_ = dl.Index()
 		AddMirrorLocal(m.GetUid(), tarStatus)
-		path = archiver.TarPath(path)
+		var err error
+		path, err = archiver.TarPath(path)
+		if err != nil {
+			L().Errorf("Failed to archive the contents, uploading as it is: %s: %v", path, err)
+			SendMessage(m.bot, fmt.Sprintf("Failed to archive the contents, uploading as it is: %s\nERR: %s\nGid: <code>%s</code>", dl.Name(), err.Error(), dl.Gid()), m.Update.Message)
+		}
 	}
 	if m.doUnArchive {
 		unarchiver := NewUnArchiver()
 		totalSize, err := unarchiver.CalculateTotalSize(path)
 		if err != nil {
 			L().Errorf("Failed to get archive contents size, uploading as it is: %s: %v", path, err)
+			SendMessage(m.bot, fmt.Sprintf("Failed to get archive contents size, uploading as it is: %s\nERR: %s\nGid: <code>%s</code>", dl.Name(), err.Error(), dl.Gid()), m.Update.Message)
 		} else {
 			unarchiver.SetTotal(totalSize)
 			unArchiverStatus := NewUnArchiverStatus(dl.Gid(), dl.Name(), nil, unarchiver)
@@ -75,6 +81,7 @@ func (m *MirrorListener) OnDownloadComplete() {
 			path, err = unarchiver.UnArchivePath(path)
 			if err != nil {
 				L().Errorf("Failed to unarchive the contents, uploading as it is: %s: %v", path, err)
+				SendMessage(m.bot, fmt.Sprintf("Failed to unarchive the contents, uploading as it is: %s\nERR: %s\nGid: <code>%s</code>", dl.Name(), err.Error(), dl.Gid()), m.Update.Message)
 			}
 		}
 	}

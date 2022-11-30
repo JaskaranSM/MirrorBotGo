@@ -181,10 +181,10 @@ func (t *UnArchiver) UnArchivePath(path string) (string, error) {
 				return err
 			}
 			reader, err := f.Open()
-			defer reader.Close()
 			if err != nil {
 				return err
 			}
+			defer reader.Close()
 			_, err = io.Copy(io.MultiWriter(writer, t), reader)
 			if err != nil {
 				return err
