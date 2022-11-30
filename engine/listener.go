@@ -13,14 +13,15 @@ import (
 )
 
 type MirrorListener struct {
-	Update      *ext.Context
-	bot         *gotgbot.Bot
-	isTar       bool
-	isSeed      bool
-	isTorrent   bool
-	doUnArchive bool
-	parentId    string
-	isCanceled  bool
+	Update         *ext.Context
+	bot            *gotgbot.Bot
+	isTar          bool
+	isSeed         bool
+	isTorrent      bool
+	doUnArchive    bool
+	parentId       string
+	customParentId bool
+	isCanceled     bool
 }
 
 func (m *MirrorListener) GetUid() int64 {
@@ -100,6 +101,7 @@ func (m *MirrorListener) OnDownloadComplete() {
 			parentId = utils.GetGDriveParentId()
 		} else {
 			parentId = m.parentId
+			m.customParentId = true
 		}
 	} else {
 		parentId = utils.GetGDriveParentId()
@@ -153,11 +155,15 @@ func (m *MirrorListener) OnUploadComplete(link string) {
 	msg := fmt.Sprintf("<a href='%s'>%s</a> (%s)", link, dl.Name(), utils.GetHumanBytes(dl.TotalLength()))
 	in_url := utils.GetIndexUrl()
 	if in_url != "" {
-		in_url = in_url + "/" + name
-		if utils.IsPathDir(dl.Path()) {
-			in_url += "/"
+		if m.customParentId {
+			msg += "\n\nShareable Link: Mirror belongs to a custom parentId"
+		} else {
+			in_url = fmt.Sprintf("%s/%s", in_url, name)
+			if utils.IsPathDir(dl.Path()) {
+				in_url += "/"
+			}
+			msg += fmt.Sprintf("\n\nShareable Link: <a href='%s'>here</a>", in_url)
 		}
-		msg += fmt.Sprintf("\n\n Shareable Link: <a href='%s'>here</a>", in_url)
 	}
 	if m.isSeed {
 		seedStatus := GetSeedingMirrorByUid(m.GetUid())
