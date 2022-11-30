@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/shirou/gopsutil/v3/cpu"
 )
 
 var StatusMessageStorage map[int64]*gotgbot.Message // chatId : message
@@ -112,6 +113,16 @@ func DeleteAllMessages(b *gotgbot.Bot) {
 	}
 }
 
+func GetCpuUsage() string {
+	out := ""
+	data, err := cpu.Percent(time.Second, false)
+	if err != nil {
+		return "NA"
+	}
+	out += fmt.Sprintf("%.2f", data[0]) + "%"
+	return out
+}
+
 func GetStatsString() string {
 	var outStr string
 	var mem runtime.MemStats
@@ -120,7 +131,8 @@ func GetStatsString() string {
 	outStr += fmt.Sprintf("TAlloc: %s | ", utils.GetHumanBytes(int64(mem.TotalAlloc)))
 	outStr += fmt.Sprintf("GC: %d | ", mem.NumGC)
 	outStr += fmt.Sprintf("GR: %d | ", runtime.NumGoroutine())
-	outStr += fmt.Sprintf("TH: %d", threadProfile.Count())
+	outStr += fmt.Sprintf("TH: %d | ", threadProfile.Count())
+	outStr += fmt.Sprintf("CPU: %s", GetCpuUsage())
 	return outStr
 }
 
@@ -287,7 +299,7 @@ func (p *ProgressSpinner) SpinProgress(b *gotgbot.Bot) {
 			break
 		}
 		UpdateAllMessages(b)
-		time.Sleep(p.UpdateInterval)
+		time.Sleep(p.UpdateInterval - time.Second) //GetCpuUsage sleeps for time.Second
 	}
 }
 

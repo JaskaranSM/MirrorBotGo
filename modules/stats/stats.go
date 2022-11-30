@@ -10,7 +10,6 @@ import (
 	"runtime/pprof"
 	"time"
 
-	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -29,16 +28,6 @@ func GetMemoryUsage() string {
 		return "NA"
 	}
 	out += fmt.Sprintf("%.2f", memoryStat.UsedPercent) + "%"
-	return out
-}
-
-func GetCpuUsage() string {
-	out := ""
-	data, err := cpu.Percent(time.Second, false)
-	if err != nil {
-		return "NA"
-	}
-	out += fmt.Sprintf("%.2f", data[0]) + "%"
 	return out
 }
 
@@ -90,7 +79,7 @@ func StatsHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	out += fmt.Sprintf("Total: %s\n", utils.GetHumanBytes(int64(diskStats.Size())))
 	out += fmt.Sprintf("Used: %s\n", utils.GetHumanBytes(int64(diskStats.Used())))
 	out += fmt.Sprintf("Free: %s\n", utils.GetHumanBytes(int64(diskStats.Free())))
-	out += fmt.Sprintf("CPU: %s\n", GetCpuUsage())
+	out += fmt.Sprintf("CPU: %s\n", engine.GetCpuUsage())
 	out += fmt.Sprintf("RAM: %s\n", GetMemoryUsage())
 	out += fmt.Sprintf("Cores: %d\n", runtime.NumCPU())
 	out += fmt.Sprintf("Goroutines: %d\n", runtime.NumGoroutine())
