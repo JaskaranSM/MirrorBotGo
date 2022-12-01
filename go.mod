@@ -4,7 +4,7 @@ go 1.17
 
 require (
 	github.com/PaulSonOfLars/gotgbot/v2 v2.0.0-rc.10
-	github.com/anacrolix/torrent v1.46.1-0.20220831010947-648acc0120a4
+	github.com/anacrolix/torrent v1.47.0
 	github.com/dustin/go-humanize v1.0.0
 	github.com/gabriel-vasile/mimetype v1.4.1
 	github.com/gotd/contrib v0.13.0
@@ -32,7 +32,7 @@ require (
 	github.com/ajwerner/btree v0.0.0-20211221152037-f427b3e689c0 // indirect
 	github.com/alecthomas/atomic v0.1.0-alpha2 // indirect
 	github.com/anacrolix/chansync v0.3.0 // indirect
-	github.com/anacrolix/dht/v2 v2.18.1 // indirect
+	github.com/anacrolix/dht/v2 v2.19.0 // indirect
 	github.com/anacrolix/envpprof v1.2.1 // indirect
 	github.com/anacrolix/generics v0.0.0-20220618083756-f99e35403a60 // indirect
 	github.com/anacrolix/go-libutp v1.2.0 // indirect
@@ -65,6 +65,7 @@ require (
 	github.com/go-faster/xor v0.3.0 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
 	github.com/go-playground/validator/v10 v10.10.0 // indirect
@@ -93,6 +94,7 @@ require (
 	github.com/klauspost/pgzip v1.2.5 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/lispad/go-generics-tools v1.1.0 // indirect
+	github.com/lufia/plan9stats v0.0.0-20211012122336-39d0f177ccd0 // indirect
 	github.com/mattn/go-isatty v0.0.14 // indirect
 	github.com/mholt/archiver/v3 v3.5.1 // indirect
 	github.com/mholt/archiver/v4 v4.0.0-alpha.7 // indirect
@@ -130,14 +132,18 @@ require (
 	github.com/pion/udp v0.1.1 // indirect
 	github.com/pion/webrtc/v3 v3.1.43 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
+	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/powerman/rpc-codec v1.2.2 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20201227073835-cf1acfcdf475 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20200410134404-eec4a21b6bb0 // indirect
 	github.com/rs/dnscache v0.0.0-20211102005908-e0241e321417 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
+	github.com/shirou/gopsutil/v3 v3.22.8 // indirect
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/therootcompany/xz v1.0.1 // indirect
 	github.com/tidwall/btree v1.4.2 // indirect
+	github.com/tklauser/go-sysconf v0.3.10 // indirect
+	github.com/tklauser/numcpus v0.4.0 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
 	github.com/ulikunitz/xz v0.5.10 // indirect
 	github.com/xdg-go/pbkdf2 v1.0.0 // indirect
@@ -146,6 +152,7 @@ require (
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20201027041543-1326539a0a0a // indirect
 	github.com/youtube/vitess v3.0.0-rc.3+incompatible // indirect
+	github.com/yusufpapurcu/wmi v1.2.2 // indirect
 	github.com/zeebo/bencode v1.0.0 // indirect
 	go.etcd.io/bbolt v1.3.6 // indirect
 	go.opencensus.io v0.23.0 // indirect
