@@ -817,6 +817,8 @@ github.com/jaskaranSM/go-httpdl v0.0.0-20220913134944-e5a10ac11c5c h1:nJwKQuAzy+
 github.com/jaskaranSM/go-httpdl v0.0.0-20220913134944-e5a10ac11c5c/go.mod h1:FP/5RxKjjXtSH7g7WakiiPjQuhJhrypOUV5p727mwOs=
 github.com/jaskaranSM/go-httpdl v0.0.0-20220913135107-9ed551b2deb3 h1:KNowQ0pxvZu7gxOhhQ0nEgJdaD6Qd8Qe8brM4sxcIg4=
 github.com/jaskaranSM/go-httpdl v0.0.0-20220913135107-9ed551b2deb3/go.mod h1:FP/5RxKjjXtSH7g7WakiiPjQuhJhrypOUV5p727mwOs=
+github.com/jaskaranSM/go-httpdl v0.0.0-20221201153929-a1a4f1471877 h1:X/yah2b53ImSV+iUTfas3MLm/YjPgFbDkLIswufvA2k=
+github.com/jaskaranSM/go-httpdl v0.0.0-20221201153929-a1a4f1471877/go.mod h1:FP/5RxKjjXtSH7g7WakiiPjQuhJhrypOUV5p727mwOs=
 github.com/jaskaranSM/megasdkgo v0.0.0-20211212155139-09f730a1b210 h1:jvC/ko4yyAjrLMoUWWhoJ384XieNJ2luRRXwiTFgv5o=
 github.com/jaskaranSM/megasdkgo v0.0.0-20211212155139-09f730a1b210/go.mod h1:mqfISNHoFGYGbiTJdfdBlh+Pcz/EDWnp9U/2FG8Y4V8=
 github.com/jellevandenhooff/dkim v0.0.0-20150330215556-f50fe3d243e1/go.mod h1:E0B/fFc00Y+Rasa88328GlI/XbtyysCtTHZS8h7IrBU=

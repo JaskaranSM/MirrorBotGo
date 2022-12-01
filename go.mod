@@ -9,7 +9,7 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.1
 	github.com/gotd/contrib v0.13.0
 	github.com/gotd/td v0.68.1
-	github.com/jaskaranSM/go-httpdl v0.0.0-20220913135107-9ed551b2deb3
+	github.com/jaskaranSM/go-httpdl v0.0.0-20221201153929-a1a4f1471877
 	github.com/jaskaranSM/megasdkgo v0.0.0-20211212155139-09f730a1b210
 	github.com/lithammer/shortuuid v3.0.0+incompatible
 	github.com/mackerelio/go-osstat v0.2.3
