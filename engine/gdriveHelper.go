@@ -327,7 +327,7 @@ func (G *GoogleDriveClient) Download(fileId string, dir string) {
 		os.Mkdir(local, 0755)
 		G.DownloadFolder(meta.Id, local)
 	} else {
-		err := G.DownloadFileMultiConnection(meta, dir, 1)
+		err := G.DownloadFile(meta.Id, local, meta.Size, 1)
 		G.Clean()
 		if err != nil {
 			G.Listener.OnDownloadError(err.Error())
@@ -374,7 +374,7 @@ func (G *GoogleDriveClient) DownloadFolder(folderId string, local string) bool {
 			os.Mkdir(current_path, 0755)
 			G.DownloadFolder(file.Id, current_path)
 		} else {
-			err := G.DownloadFileMultiConnection(file, local, 1)
+			err := G.DownloadFile(file.Id, current_path, file.Size, 1)
 			G.Clean()
 			if err != nil {
 				G.doNothing = true
