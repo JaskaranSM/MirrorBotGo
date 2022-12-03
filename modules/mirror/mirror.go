@@ -95,7 +95,7 @@ func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, send
 			return nil
 		}
 	} else if fileId != "" {
-		engine.NewGDriveDownload(fileId, &listener)
+		engine.NewGDriveDownloadTransferService(fileId, &listener)
 	} else if utils.IsMegaLink(link) {
 		//err := fmt.Errorf("mega isnt supported in this build")
 		err := engine.NewMegaDownload(link, &listener)

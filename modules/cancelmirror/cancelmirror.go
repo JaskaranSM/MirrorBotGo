@@ -35,7 +35,7 @@ func CancelMirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 		return nil
 	}
 	status := dl.GetStatusType()
-	if status == engine.MirrorStatusDownloading || status == engine.MirrorStatusWaiting || status == engine.MirrorStatusFailed || status == engine.MirrorStatusCloning || status == engine.MirrorStatusSeeding {
+	if status == engine.MirrorStatusDownloading || status == engine.MirrorStatusWaiting || status == engine.MirrorStatusFailed || status == engine.MirrorStatusCloning || status == engine.MirrorStatusSeeding || status == engine.MirrorStatusUploading {
 		dl.CancelMirror()
 	} else {
 		engine.SendMessage(b, "Can only cancel downloads/seeds/clones.", message)
@@ -56,9 +56,10 @@ func CancelAllMirrorsHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	for _, dl := range engine.GetAllMirrors() {
 		status := dl.GetStatusType()
-		if status == engine.MirrorStatusDownloading || status == engine.MirrorStatusWaiting || status == engine.MirrorStatusFailed || status == engine.MirrorStatusCloning || status == engine.MirrorStatusSeeding {
-			dl.CancelMirror()
-			count += 1
+		if status == engine.MirrorStatusDownloading || status == engine.MirrorStatusWaiting || status == engine.MirrorStatusFailed || status == engine.MirrorStatusCloning || status == engine.MirrorStatusSeeding || status == engine.MirrorStatusUploading {
+			if dl.CancelMirror() {
+				count += 1
+			}
 		}
 	}
 	engine.SendMessage(b, fmt.Sprintf("%d mirror(s) cancelled.", count), message)

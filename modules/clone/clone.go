@@ -37,7 +37,7 @@ func Clone(b *gotgbot.Bot, ctx *ext.Context, sendStatusMessage bool) error {
 			}
 		} else {
 			listener := engine.NewCloneListener(b, ctx, parentId)
-			engine.NewGDriveClone(fileId, parentId, &listener)
+			engine.NewGDriveCloneTransferService(fileId, parentId, &listener)
 			if sendStatusMessage {
 				engine.SendStatusMessage(b, message)
 			}

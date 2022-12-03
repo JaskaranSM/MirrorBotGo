@@ -83,19 +83,14 @@ func (m *MirrorListener) OnDownloadComplete() {
 			if err != nil {
 				L().Errorf("Failed to unarchive the contents, uploading as it is: %s: %v", path, err)
 				SendMessage(m.bot, fmt.Sprintf("Failed to unarchive the contents, uploading as it is: %s\nERR: %s\nGid: <code>%s</code>", dl.Name(), err.Error(), dl.Gid()), m.Update.Message)
+			} else {
+				size = totalSize
 			}
 		}
 	}
-	drive := NewGDriveClient(size, dl.GetListener())
-	drive.Init("")
-	drive.Authorize()
-	driveStatus := NewGoogleDriveStatus(drive, utils.GetFileBaseName(path), dl.Gid())
-	driveStatus.Index_ = dl.Index()
-	AddMirrorLocal(m.GetUid(), driveStatus)
-	UpdateAllMessages(m.bot)
 	var parentId string
 	if m.parentId != "" {
-		_, err := drive.GetFileMetadata(m.parentId, 1)
+		_, err := transferServiceClient.GetFileMetadata(m.parentId)
 		if err != nil {
 			L().Warn("Error while checking for user supplied parentId so uploading to main parentId: ", err)
 			parentId = utils.GetGDriveParentId()
@@ -106,8 +101,23 @@ func (m *MirrorListener) OnDownloadComplete() {
 	} else {
 		parentId = utils.GetGDriveParentId()
 	}
-	upload_limit_chan <- 1
-	drive.Upload(path, parentId)
+	trGid, err := transferServiceClient.AddUpload(&UploadRequest{
+		Path:        path,
+		ParentId:    parentId,
+		Concurrency: 10,
+		Size:        size,
+	})
+	if err != nil {
+		L().Error(err)
+		m.OnUploadError(err.Error())
+	} else {
+		trListener := NewGoogleDriveTransferListener(m, nil, false, trGid)
+		driveStatus := NewGoogleDriveTransferStatus(trGid, path, dl.GetListener(), nil)
+		driveStatus.Index_ = dl.Index()
+		AddMirrorLocal(m.GetUid(), driveStatus)
+		trListener.StartListener()
+		UpdateAllMessages(m.bot)
+	}
 }
 
 func (m *MirrorListener) OnDownloadError(err string) {
@@ -252,24 +262,21 @@ func (m *CloneListener) OnCloneError(err string) {
 
 }
 
-func (m *CloneListener) OnCloneComplete(link string, is_dir bool) {
+func (m *CloneListener) OnCloneComplete(link string) {
 	dl := m.GetDownload()
 	name := dl.Name()
 	size := dl.TotalLength()
 	L().Infof("[CloneComplete]: %s (%d)", name, size)
 	link = strings.ReplaceAll(link, "'", "")
-	msg := fmt.Sprintf("<a href='%s'>%s</a> (%s)", link, dl.Name(), utils.GetHumanBytes(dl.TotalLength()))
+	name = strings.ReplaceAll(dl.Name(), "'", "")
+	msg := fmt.Sprintf("<a href='%s'>%s</a> (%s)", link, name, utils.GetHumanBytes(dl.CompletedLength()))
 	in_url := utils.GetIndexUrl()
 	if in_url != "" {
 		in_url = in_url + "/" + name
-		if is_dir {
-			in_url += "/"
-		}
-		msg += fmt.Sprintf("\n\n Shareable Link: <a href='%s'>here</a>", in_url)
+		msg += fmt.Sprintf("\n\nShareable Link: <a href='%s'>here</a>", in_url)
 	}
 	m.Clean()
 	SendMessage(m.bot, msg, m.Update.Message)
-
 }
 
 func NewCloneListener(b *gotgbot.Bot, update *ext.Context, parentId string) CloneListener {
