@@ -1,3 +1,11 @@
 build/
 MirrorBotGo
 dist/
+config.json
+.idea
+accounts
+credentials.json
+token.json
+log.txt
+.torrent*
+file.session

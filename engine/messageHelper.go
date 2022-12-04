@@ -2,6 +2,7 @@ package engine
 
 import (
 	"MirrorBotGo/utils"
+	"errors"
 	"fmt"
 	"runtime"
 	"runtime/pprof"
@@ -16,10 +17,11 @@ var StatusMessageStorage map[int64]*gotgbot.Message // chatId : message
 var Spinner *ProgressSpinner = getSpinner()
 var mutex sync.Mutex
 var threadProfile = pprof.Lookup("threadcreate")
+var FailedToSendMessageError error = errors.New("failed to send message")
 
-var STATUS_MESSAGE_CHUNKSIZE int = utils.GetStatusMessagesPerPage()
+var StatusMessageChunkSize int = utils.GetStatusMessagesPerPage()
 
-func Init() {
+func init() {
 	StatusMessageStorage = make(map[int64]*gotgbot.Message)
 }
 
@@ -48,10 +50,6 @@ func GetMessageByChatId(chatId int64) *gotgbot.Message {
 	return nil
 }
 
-func GetAllMessagesCount() int {
-	return len(GetAllMessages())
-}
-
 func DeleteMessageByChatId(chatId int64) {
 	for i := range StatusMessageStorage {
 		if i == chatId {
@@ -60,26 +58,34 @@ func DeleteMessageByChatId(chatId int64) {
 	}
 }
 
-func SendMessage(b *gotgbot.Bot, messageText string, message *gotgbot.Message) (*gotgbot.Message, error) {
-	return b.SendMessage(
+func SendMessage(b *gotgbot.Bot, messageText string, message *gotgbot.Message) *gotgbot.Message {
+	msg, err := b.SendMessage(
 		message.Chat.Id, messageText, &gotgbot.SendMessageOpts{
 			ReplyToMessageId: message.MessageId,
 			ParseMode:        "HTML",
 		},
 	)
+	if err != nil {
+		L().Errorf("SendMessage: %s | %d | %d : %v", messageText, message.Chat.Id, message.MessageId, err)
+	}
+	return msg
 }
 
-func SendMessageMarkup(b *gotgbot.Bot, messageText string, message *gotgbot.Message, markup gotgbot.InlineKeyboardMarkup) (*gotgbot.Message, error) {
-	return b.SendMessage(
+func SendMessageMarkup(b *gotgbot.Bot, messageText string, message *gotgbot.Message, markup gotgbot.InlineKeyboardMarkup) *gotgbot.Message {
+	msg, err := b.SendMessage(
 		message.Chat.Id, messageText, &gotgbot.SendMessageOpts{
 			ReplyToMessageId: message.MessageId,
 			ParseMode:        "HTML",
 			ReplyMarkup:      markup,
 		},
 	)
+	if err != nil {
+		L().Errorf("SendMessageMarkup: %s | %d | %d | %v", messageText, message.Chat.Id, message.MessageId, err)
+	}
+	return msg
 }
 
-func EditMessage(b *gotgbot.Bot, messageText string, message *gotgbot.Message) (*gotgbot.Message, error) {
+func EditMessage(b *gotgbot.Bot, messageText string, message *gotgbot.Message) *gotgbot.Message {
 	m, _, err := b.EditMessageText(
 		messageText, &gotgbot.EditMessageTextOpts{
 			ChatId:    message.Chat.Id,
@@ -87,10 +93,13 @@ func EditMessage(b *gotgbot.Bot, messageText string, message *gotgbot.Message) (
 			ParseMode: "HTML",
 		},
 	)
-	return m, err
+	if err != nil {
+		L().Errorf("EditMessage: %s | %d | %d | %v", messageText, message.Chat.Id, message.MessageId, err)
+	}
+	return m
 }
 
-func EditMessageMarkup(b *gotgbot.Bot, messageText string, message *gotgbot.Message, markup gotgbot.InlineKeyboardMarkup) (*gotgbot.Message, error) {
+func EditMessageMarkup(b *gotgbot.Bot, messageText string, message *gotgbot.Message, markup gotgbot.InlineKeyboardMarkup) *gotgbot.Message {
 	m, _, err := b.EditMessageText(
 		messageText, &gotgbot.EditMessageTextOpts{
 			ChatId:      message.Chat.Id,
@@ -99,11 +108,18 @@ func EditMessageMarkup(b *gotgbot.Bot, messageText string, message *gotgbot.Mess
 			ReplyMarkup: markup,
 		},
 	)
-	return m, err
+	if err != nil {
+		L().Errorf("EditMessageMarkup: %s | %d | %d | %v", messageText, message.Chat.Id, message.MessageId, err)
+	}
+	return m
 }
 
-func DeleteMessage(b *gotgbot.Bot, message *gotgbot.Message) (bool, error) {
-	return b.DeleteMessage(message.Chat.Id, message.MessageId, nil)
+func DeleteMessage(b *gotgbot.Bot, message *gotgbot.Message) bool {
+	deleted, err := b.DeleteMessage(message.Chat.Id, message.MessageId, nil)
+	if err != nil {
+		L().Errorf("DeleteMessage: %d | %d | %v", message.Chat.Id, message.MessageId, err)
+	}
+	return deleted
 }
 
 func DeleteAllMessages(b *gotgbot.Bot) {
@@ -140,7 +156,7 @@ func GetReadableProgressMessage(page int) string {
 	var globalDownloadSpeed int64
 	var globalUploadSpeed int64
 	msg := ""
-	chunks := GetAllMirrorsChunked(STATUS_MESSAGE_CHUNKSIZE)
+	chunks := GetAllMirrorsChunked(StatusMessageChunkSize)
 	if len(chunks)-1 < page {
 		page = len(chunks) - 1
 	}
@@ -191,10 +207,10 @@ func GetReadableProgressMessage(page int) string {
 	return msg
 }
 
-func NewKeyboardButtonText(text string, callback_data string) gotgbot.InlineKeyboardButton {
+func NewKeyboardButtonText(text string, callbackData string) gotgbot.InlineKeyboardButton {
 	return gotgbot.InlineKeyboardButton{
 		Text:         text,
-		CallbackData: callback_data,
+		CallbackData: callbackData,
 	}
 }
 
@@ -218,7 +234,6 @@ func GetPaginationMarkup(previous bool, next bool, prString string, nxString str
 func SendStatusMessage(b *gotgbot.Bot, message *gotgbot.Message) error {
 	mutex.Lock()
 	defer mutex.Unlock()
-	var err error
 	var newMsg *gotgbot.Message
 	var progress string
 	msg := GetMessageByChatId(message.Chat.Id)
@@ -228,17 +243,15 @@ func SendStatusMessage(b *gotgbot.Bot, message *gotgbot.Message) error {
 	}
 
 	progress = GetReadableProgressMessage(0)
-	if GetAllMirrorsCount() > STATUS_MESSAGE_CHUNKSIZE {
-		newMsg, err = SendMessageMarkup(b, progress, message, GetPaginationMarkup(false, true, "0", utils.ParseIntToString(len(GetAllMirrorsChunked(STATUS_MESSAGE_CHUNKSIZE))-1)))
-		if err != nil {
-			L().Error(err)
-			return err
+	if GetAllMirrorsCount() > StatusMessageChunkSize {
+		newMsg = SendMessageMarkup(b, progress, message, GetPaginationMarkup(false, true, "0", utils.ParseIntToString(len(GetAllMirrorsChunked(StatusMessageChunkSize))-1)))
+		if newMsg == nil {
+			return FailedToSendMessageError
 		}
 	} else {
-		newMsg, err = SendMessage(b, progress, message)
-		if err != nil {
-			L().Error(err)
-			return err
+		newMsg = SendMessage(b, progress, message)
+		if newMsg == nil {
+			return FailedToSendMessageError
 		}
 	}
 	newMsg.Date = 0
@@ -250,7 +263,9 @@ func AutoDeleteMessages(b *gotgbot.Bot, timeout time.Duration, messages ...*gotg
 	go func() {
 		time.Sleep(timeout)
 		for _, m := range messages {
-			DeleteMessage(b, m)
+			if m != nil {
+				DeleteMessage(b, m)
+			}
 		}
 	}()
 }
@@ -261,9 +276,9 @@ func UpdateAllMessages(b *gotgbot.Bot) {
 		var previous bool
 		var next bool
 		progress := GetReadableProgressMessage(int(msg.Date))
-		chunks := GetAllMirrorsChunked(STATUS_MESSAGE_CHUNKSIZE)
+		chunks := GetAllMirrorsChunked(StatusMessageChunkSize)
 		if msg.Text != progress {
-			if mirrorsCount > STATUS_MESSAGE_CHUNKSIZE {
+			if mirrorsCount > StatusMessageChunkSize {
 				if msg.Date > int64(len(chunks)) {
 					msg.Date = int64(len(chunks)) - 1
 				}

@@ -32,13 +32,13 @@ func GetMemoryUsage() string {
 }
 
 func GetMemoryStats() string {
-	var mem runtime.MemStats
-	runtime.ReadMemStats(&mem)
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
 	outStr := ""
-	outStr += fmt.Sprintf("Alloc: %s\n", utils.GetHumanBytes(int64(mem.Alloc)))
-	outStr += fmt.Sprintf("TotalAlloc: %s\n", utils.GetHumanBytes(int64(mem.TotalAlloc)))
-	outStr += fmt.Sprintf("HeapAlloc: %s\n", utils.GetHumanBytes(int64(mem.HeapAlloc)))
-	outStr += fmt.Sprintf("NumGC: %d", mem.NumGC)
+	outStr += fmt.Sprintf("Alloc: %s\n", utils.GetHumanBytes(int64(memStats.Alloc)))
+	outStr += fmt.Sprintf("TotalAlloc: %s\n", utils.GetHumanBytes(int64(memStats.TotalAlloc)))
+	outStr += fmt.Sprintf("HeapAlloc: %s\n", utils.GetHumanBytes(int64(memStats.HeapAlloc)))
+	outStr += fmt.Sprintf("NumGC: %d", memStats.NumGC)
 	return outStr
 }
 
@@ -46,7 +46,11 @@ func ProfileHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !utils.IsUserOwner(ctx.EffectiveMessage.From.Id) {
 		return nil
 	}
-	pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
+	err := pprof.Lookup("goroutine").WriteTo(os.Stdout, 1)
+	if err != nil {
+		engine.L().Errorf("ProfileHandler: pprof.WriteTo: %v", err)
+		return err
+	}
 	return nil
 }
 

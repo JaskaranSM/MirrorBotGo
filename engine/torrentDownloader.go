@@ -4,6 +4,7 @@ import (
 	"MirrorBotGo/utils"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"time"
@@ -24,13 +25,13 @@ func GetAnacrolixTorrentClientStatus() bytes.Buffer {
 
 func getAnacrolixTorrentClient(seed bool) *torrent.Client {
 	config := torrent.NewDefaultClientConfig()
-	config.EstablishedConnsPerTorrent = 100
-	config.HTTPUserAgent = "qBittorrent/4.3.8"
-	config.Bep20 = "-qB4380-"
-	config.UpnpID = "qBittorrent 4.3.8"
-	config.ExtendedHandshakeClientVersion = "qBittorrent/4.3.8"
+	config.EstablishedConnsPerTorrent = utils.GetTorrentClientEstablishedConnsPerTorrent()
+	config.HTTPUserAgent = utils.GetTorrentClientHTTPUserAgent()
+	config.Bep20 = utils.GetTorrentClientBep20()
+	config.UpnpID = utils.GetTorrentClientUpnpID()
+	config.ExtendedHandshakeClientVersion = utils.GetTorrentClientExtendedHandshakeClientVersion()
 	config.Seed = seed
-	config.MinDialTimeout = 10 * time.Second
+	config.MinDialTimeout = utils.GetTorrentClientMinDialTimeout()
 	config.ListenPort = utils.GetTorrentClientListenPort()
 	L().Infof("[ALXTorrent]: starting client on port: %d", config.ListenPort)
 	client, err := torrent.NewClient(config)
@@ -179,7 +180,12 @@ func (a *AnacrolixTorrentDownloader) GetTorrentSpec(link string) (*torrent.Torre
 		if err != nil {
 			return spec, err
 		}
-		defer reader.Close()
+		defer func(reader io.ReadCloser) {
+			err := reader.Close()
+			if err != nil {
+				L().Errorf("GetTorrentSpec: reader.Close(): %s : %v", link, err)
+			}
+		}(reader)
 		meta, err := metainfo.Load(reader)
 		if err != nil {
 			return spec, err
@@ -198,17 +204,29 @@ func (a *AnacrolixTorrentDownloader) AddDownload(link string, listener *MirrorLi
 	if err != nil {
 		return err
 	}
-	os.MkdirAll(dir, 0755)
+	err = os.MkdirAll(dir, 0755)
+	if err != nil {
+		L().Errorf("[ALXTorrent]: AddDownload: os.MkdirAll: %s, %v", link, err)
+		return err
+	}
 	spec.Storage = storage.NewMMap(dir)
 	for _, tor := range anacrolixClient.Torrents() {
 		if tor.InfoHash().HexString() == spec.InfoHash.HexString() {
-			os.RemoveAll(dir)
+			err = os.RemoveAll(dir)
+			if err != nil {
+				L().Errorf("[ALXTorrent]: AddDownload: os.RemoveAll (torrent already present in client): %s, %v", link, err)
+			}
 			return fmt.Errorf("Infohash %s is already registered in the client", tor.InfoHash().HexString())
 		}
 	}
 	t, _, err := anacrolixClient.AddTorrentSpec(spec)
 	if err != nil {
-		os.RemoveAll(dir)
+		func() {
+			err := os.RemoveAll(dir)
+			if err != nil {
+				L().Errorf("[ALXTorrent]: AddDownload: os.RemoveAll (failed to add torrent spec): %s, %v", link, err)
+			} //we do not want this error to be sent to the user.
+		}()
 		return err
 	}
 	listener.isTorrent = true

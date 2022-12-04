@@ -16,10 +16,7 @@ func Clone(b *gotgbot.Bot, ctx *ext.Context, sendStatusMessage bool) error {
 	message := ctx.EffectiveMessage
 	link := utils.ParseMessageArgs(message.Text)
 	if link == "" {
-		_, err := engine.SendMessage(b, "Provide GDrive Shareable link to clone.", message)
-		if err != nil {
-			engine.L().Error("SendMessage: " + err.Error())
-		}
+		engine.SendMessage(b, "Provide GDrive Shareable link to clone.", message)
 	} else {
 		var parentId string
 		if strings.Contains(link, "|") {
@@ -31,15 +28,15 @@ func Clone(b *gotgbot.Bot, ctx *ext.Context, sendStatusMessage bool) error {
 		}
 		fileId := utils.GetFileIdByGDriveLink(link)
 		if fileId == "" {
-			_, err := engine.SendMessage(b, "FileId extraction failed, make sure GDrive link is correct.", message)
-			if err != nil {
-				engine.L().Error("SendMessage: " + err.Error())
-			}
+			engine.SendMessage(b, "FileId extraction failed, make sure GDrive link is correct.", message)
 		} else {
 			listener := engine.NewCloneListener(b, ctx, parentId)
 			engine.NewGDriveCloneTransferService(fileId, parentId, &listener)
 			if sendStatusMessage {
-				engine.SendStatusMessage(b, message)
+				err := engine.SendStatusMessage(b, message)
+				if err != nil {
+					engine.SendMessage(b, err.Error(), message)
+				}
 			}
 			if !engine.Spinner.IsRunning() {
 				engine.Spinner.Start(b)

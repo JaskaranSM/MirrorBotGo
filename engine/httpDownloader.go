@@ -110,7 +110,8 @@ func (h *HTTPDownloadListener) OnDownloadStart(dl *httpdl.HTTPDownload) {
 func (h *HTTPDownloadListener) OnDownloadStop(dl *httpdl.HTTPDownload) {
 	err := dl.GetFailureError()
 	if err == nil {
-		err = fmt.Errorf("Unknown error, debug wen")
+		//I have no idea why did I do it this way. guess we find out when time comes
+		err = fmt.Errorf("unknown error, debug wen: %v", err)
 	}
 	h.listener.OnDownloadError(err.Error())
 }

@@ -27,7 +27,7 @@ func ListHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 		return nil
 	}
 	outMsg := ""
-	client := engine.NewTransferServiceClient("http://127.0.0.1:6969/api/v1", &http.Client{})
+	client := engine.NewTransferServiceClient(utils.GetTransferServiceURL(), &http.Client{})
 	res, err := client.ListFiles(&engine.ListFilesRequest{
 		ParentID: utils.GetGDriveParentId(),
 		Name:     name,
@@ -47,21 +47,17 @@ func ListHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 		} else {
 			outMsg += fmt.Sprintf("⁍ <a href='%s'>%s</a> (%s)", engine.FormatGDriveLink(file.Id), strings.ReplaceAll(file.Name, "'", ""), utils.GetHumanBytes(file.Size))
 		}
-		in_url := utils.GetIndexUrl()
-		if in_url != "" {
-			in_url = in_url + "/" + strings.ReplaceAll(file.Name, "'", "")
+		inUrl := utils.GetIndexUrl()
+		if inUrl != "" {
+			inUrl = inUrl + "/" + strings.ReplaceAll(file.Name, "'", "")
 			if engine.IsGDriveFolder(file.MimeType) {
-				in_url += "/"
+				inUrl += "/"
 			}
-			outMsg += fmt.Sprintf(" | <a href='%s'>Index url</a>", in_url)
+			outMsg += fmt.Sprintf(" | <a href='%s'>Index url</a>", inUrl)
 		}
 		outMsg += "\n"
 	}
-	out, err = engine.SendMessage(b, outMsg, message)
-	if err != nil {
-		engine.SendMessage(b, err.Error(), message)
-		return nil
-	}
+	out = engine.SendMessage(b, outMsg, message)
 	engine.AutoDeleteMessages(b, utils.GetAutoDeleteTimeOut(), out, message)
 	return nil
 }

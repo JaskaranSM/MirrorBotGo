@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -129,7 +130,12 @@ func (t *TransferServiceClient) CancelTransfer(u *CancelRequest) (string, error)
 	if err != nil {
 		return "", fmt.Errorf("clientDoRequest: %v", err)
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			L().Errorf("TransferServiceClient: CancelTransfer: Failed to close response body: %v", err)
+		}
+	}(res.Body)
 	gidResponse := &GidResponse{}
 	resData, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -159,7 +165,12 @@ func (t *TransferServiceClient) AddUpload(u *UploadRequest) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("clientDoRequest: %v", err)
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			L().Errorf("TransferServiceClient: AddUpload: Failed to close response body: %v", err)
+		}
+	}(res.Body)
 	gidResponse := &GidResponse{}
 	resData, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -189,7 +200,12 @@ func (t *TransferServiceClient) AddClone(u *CloneRequest) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("clientDoRequest: %v", err)
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			L().Errorf("TransferServiceClient: AddClone: Failed to close response body: %v", err)
+		}
+	}(res.Body)
 	gidResponse := &GidResponse{}
 	resData, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -219,7 +235,12 @@ func (t *TransferServiceClient) ListFiles(u *ListFilesRequest) (*ListFilesRespon
 	if err != nil {
 		return nil, fmt.Errorf("clientDoRequest: %v", err)
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			L().Errorf("TransferServiceClient: ListFiles: Failed to close response body: %v", err)
+		}
+	}(res.Body)
 	listFilesResponse := &ListFilesResponse{}
 	resData, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -249,7 +270,12 @@ func (t *TransferServiceClient) AddDownload(u *DownloadRequest) (string, error) 
 	if err != nil {
 		return "", fmt.Errorf("clientDoRequest: %v", err)
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			L().Errorf("TransferServiceClient: AddDownload: Failed to close response body: %v", err)
+		}
+	}(res.Body)
 	gidResponse := &GidResponse{}
 	resData, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -274,7 +300,12 @@ func (t *TransferServiceClient) GetFileMetadata(fileId string) (*FileMetadataRes
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			L().Errorf("TransferServiceClient: GetFileMetadata: Failed to close response body: %v", err)
+		}
+	}(res.Body)
 	fileMetadataResponse := &FileMetadataResponse{}
 	resData, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -299,7 +330,12 @@ func (t *TransferServiceClient) GetStatusByGid(gid string) (*TransferStatusRespo
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			L().Errorf("TransferServiceClient: GetStatusByGid: Failed to close response body: %v", err)
+		}
+	}(res.Body)
 	transferStatusResponse := &TransferStatusResponse{}
 	resData, err := ioutil.ReadAll(res.Body)
 	if err != nil {
@@ -364,7 +400,7 @@ func (g *GoogleDriveTransferStatus) Gid() string {
 }
 
 func (g *GoogleDriveTransferStatus) ETA() *time.Duration {
-	eta := time.Duration(0)
+	eta := utils.CalculateETA(g.TotalLength()-g.CompletedLength(), g.Speed())
 	return &eta
 }
 
@@ -497,7 +533,7 @@ func (g *GoogleDriveTransferListener) OnUploadComplete(fileId string) {
 	}
 	g.StopListener()
 	g.handled = true
-	g.listener.OnUploadComplete(fmt.Sprintf("https://drive.google.con/open?id=%s", fileId))
+	g.listener.OnUploadComplete(FormatGDriveLink(fileId))
 }
 
 func (g *GoogleDriveTransferListener) OnUploadError(err string) {
@@ -524,7 +560,7 @@ func (g *GoogleDriveTransferListener) OnCloneComplete(fileId string) {
 	}
 	g.StopListener()
 	g.handled = true
-	g.cloneListener.OnCloneComplete(fmt.Sprintf("https://drive.google.con/open?id=%s", fileId))
+	g.cloneListener.OnCloneComplete(FormatGDriveLink(fileId))
 }
 
 func (g *GoogleDriveTransferListener) ListenForEvents() {
@@ -591,7 +627,11 @@ func NewGDriveCloneTransferService(fileId string, parentId string, listener *Clo
 
 func NewGDriveDownloadTransferService(fileId string, listener *MirrorListener) {
 	dir := path.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(listener.GetUid()))
-	os.MkdirAll(dir, 0755)
+	err := os.MkdirAll(dir, 0755)
+	if err != nil {
+		L().Errorf("NewGDriveDownloadTransferService: os.MkdirAll: %s : %v", dir, err)
+		return
+	}
 	trGid, err := transferServiceClient.AddDownload(&DownloadRequest{
 		FileId:      fileId,
 		LocalDir:    dir,

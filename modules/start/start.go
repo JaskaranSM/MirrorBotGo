@@ -15,10 +15,7 @@ func StartHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 		return nil
 	}
 	msg := ctx.EffectiveMessage
-	_, err := engine.SendMessage(b, "Hi I am mirror bot", msg)
-	if err != nil {
-		engine.L().Error(err)
-	}
+	engine.SendMessage(b, "Hi I am mirror bot", msg)
 	return nil
 }
 

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -81,7 +82,7 @@ type MegaSDKRestClient struct {
 func (m *MegaSDKRestClient) checkAndRaiseError(resData []byte) error {
 	if strings.Contains(string(resData), "failed") {
 		L().Errorf("MegaSDKRest: %s", string(resData))
-		return errors.New("Internal error occured")
+		return errors.New("internal error occured")
 	}
 	return nil
 }
@@ -90,7 +91,7 @@ func (m *MegaSDKRestClient) checkLogin() {
 	if megaLoggedIn {
 		return
 	}
-	_, err := m.Login(utils.GetMegaEmail(), utils.GetMegaPasssword())
+	_, err := m.Login(utils.GetMegaEmail(), utils.GetMegaPassword())
 	if err != nil {
 		L().Errorf("MegaSDKRest Login: %s", err.Error())
 	}
@@ -105,7 +106,12 @@ func (m *MegaSDKRestClient) Login(email string, password string) (*MegaSDKRestLo
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			L().Errorf(" MegaSDKRestClient: Login: failed to close response body: %v", err)
+		}
+	}(res.Body)
 	resData, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
@@ -132,7 +138,12 @@ func (m *MegaSDKRestClient) AddDl(link string, dir string) (*MegaSDKRestAddDl, e
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			L().Errorf(" MegaSDKRestClient: AddDl: failed to close response body: %v", err)
+		}
+	}(res.Body)
 	resData, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
@@ -157,7 +168,12 @@ func (m *MegaSDKRestClient) CancelDl(gid string) error {
 	if err != nil {
 		return err
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			L().Errorf(" MegaSDKRestClient: CancelDl: failed to close response body: %v", err)
+		}
+	}(res.Body)
 	resData, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return err
@@ -172,7 +188,12 @@ func (m *MegaSDKRestClient) GetDownloadInfo(gid string) (*MegaSDKRestDownloadInf
 	if err != nil {
 		return nil, err
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			L().Errorf(" MegaSDKRestClient: GetDownloadInfo: failed to close response body: %v", err)
+		}
+	}(res.Body)
 	resData, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return nil, err
@@ -192,7 +213,7 @@ func (m *MegaSDKRestClient) GetDownloadInfo(gid string) (*MegaSDKRestDownloadInf
 var megaClient *MegaSDKRestClient = NewMegaSDKRestClient("http://localhost:6090")
 
 func PerformMegaLogin() error {
-	_, err := megaClient.Login(utils.GetMegaEmail(), utils.GetMegaPasssword())
+	_, err := megaClient.Login(utils.GetMegaEmail(), utils.GetMegaPassword())
 	if err != nil {
 		L().Errorf("MegaSDKRest: %s", err.Error())
 	}
@@ -205,7 +226,11 @@ func init() {
 
 func NewMegaDownload(link string, listener *MirrorListener) error {
 	dir := path.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(listener.GetUid()))
-	os.MkdirAll(dir, 0755)
+	err := os.MkdirAll(dir, 0755)
+	if err != nil {
+		L().Errorf("NewMegaDownload: os.MkdirAll: %s : %v", dir, err)
+		return err
+	}
 	adddl, err := megaClient.AddDl(link, dir)
 	if err != nil {
 		return err
@@ -308,14 +333,16 @@ func (m *MegaDownloadStatus) ETA() *time.Duration {
 
 func (m *MegaDownloadStatus) GetStatusType() string {
 	stats := m.GetStats()
-	if stats.State == MegaSDKRestStateFailed {
+	switch stats.State {
+	case MegaSDKRestStateFailed:
 		return MirrorStatusFailed
-	} else if stats.State == MegaSDKRestStateCancelled {
+	case MegaSDKRestStateCancelled:
 		return MirrorStatusCanceled
-	} else if stats.State == MegaSDKRestStateQueued {
+	case MegaSDKRestStateQueued:
 		return MirrorStatusWaiting
+	default:
+		return MirrorStatusDownloading
 	}
-	return MirrorStatusDownloading
 }
 
 func (m *MegaDownloadStatus) Path() string {
@@ -347,7 +374,11 @@ func (m *MegaDownloadStatus) GetCloneListener() *CloneListener {
 }
 
 func (m *MegaDownloadStatus) CancelMirror() bool {
-	megaClient.CancelDl(m.Gid())
+	err := megaClient.CancelDl(m.Gid())
+	if err != nil {
+		L().Errorf("MegaDownloadStatus: CancelMirror: %s: %s: %v", m.Name(), m.Gid(), err)
+		return false
+	}
 	return true
 }
 

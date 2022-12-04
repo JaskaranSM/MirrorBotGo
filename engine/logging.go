@@ -13,7 +13,10 @@ const LogFile string = "log.txt"
 var LOGGER *zap.SugaredLogger
 
 func GetLoggerObject() *zap.SugaredLogger {
-	os.Remove(LogFile)
+	err := os.Remove(LogFile)
+	if err != nil {
+		log.Printf("GetLoggerObject: %s: %v\n", LogFile, err)
+	}
 
 	cfg := zap.NewProductionEncoderConfig()
 	cfg.EncodeLevel = zapcore.CapitalLevelEncoder
@@ -25,7 +28,12 @@ func GetLoggerObject() *zap.SugaredLogger {
 	core1 := zapcore.NewCore(zapcore.NewConsoleEncoder(cfg), os.Stdout, zap.InfoLevel)
 	core2 := zapcore.NewCore(zapcore.NewConsoleEncoder(cfg), handleSync, zap.InfoLevel)
 	logger := zap.New(zapcore.NewTee(core1, core2), zap.AddCaller())
-	defer logger.Sync() // flushes buffer, if any
+	defer func(logger *zap.Logger) {
+		err := logger.Sync()
+		if err != nil {
+			log.Printf("Failed to sync zap logger: %v\n", err)
+		}
+	}(logger) // flushes buffer, if any
 	return logger.Sugar()
 }
 

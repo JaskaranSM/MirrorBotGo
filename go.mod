@@ -9,7 +9,7 @@ require (
 	github.com/gabriel-vasile/mimetype v1.4.1
 	github.com/gotd/contrib v0.13.0
 	github.com/gotd/td v0.68.1
-	github.com/jaskaranSM/go-httpdl v0.0.0-20221201153929-a1a4f1471877
+	github.com/jaskaranSM/go-httpdl v0.0.0-20221204225223-2ddff92e7e68
 	github.com/jaskaranSM/megasdkgo v0.0.0-20211212155139-09f730a1b210
 	github.com/lithammer/shortuuid v3.0.0+incompatible
 	github.com/mackerelio/go-osstat v0.2.3
@@ -56,6 +56,7 @@ require (
 	github.com/cenkalti/log v1.0.0 // indirect
 	github.com/cenkalti/rain v1.10.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/detailyang/go-fallocate v0.0.0-20180908115635-432fa640bd2e // indirect
 	github.com/dsnet/compress v0.0.2-0.20210315054119-f66993602bf5 // indirect
 	github.com/edsrzf/mmap-go v1.1.0 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect

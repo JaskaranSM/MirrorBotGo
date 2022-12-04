@@ -2,14 +2,12 @@
 package main
 
 import (
-	"MirrorBotGo/db"
 	"MirrorBotGo/engine"
 	"MirrorBotGo/modules/authorization"
 	"MirrorBotGo/modules/botlog"
 	"MirrorBotGo/modules/cancelmirror"
 	"MirrorBotGo/modules/clone"
 	"MirrorBotGo/modules/configuration"
-	"MirrorBotGo/modules/goexec"
 	"MirrorBotGo/modules/list"
 	"MirrorBotGo/modules/mirror"
 	"MirrorBotGo/modules/mirrorstatus"
@@ -33,7 +31,6 @@ func RegisterAllHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 	mirrorstatus.LoadMirrorStatusHandler(updater, l)
 	cancelmirror.LoadCancelMirrorHandler(updater, l)
 	list.LoadListHandler(updater, l)
-	goexec.LoadExecHandler(updater, l)
 	authorization.LoadAuthorizationHandlers(updater, l)
 	stats.LoadStatsHandler(updater, l)
 	ping.LoadPingHandler(updater, l)
@@ -63,8 +60,6 @@ func main() {
 	})
 	l.Info("Starting updater")
 	RegisterAllHandlers(&updater, l)
-	db.Init()
-	engine.Init()
 	go utils.ExitCleanup()
 	err = updater.StartPolling(b, nil)
 	if err != nil {
