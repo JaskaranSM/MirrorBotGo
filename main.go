@@ -42,11 +42,10 @@ func RegisterAllHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 
 func main() {
 	router := engine.NewHealthRouter()
-	router.StartWebServer("localhost:7870")
+	router.StartWebServer(utils.GetHealthCheckRouterURL())
 	l := engine.GetLogger()
 	token := utils.GetBotToken()
 	l.Info("Starting Bot.")
-	l.Info("token: ", token)
 	b, err := gotgbot.NewBot(token, &gotgbot.BotOpts{
 		Client: http.Client{},
 	})
