@@ -1,5 +1,6 @@
 build/
 MirrorBotGo
+MirrorBotGo.exe
 dist/
 config.json
 .idea

@@ -365,6 +365,7 @@ type GoogleDriveTransferStatus struct {
 	path          string
 	listener      *MirrorListener
 	cloneListener *CloneListener
+	isCancelled   bool
 	Index_        int
 }
 
@@ -405,6 +406,9 @@ func (g *GoogleDriveTransferStatus) ETA() *time.Duration {
 }
 
 func (g *GoogleDriveTransferStatus) GetStatusType() string {
+	if g.isCancelled {
+		return MirrorStatusCanceled
+	}
 	transferType := g.getStatus().TransferType
 	switch transferType {
 	case "upload":
@@ -455,6 +459,7 @@ func (g *GoogleDriveTransferStatus) Index() int {
 }
 
 func (g *GoogleDriveTransferStatus) CancelMirror() bool {
+	g.isCancelled = true
 	_, err := transferServiceClient.CancelTransfer(&CancelRequest{
 		Gid: g.Gid(),
 	})

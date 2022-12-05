@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -493,19 +492,6 @@ func GetReaderHandleByUrl(link string) (io.ReadCloser, error) {
 
 func FormatTGFileLink(sub string, token string) string {
 	return fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", token, sub)
-}
-
-func ExitCleanup() {
-	killSignal := make(chan os.Signal, 1)
-	signal.Notify(killSignal, os.Interrupt)
-	<-killSignal
-	log.Println("Exit Cleanup")
-	err := RemoveByPath(GetDownloadDir())
-	if err != nil {
-		log.Printf("Error while removing dir: %s : %v\n", GetDownloadDir(), err)
-		return
-	}
-	os.Exit(1)
 }
 
 func ParseStringToInt64(str string) int64 {

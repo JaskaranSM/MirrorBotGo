@@ -250,6 +250,7 @@ type AnacrolixTorrentDownloadStatus struct {
 	listener          *MirrorListener
 	anacrolixListener *AnacrolixTorrentDownloadListener
 	Index_            int
+	isCancelled       bool
 	torrentHandle     *torrent.Torrent
 }
 
@@ -309,6 +310,9 @@ func (a *AnacrolixTorrentDownloadStatus) ETA() *time.Duration {
 }
 
 func (a *AnacrolixTorrentDownloadStatus) GetStatusType() string {
+	if a.isCancelled {
+		return MirrorStatusCanceled
+	}
 	if a.anacrolixListener.IsQueued {
 		return MirrorStatusWaiting
 	}
@@ -343,6 +347,7 @@ func (a *AnacrolixTorrentDownloadStatus) Index() int {
 }
 
 func (a *AnacrolixTorrentDownloadStatus) CancelMirror() bool {
+	a.isCancelled = true
 	a.torrentHandle.Drop()
 	return true
 }

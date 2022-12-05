@@ -350,6 +350,7 @@ func NewTelegramDownload(msg *gotgbot.Message, listener *MirrorListener) error {
 type GotdDownloadStatus struct {
 	gid          string
 	gotdListener *GotdDownloadListener
+	isCancelled  bool
 	Index_       int
 }
 
@@ -374,6 +375,9 @@ func (g *GotdDownloadStatus) Speed() int64 {
 }
 
 func (g *GotdDownloadStatus) GetStatusType() string {
+	if g.isCancelled {
+		return MirrorStatusCanceled
+	}
 	return MirrorStatusDownloading
 }
 
@@ -421,6 +425,7 @@ func (g *GotdDownloadStatus) Index() int {
 }
 
 func (g *GotdDownloadStatus) CancelMirror() bool {
+	g.isCancelled = true
 	g.gotdListener.Cancel()
 	return true
 }

@@ -23,7 +23,7 @@ const (
 	MirrorStatusSeeding      = "Seeding"
 	MirrorStatusWaiting      = "Queued"
 	MirrorStatusFailed       = "Failed"
-	MirrorStatusCanceled     = "Canceled"
+	MirrorStatusCanceled     = "Cancelled"
 	MirrorStatusUploadQueued = "Queued for upload"
 )
 
@@ -141,4 +141,12 @@ func GetAllMirrorsChunked(chunkSize int) (chunks [][]MirrorStatus) {
 	}
 	//Finally we append the remaining items to the new array and return it
 	return append(chunks, items)
+}
+
+func CancelAllMirrors() {
+	mirrors := GetAllMirrors()
+	L().Errorf("Cancelling all mirrrors: count:%d,", len(mirrors))
+	for i := range mirrors {
+		mirrors[i].CancelMirror()
+	}
 }

@@ -235,6 +235,7 @@ type UsenetDownloadStatus struct {
 	gid                    string
 	usenetDownloadListener *UsenetDownloadListener
 	nzbID                  int64
+	isCancelled            bool
 	Index_                 int
 }
 
@@ -300,6 +301,9 @@ func (u *UsenetDownloadStatus) ETA() *time.Duration {
 }
 
 func (u *UsenetDownloadStatus) GetStatusType() string {
+	if u.isCancelled {
+		return MirrorStatusCanceled
+	}
 	if u.GetStatus().IsQueued {
 		return MirrorStatusWaiting
 	}
@@ -334,6 +338,7 @@ func (u *UsenetDownloadStatus) Index() int {
 }
 
 func (u *UsenetDownloadStatus) CancelMirror() bool {
+	u.isCancelled = true
 	dun, err := usenetClient.EditQueue("GroupPause", "", []int64{u.nzbID})
 	if err != nil {
 		L().Error(err)

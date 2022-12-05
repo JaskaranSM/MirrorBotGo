@@ -17,6 +17,8 @@ import (
 	"MirrorBotGo/modules/stats"
 	"MirrorBotGo/utils"
 	"net/http"
+	"os"
+	"os/signal"
 
 	_ "net/http/pprof"
 
@@ -24,6 +26,19 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"go.uber.org/zap"
 )
+
+func ExitCleanup() {
+	killSignal := make(chan os.Signal, 1)
+	signal.Notify(killSignal, os.Interrupt)
+	<-killSignal
+	engine.CancelAllMirrors()
+	engine.L().Info("Exit Cleanup")
+	err := utils.RemoveByPath(utils.GetDownloadDir())
+	if err != nil {
+		engine.L().Errorf("Error while removing dir: %s : %v\n", utils.GetDownloadDir(), err)
+	}
+	os.Exit(1)
+}
 
 func RegisterAllHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 	start.LoadStartHandler(updater, l)
@@ -59,7 +74,7 @@ func main() {
 	})
 	l.Info("Starting updater")
 	RegisterAllHandlers(&updater, l)
-	go utils.ExitCleanup()
+	go ExitCleanup()
 	err = updater.StartPolling(b, nil)
 	if err != nil {
 		l.Fatalf("Error occurred at start of polling :  %s", err.Error())
