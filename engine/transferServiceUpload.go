@@ -358,7 +358,7 @@ func NewTransferServiceClient(apiUrl string, client *http.Client) *TransferServi
 	}
 }
 
-var transferServiceClient *TransferServiceClient = NewTransferServiceClient("http://127.0.0.1:6969/api/v1", &http.Client{})
+var transferServiceClient *TransferServiceClient = NewTransferServiceClient(utils.GetTransferServiceURL(), &http.Client{})
 
 type GoogleDriveTransferStatus struct {
 	gid           string
