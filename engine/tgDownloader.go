@@ -289,7 +289,7 @@ func (g *GotdDownloader) PrepareDocumentForDownload(ctx context.Context, api *tg
 		if err != nil {
 			return nil, err
 		}
-		return nil, fmt.Errorf("Not a document")
+		return nil, fmt.Errorf("not a document")
 	}
 	document, ok := doc.Document.AsNotEmpty()
 	if !ok {
@@ -311,7 +311,11 @@ func (g *GotdDownloader) AddDownload(msg *gotgbot.Message, listener *MirrorListe
 		filename = gid
 	}
 	dir := path.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(listener.GetUid()))
-	os.MkdirAll(dir, 0755)
+	err = os.MkdirAll(dir, 0755)
+	if err != nil {
+		L().Errorf("GotdDownloader: AddDownload: os.MkdirAll: %s : %v", dir, err)
+		return err
+	}
 	filePath := path.Join(dir, filename)
 	writer, err := os.Create(filePath)
 	if err != nil {
@@ -346,6 +350,7 @@ func NewTelegramDownload(msg *gotgbot.Message, listener *MirrorListener) error {
 type GotdDownloadStatus struct {
 	gid          string
 	gotdListener *GotdDownloadListener
+	isCancelled  bool
 	Index_       int
 }
 
@@ -370,6 +375,9 @@ func (g *GotdDownloadStatus) Speed() int64 {
 }
 
 func (g *GotdDownloadStatus) GetStatusType() string {
+	if g.isCancelled {
+		return MirrorStatusCanceled
+	}
 	return MirrorStatusDownloading
 }
 
@@ -417,6 +425,7 @@ func (g *GotdDownloadStatus) Index() int {
 }
 
 func (g *GotdDownloadStatus) CancelMirror() bool {
+	g.isCancelled = true
 	g.gotdListener.Cancel()
 	return true
 }
@@ -441,7 +450,11 @@ func (p *GotdProgressWriter) WriteAt(b []byte, off int64) (int, error) {
 	}
 	n := len(b)
 	p.completed += int64(n)
-	p.writer.WriteAt(b, off)
+	_, err := p.writer.WriteAt(b, off)
+	if err != nil {
+		L().Errorf("GotdProgressWriter: WriteAt: %d : %v", off, err)
+		return 0, err
+	}
 	return n, nil
 }
 

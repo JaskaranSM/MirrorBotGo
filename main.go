@@ -2,14 +2,12 @@
 package main
 
 import (
-	"MirrorBotGo/db"
 	"MirrorBotGo/engine"
 	"MirrorBotGo/modules/authorization"
 	"MirrorBotGo/modules/botlog"
 	"MirrorBotGo/modules/cancelmirror"
 	"MirrorBotGo/modules/clone"
 	"MirrorBotGo/modules/configuration"
-	"MirrorBotGo/modules/goexec"
 	"MirrorBotGo/modules/list"
 	"MirrorBotGo/modules/mirror"
 	"MirrorBotGo/modules/mirrorstatus"
@@ -19,6 +17,8 @@ import (
 	"MirrorBotGo/modules/stats"
 	"MirrorBotGo/utils"
 	"net/http"
+	"os"
+	"os/signal"
 
 	_ "net/http/pprof"
 
@@ -27,13 +27,25 @@ import (
 	"go.uber.org/zap"
 )
 
+func ExitCleanup() {
+	killSignal := make(chan os.Signal, 1)
+	signal.Notify(killSignal, os.Interrupt)
+	<-killSignal
+	engine.CancelAllMirrors()
+	engine.L().Info("Exit Cleanup")
+	err := utils.RemoveByPath(utils.GetDownloadDir())
+	if err != nil {
+		engine.L().Errorf("Error while removing dir: %s : %v\n", utils.GetDownloadDir(), err)
+	}
+	os.Exit(1)
+}
+
 func RegisterAllHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 	start.LoadStartHandler(updater, l)
 	mirror.LoadMirrorHandlers(updater, l)
 	mirrorstatus.LoadMirrorStatusHandler(updater, l)
 	cancelmirror.LoadCancelMirrorHandler(updater, l)
 	list.LoadListHandler(updater, l)
-	goexec.LoadExecHandler(updater, l)
 	authorization.LoadAuthorizationHandlers(updater, l)
 	stats.LoadStatsHandler(updater, l)
 	ping.LoadPingHandler(updater, l)
@@ -45,11 +57,10 @@ func RegisterAllHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 
 func main() {
 	router := engine.NewHealthRouter()
-	router.StartWebServer("localhost:7870")
+	router.StartWebServer(utils.GetHealthCheckRouterURL())
 	l := engine.GetLogger()
 	token := utils.GetBotToken()
 	l.Info("Starting Bot.")
-	l.Info("token: ", token)
 	b, err := gotgbot.NewBot(token, &gotgbot.BotOpts{
 		Client: http.Client{},
 	})
@@ -63,9 +74,7 @@ func main() {
 	})
 	l.Info("Starting updater")
 	RegisterAllHandlers(&updater, l)
-	db.Init()
-	engine.Init()
-	go utils.ExitCleanup()
+	go ExitCleanup()
 	err = updater.StartPolling(b, nil)
 	if err != nil {
 		l.Fatalf("Error occurred at start of polling :  %s", err.Error())

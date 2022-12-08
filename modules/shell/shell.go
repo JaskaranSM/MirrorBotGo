@@ -13,22 +13,22 @@ import (
 	"go.uber.org/zap"
 )
 
-type ShellOutputWriter struct {
+type OutputWriter struct {
 	content   string
 	completed bool
 }
 
-func (s *ShellOutputWriter) Write(p []byte) (int, error) {
+func (s *OutputWriter) Write(p []byte) (int, error) {
 	data := string(p)
 	s.content += data
 	return len(p), nil
 }
 
-func (s *ShellOutputWriter) GetContent() string {
+func (s *OutputWriter) GetContent() string {
 	return s.content
 }
 
-func RunCommand(command string, writer *ShellOutputWriter) error {
+func RunCommand(command string, writer *OutputWriter) error {
 	defer func() {
 		writer.completed = true
 	}()
@@ -69,7 +69,7 @@ func ShellHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 		engine.SendMessage(b, err.Error(), m)
 		return nil
 	}
-	output := &ShellOutputWriter{}
+	output := &OutputWriter{}
 	go func() {
 		for range time.Tick(3 * time.Second) {
 			if output.completed {
@@ -78,13 +78,16 @@ func ShellHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 			UpdateMessage(output.GetContent(), b, outMsg)
 		}
 	}()
-	RunCommand(cmd, output)
+	err = RunCommand(cmd, output)
+	if err != nil {
+		return err
+	}
 	UpdateMessage(output.GetContent(), b, outMsg)
-	b.SendMessage(chat.Id, "Execution completed", nil)
+	engine.SendMessage(b, "Execution completed", m)
 	return nil
 }
 
 func LoadShellHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
-	defer l.Info("Ping Module Loaded.")
+	defer l.Info("Shell Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("sh", ShellHandler))
 }

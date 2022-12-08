@@ -5,6 +5,8 @@ import (
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
 	"fmt"
+	"net/http"
+	"strings"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -25,38 +27,37 @@ func ListHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 		return nil
 	}
 	outMsg := ""
-	drive := engine.NewGDriveClient(0, nil)
-	drive.Init("")
-	drive.Authorize()
-	files, err := drive.ListFilesByParentId(utils.GetGDriveParentId(), name, 20, 1)
+	client := engine.NewTransferServiceClient(utils.GetTransferServiceURL(), &http.Client{})
+	res, err := client.ListFiles(&engine.ListFilesRequest{
+		ParentID: utils.GetGDriveParentId(),
+		Name:     name,
+		Count:    20,
+	})
 	if err != nil {
 		engine.SendMessage(b, err.Error(), message)
 		return nil
 	}
+	files := res.Files
 	if len(files) == 0 {
 		outMsg += "No Result Found."
 	}
 	for _, file := range files {
-		if file.MimeType == drive.GDRIVE_DIR_MIMETYPE {
-			outMsg += fmt.Sprintf("⁍ <a href='%s'>%s</a> (folder)", drive.FormatLink(file.Id), file.Name)
+		if engine.IsGDriveFolder(file.MimeType) {
+			outMsg += fmt.Sprintf("⁍ <a href='%s'>%s</a> (folder)", engine.FormatGDriveLink(file.Id), strings.ReplaceAll(file.Name, "'", ""))
 		} else {
-			outMsg += fmt.Sprintf("⁍ <a href='%s'>%s</a> (%s)", drive.FormatLink(file.Id), file.Name, utils.GetHumanBytes(file.Size))
+			outMsg += fmt.Sprintf("⁍ <a href='%s'>%s</a> (%s)", engine.FormatGDriveLink(file.Id), strings.ReplaceAll(file.Name, "'", ""), utils.GetHumanBytes(file.Size))
 		}
-		in_url := utils.GetIndexUrl()
-		if in_url != "" {
-			in_url = in_url + "/" + file.Name
-			if file.MimeType == drive.GDRIVE_DIR_MIMETYPE {
-				in_url += "/"
+		inUrl := utils.GetIndexUrl()
+		if inUrl != "" {
+			inUrl = inUrl + "/" + strings.ReplaceAll(file.Name, "'", "")
+			if engine.IsGDriveFolder(file.MimeType) {
+				inUrl += "/"
 			}
-			outMsg += fmt.Sprintf(" | <a href='%s'>Index url</a>", in_url)
+			outMsg += fmt.Sprintf(" | <a href='%s'>Index url</a>", inUrl)
 		}
 		outMsg += "\n"
 	}
-	out, err = engine.SendMessage(b, outMsg, message)
-	if err != nil {
-		engine.SendMessage(b, err.Error(), message)
-		return nil
-	}
+	out = engine.SendMessage(b, outMsg, message)
 	engine.AutoDeleteMessages(b, utils.GetAutoDeleteTimeOut(), out, message)
 	return nil
 }

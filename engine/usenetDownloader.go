@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -18,15 +19,15 @@ import (
 
 var usenetClient *nzbget.NZBGet = getUsenetClient()
 var usenetActiveDls []string
-var usenetMutx sync.Mutex
+var usenetMutex sync.Mutex
 var isRPCConnected bool = false
 
 var GroupRespNotFoundErr = errors.New("(GroupResp): NZB download not found")
 var HistoryRespNotFoundErr = errors.New("(HistoryResp): NZB download not found")
 
 func isUsenetDlExist(dl string) bool {
-	usenetMutx.Lock()
-	defer usenetMutx.Unlock()
+	usenetMutex.Lock()
+	defer usenetMutex.Unlock()
 	for _, t := range usenetActiveDls {
 		if t == dl {
 			return true
@@ -35,9 +36,9 @@ func isUsenetDlExist(dl string) bool {
 	return false
 }
 
-func getUsenetDlindex(dl string) int {
-	usenetMutx.Lock()
-	defer usenetMutx.Unlock()
+func getUsenetDlIndex(dl string) int {
+	usenetMutex.Lock()
+	defer usenetMutex.Unlock()
 	for i, t := range usenetActiveDls {
 		if t == dl {
 			return i
@@ -46,27 +47,27 @@ func getUsenetDlindex(dl string) int {
 	return -1
 }
 
-func addusenetActiveDl(dl string) {
-	usenetMutx.Lock()
-	defer usenetMutx.Unlock()
+func addUsenetActiveDl(dl string) {
+	usenetMutex.Lock()
+	defer usenetMutex.Unlock()
 	usenetActiveDls = append(usenetActiveDls, dl)
 }
 
 func removeUsenetActiveDl(dl string) {
-	index := getUsenetDlindex(dl)
+	index := getUsenetDlIndex(dl)
 	if index == -1 {
 		return
 	}
-	usenetMutx.Lock()
-	defer usenetMutx.Unlock()
+	usenetMutex.Lock()
+	defer usenetMutex.Unlock()
 	usenetActiveDls[index] = ""
 }
 
 func getUsenetClient() *nzbget.NZBGet {
 	nzb := nzbget.New(&nzbget.Config{
-		URL:  "http://127.0.0.1:6789",
-		User: "nzbget",
-		Pass: "tegbzn6789",
+		URL:  utils.GetUsenetClientURL(),
+		User: utils.GetUsenetClientUsername(),
+		Pass: utils.GetUsenetClientPassword(),
 		Client: &http.Client{
 			Timeout: 20 * time.Second,
 		},
@@ -117,7 +118,7 @@ func GetHistoryRespByNZBID(nzbID int64) (*nzbget.History, error) {
 
 func NewUsenetDownloadListener(nzbID int64, listener *MirrorListener, content string) *UsenetDownloadListener {
 	return &UsenetDownloadListener{
-		NZBID:    nzbID,
+		NzbID:    nzbID,
 		listener: listener,
 		Content:  content,
 	}
@@ -125,7 +126,7 @@ func NewUsenetDownloadListener(nzbID int64, listener *MirrorListener, content st
 
 type UsenetDownloadListener struct {
 	Content           string
-	NZBID             int64
+	NzbID             int64
 	handled           bool
 	listener          *MirrorListener
 	IsListenerRunning bool
@@ -149,7 +150,11 @@ func (u *UsenetDownloadListener) OnDownloadComplete() {
 	}
 	u.handled = true
 	removeUsenetActiveDl(u.Content)
-	usenetClient.EditQueue("GroupDelete", "", []int64{u.NZBID})
+	_, err := usenetClient.EditQueue("GroupDelete", "", []int64{u.NzbID})
+	if err != nil {
+		L().Errorf("UsenetDownloadListener: OnDownloadComplete: EditQueue: GroupDelete: %d : %v", u.NzbID, err)
+		return
+	}
 	u.StopListener()
 	u.listener.OnDownloadComplete()
 }
@@ -160,7 +165,11 @@ func (u *UsenetDownloadListener) OnDownloadError(err string) {
 	}
 	u.handled = true
 	removeUsenetActiveDl(u.Content)
-	usenetClient.EditQueue("GroupDelete", "", []int64{u.NZBID})
+	_, err2 := usenetClient.EditQueue("GroupDelete", "", []int64{u.NzbID})
+	if err2 != nil {
+		L().Errorf("UsenetDownloadListener: OnDownloadError: EditQueue: GroupDelete: %d : %v", u.NzbID, err2)
+		return
+	}
 	u.StopListener()
 	u.listener.OnDownloadError(err)
 }
@@ -168,9 +177,9 @@ func (u *UsenetDownloadListener) OnDownloadError(err string) {
 func (u *UsenetDownloadListener) ListenForEvents() {
 	var last int64 = 0
 	for u.IsListenerRunning {
-		group, err := GetGroupRespByNZBID(u.NZBID)
+		group, err := GetGroupRespByNZBID(u.NzbID)
 		if err == GroupRespNotFoundErr {
-			history, err := GetHistoryRespByNZBID(u.NZBID)
+			history, err := GetHistoryRespByNZBID(u.NzbID)
 			if err != nil {
 				L().Error(err)
 			}
@@ -182,7 +191,11 @@ func (u *UsenetDownloadListener) ListenForEvents() {
 				return
 			} else if strings.Contains(history.Status, "FAILURE") {
 				u.pth = path.Join(u.futurePath, history.Name)
-				os.Rename(history.DestDir, u.pth)
+				err := os.Rename(history.DestDir, u.pth)
+				if err != nil {
+					L().Errorf("UsenetDownloadListener: usenet download fail: rename: %s -> %s : %v", history.DestDir, u.pth, err)
+					return
+				}
 				u.OnDownloadError("usenet download failed")
 				return
 			}
@@ -222,6 +235,7 @@ type UsenetDownloadStatus struct {
 	gid                    string
 	usenetDownloadListener *UsenetDownloadListener
 	nzbID                  int64
+	isCancelled            bool
 	Index_                 int
 }
 
@@ -287,6 +301,9 @@ func (u *UsenetDownloadStatus) ETA() *time.Duration {
 }
 
 func (u *UsenetDownloadStatus) GetStatusType() string {
+	if u.isCancelled {
+		return MirrorStatusCanceled
+	}
 	if u.GetStatus().IsQueued {
 		return MirrorStatusWaiting
 	}
@@ -321,6 +338,7 @@ func (u *UsenetDownloadStatus) Index() int {
 }
 
 func (u *UsenetDownloadStatus) CancelMirror() bool {
+	u.isCancelled = true
 	dun, err := usenetClient.EditQueue("GroupPause", "", []int64{u.nzbID})
 	if err != nil {
 		L().Error(err)
@@ -337,17 +355,26 @@ func NewUsenetDownload(filename string, link string, listener *MirrorListener) e
 	if err != nil {
 		return err
 	}
-	defer reader.Close()
+	defer func(reader io.ReadCloser) {
+		err := reader.Close()
+		if err != nil {
+			L().Errorf("NewUsenetDownload: failed to close reader handle: %s: %v", link, err)
+		}
+	}(reader)
 	content, err := ioutil.ReadAll(reader)
 	if err != nil {
 		return err
 	}
 	base64Encoded := base64.StdEncoding.EncodeToString(content)
 	if isUsenetDlExist(base64Encoded) {
-		return errors.New("This usenet download is already in queue, let the mirror finish and then add again.")
+		return errors.New("this usenet download is already in queue, let the mirror finish and then add again")
 	}
 	dir := path.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(listener.GetUid()))
-	os.MkdirAll(dir, 0755)
+	err = os.MkdirAll(dir, 0755)
+	if err != nil {
+		L().Errorf("NewUsenetDownload: os.MkdirAll: %s : %v", dir, err)
+		return err
+	}
 	nzbID, err := usenetClient.Append(&nzbget.AppendInput{
 		Filename: filename,
 		Content:  base64Encoded,
@@ -363,7 +390,7 @@ func NewUsenetDownload(filename string, link string, listener *MirrorListener) e
 	status := NewUsenetDownloadStatus(gid, usenetListener, nzbID)
 	status.Index_ = GenerateMirrorIndex()
 	AddMirrorLocal(listener.GetUid(), status)
-	addusenetActiveDl(base64Encoded)
+	addUsenetActiveDl(base64Encoded)
 	status.GetListener().OnDownloadStart(status.Gid())
 	return err
 }

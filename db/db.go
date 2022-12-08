@@ -17,7 +17,7 @@ var AuthorizedUsers []int64
 var AuthorizedChats []int64
 
 func getDbClient() *mongo.Client {
-	engine.L().Infof("[DB] Connection: %s", utils.GetDbUri())
+	engine.L().Info("[DB] Connection: Connecting")
 	client, err := mongo.NewClient(options.Client().ApplyURI(utils.GetDbUri()))
 	if err != nil {
 		engine.L().Fatal(err)
@@ -28,6 +28,7 @@ func getDbClient() *mongo.Client {
 	if err != nil {
 		engine.L().Fatal(err)
 	}
+	engine.L().Info("[DB] Connection: Connected")
 	return client
 }
 
@@ -173,7 +174,7 @@ func UnAuthorizeUserDb(userId int64) bool {
 	return true
 }
 
-func Init() {
+func init() {
 	engine.L().Info("Initializing database..")
 	InitChats()
 	InitUsers()
@@ -196,7 +197,12 @@ func InitChats() bool {
 		engine.L().Error(err)
 		return false
 	}
-	defer cur.Close(Ctx)
+	defer func(cur *mongo.Cursor, ctx context.Context) {
+		err := cur.Close(ctx)
+		if err != nil {
+			engine.L().Errorf("InitChats: failed to close cursor: %v", err)
+		}
+	}(cur, Ctx)
 	for cur.Next(Ctx) {
 		var result bson.M
 		err := cur.Decode(&result)
@@ -223,7 +229,12 @@ func InitUsers() bool {
 		engine.L().Error(err)
 		return false
 	}
-	defer cur.Close(Ctx)
+	defer func(cur *mongo.Cursor, ctx context.Context) {
+		err := cur.Close(ctx)
+		if err != nil {
+			engine.L().Errorf("InitUsers: failed to close cursor: %v", err)
+		}
+	}(cur, Ctx)
 	for cur.Next(Ctx) {
 		var result bson.M
 		err := cur.Decode(&result)

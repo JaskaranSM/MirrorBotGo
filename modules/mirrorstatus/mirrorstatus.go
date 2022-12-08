@@ -17,24 +17,32 @@ func MirrorStatusHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	}
 	message := ctx.EffectiveMessage
 	if engine.GetAllMirrorsCount() == 0 {
-		out, _ := engine.SendMessage(b, "No Active Mirrors.", message)
+		out := engine.SendMessage(b, "No Active Mirrors.", message)
 		engine.AutoDeleteMessages(b, utils.GetAutoDeleteTimeOut(), out, message)
 		return nil
 	}
-	engine.SendStatusMessage(b, message)
+	err := engine.SendStatusMessage(b, message)
+	if err != nil {
+		engine.SendMessage(b, err.Error(), message)
+		return nil
+	}
 	engine.DeleteMessage(b, message)
 	return nil
 }
 
 func MirrorStatusPreviousHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	cq := ctx.CallbackQuery
-	cq.Answer(b, nil)
-	status_msg := engine.GetMessageByChatId(ctx.EffectiveChat.Id)
-	if status_msg == nil {
+	_, err := cq.Answer(b, nil)
+	if err != nil {
+		engine.L().Errorf("MirrorStatusPreviousHandler: callback: %v", err)
 		return nil
 	}
-	if engine.GetAllMirrorsCount() > engine.STATUS_MESSAGE_CHUNKSIZE {
-		status_msg.Date = status_msg.Date - 1
+	statusMsg := engine.GetMessageByChatId(ctx.EffectiveChat.Id)
+	if statusMsg == nil {
+		return nil
+	}
+	if engine.GetAllMirrorsCount() > engine.StatusMessageChunkSize {
+		statusMsg.Date = statusMsg.Date - 1
 	}
 	engine.UpdateAllMessages(b)
 	return nil
@@ -42,13 +50,17 @@ func MirrorStatusPreviousHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 
 func MirrorStatusFirstHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	cq := ctx.CallbackQuery
-	cq.Answer(b, nil)
-	status_msg := engine.GetMessageByChatId(ctx.EffectiveChat.Id)
-	if status_msg == nil {
+	_, err := cq.Answer(b, nil)
+	if err != nil {
+		engine.L().Errorf("MirrorStatusFirstHandler: callback: %v", err)
 		return nil
 	}
-	if engine.GetAllMirrorsCount() > engine.STATUS_MESSAGE_CHUNKSIZE {
-		status_msg.Date = 0
+	statusMsg := engine.GetMessageByChatId(ctx.EffectiveChat.Id)
+	if statusMsg == nil {
+		return nil
+	}
+	if engine.GetAllMirrorsCount() > engine.StatusMessageChunkSize {
+		statusMsg.Date = 0
 	}
 	engine.UpdateAllMessages(b)
 	return nil
@@ -56,13 +68,17 @@ func MirrorStatusFirstHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 
 func MirrorStatusNextHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	cq := ctx.CallbackQuery
-	cq.Answer(b, nil)
-	status_msg := engine.GetMessageByChatId(ctx.EffectiveChat.Id)
-	if status_msg == nil {
+	_, err := cq.Answer(b, nil)
+	if err != nil {
+		engine.L().Errorf("MirrorStatusNextHandler: callback: %v", err)
 		return nil
 	}
-	if engine.GetAllMirrorsCount() > engine.STATUS_MESSAGE_CHUNKSIZE {
-		status_msg.Date = status_msg.Date + 1
+	statusMsg := engine.GetMessageByChatId(ctx.EffectiveChat.Id)
+	if statusMsg == nil {
+		return nil
+	}
+	if engine.GetAllMirrorsCount() > engine.StatusMessageChunkSize {
+		statusMsg.Date = statusMsg.Date + 1
 	}
 	engine.UpdateAllMessages(b)
 	return nil
@@ -70,13 +86,17 @@ func MirrorStatusNextHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 
 func MirrorStatusLastHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	cq := ctx.CallbackQuery
-	cq.Answer(b, nil)
-	status_msg := engine.GetMessageByChatId(ctx.EffectiveChat.Id)
-	if status_msg == nil {
+	_, err := cq.Answer(b, nil)
+	if err != nil {
+		engine.L().Errorf("MirrorStatusLastHandler: callback: %v", err)
 		return nil
 	}
-	if engine.GetAllMirrorsCount() > engine.STATUS_MESSAGE_CHUNKSIZE {
-		status_msg.Date = int64(len(engine.GetAllMirrorsChunked(engine.STATUS_MESSAGE_CHUNKSIZE)) - 1)
+	statusMsg := engine.GetMessageByChatId(ctx.EffectiveChat.Id)
+	if statusMsg == nil {
+		return nil
+	}
+	if engine.GetAllMirrorsCount() > engine.StatusMessageChunkSize {
+		statusMsg.Date = int64(len(engine.GetAllMirrorsChunked(engine.StatusMessageChunkSize)) - 1)
 	}
 	engine.UpdateAllMessages(b)
 	return nil

@@ -141,10 +141,14 @@ func (t *UnArchiver) CalculateTotalSize(path string) (int64, error) {
 	ctx := context.Background()
 	var size int64
 	if ex, ok := format.(archiver.Extractor); ok {
-		ex.Extract(ctx, archiveReader, nil, func(ctx context.Context, f archiver.File) error {
+		err = ex.Extract(ctx, archiveReader, nil, func(ctx context.Context, f archiver.File) error {
 			size += f.Size()
 			return nil
 		})
+		if err != nil {
+			L().Errorf("UnArchiver: CalculateTotalSize: %s : %v", path, err)
+			return 0, err
+		}
 	} else {
 		return 0, errors.New("Unsupported archive")
 	}
@@ -158,7 +162,11 @@ func fileNameWithoutExtSliceNotation(fileName string) string {
 func (t *UnArchiver) UnArchivePath(path string) (string, error) {
 	L().Infof("[Unarchive] starting unarchive: %s", path)
 	outPath := fileNameWithoutExtSliceNotation(path)
-	os.MkdirAll(outPath, 0755)
+	err := os.MkdirAll(outPath, 0755)
+	if err != nil {
+		L().Errorf("UnArchiver: UnArchivePath: os.MkdirAll: %s : %v", path, err)
+		return "", err
+	}
 	reader, err := os.Open(path)
 	if err != nil {
 		return path, err
@@ -175,7 +183,11 @@ func (t *UnArchiver) UnArchivePath(path string) (string, error) {
 			}
 			writerPath := filepath.Join(outPath, f.NameInArchive)
 			dir := filepath.Dir(writerPath)
-			os.MkdirAll(dir, 0755)
+			err = os.MkdirAll(dir, 0755)
+			if err != nil {
+				L().Errorf("UnArchiver: UnArchivePath: ex.Extract: os.MkdirAll: %s : %v", path, err)
+				//in case directory exists, no need to stop the extraction.
+			}
 			writer, err := os.Create(writerPath)
 			if err != nil {
 				return err
@@ -184,7 +196,12 @@ func (t *UnArchiver) UnArchivePath(path string) (string, error) {
 			if err != nil {
 				return err
 			}
-			defer reader.Close()
+			defer func(reader io.ReadCloser) {
+				err := reader.Close()
+				if err != nil {
+					L().Errorf("UnArchiver: UnArchivePath: ex.Extract: Failed to close reader: %v", err)
+				}
+			}(reader)
 			_, err = io.Copy(io.MultiWriter(writer, t), reader)
 			if err != nil {
 				return err

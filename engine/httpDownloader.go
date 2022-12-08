@@ -11,9 +11,10 @@ import (
 )
 
 type HTTPDownloadStatus struct {
-	dl       *httpdl.HTTPDownload
-	listener *MirrorListener
-	Index_   int
+	dl          *httpdl.HTTPDownload
+	listener    *MirrorListener
+	isCancelled bool
+	Index_      int
 }
 
 func (h *HTTPDownloadStatus) Name() string {
@@ -46,6 +47,9 @@ func (h *HTTPDownloadStatus) ETA() *time.Duration {
 }
 
 func (h *HTTPDownloadStatus) GetStatusType() string {
+	if h.isCancelled {
+		return MirrorStatusCanceled
+	}
 	return MirrorStatusDownloading
 }
 
@@ -78,6 +82,7 @@ func (h *HTTPDownloadStatus) GetCloneListener() *CloneListener {
 }
 
 func (h *HTTPDownloadStatus) CancelMirror() bool {
+	h.isCancelled = true
 	h.dl.CancelDownload()
 	return true
 }
@@ -110,7 +115,8 @@ func (h *HTTPDownloadListener) OnDownloadStart(dl *httpdl.HTTPDownload) {
 func (h *HTTPDownloadListener) OnDownloadStop(dl *httpdl.HTTPDownload) {
 	err := dl.GetFailureError()
 	if err == nil {
-		err = fmt.Errorf("Unknown error, debug wen")
+		//I have no idea why did I do it this way. guess we find out when time comes
+		err = fmt.Errorf("unknown error, debug wen: %v", err)
 	}
 	h.listener.OnDownloadError(err.Error())
 }

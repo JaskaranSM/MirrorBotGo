@@ -12,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"reflect"
 	"regexp"
@@ -26,49 +25,60 @@ import (
 
 const ConfigJsonPath string = "config.json"
 
-const PROGRESS_MAX_SIZE = 100 / 8
+const ProgressMaxSize = 100 / 8
 const MaxMessageTextLength int = 4000
 
-var PROGRESS_INCOMPLETE []string = []string{"▏", "▎", "▍", "▌", "▋", "▊", "▉"}
+var ProgressIncomplete []string = []string{"▏", "▎", "▍", "▌", "▋", "▊", "▉"}
 
 const (
-	MAGNET_REGEX     string = "magnet:\\?xt=urn:btih:[a-zA-Z0-9]*"
-	URL_REGEX        string = "(?:(?:https?|ftp):\\/\\/)?[\\w/\\-?=%.]+\\.[\\w/\\-?=%.]+"
-	DRIVE_LINK_REGEX string = `https://drive\.google\.com/(drive)?/?u?/?\d?/?(mobile)?/?(file)?(folders)?/?d?/([-\w]+)[?+]?/?(w+)?`
+	MagnetRegex    string = "magnet:\\?xt=urn:btih:[a-zA-Z0-9]*"
+	UrlRegex       string = "(?:(?:https?|ftp):\\/\\/)?[\\w/\\-?=%.]+\\.[\\w/\\-?=%.]+"
+	DriveLinkRegex string = `https://drive\.google\.com/(drive)?/?u?/?\d?/?(mobile)?/?(file)?(folders)?/?d?/([-\w]+)[?+]?/?(w+)?`
 )
 
 func IsMagnetLink(link string) bool {
-	match := regexp.MustCompile(MAGNET_REGEX)
+	match := regexp.MustCompile(MagnetRegex)
 	return match.MatchString(link)
 }
 
 func IsUrlLink(link string) bool {
-	match := regexp.MustCompile(URL_REGEX)
+	match := regexp.MustCompile(UrlRegex)
 	return match.MatchString(link)
 }
 
 type ConfigJson struct {
-	BOT_TOKEN               string  `json:"bot_token"`
-	SUDO_USERS              []int64 `json:"sudo_users"`
-	AUTHORIZED_CHATS        []int64 `json:"authorized_chats"`
-	OWNER_ID                int64   `json:"owner_id"`
-	DOWNLOAD_DIR            string  `json:"download_dir"`
-	IS_TEAM_DRIVE           bool    `json:"is_team_drive"`
-	GDRIVE_PARENT_ID        string  `json:"gdrive_parent_id"`
-	STATUS_UPDATE_INTERVAL  int     `json:"status_update_interval"`
-	AUTO_DELETE_TIMEOUT     int     `json:"auto_delete_timeout"`
-	DB_URI                  string  `json:"db_uri"`
-	USE_SA                  bool    `json:"use_sa"`
-	INDEX_URL               string  `json:"index_url"`
-	TG_APP_ID               string  `json:"tg_app_id"`
-	TG_APP_HASH             string  `json:"tg_app_hash"`
-	MegaEmail               string  `json:"mega_email"`
-	MegaPassword            string  `json:"mega_password"`
-	MegaAPIKey              string  `json:"mega_api_key"`
-	StatusMessagesPerPage   int     `json:"status_messages_per_page"`
-	EncryptionPassword      string  `json:"encryption_password"`
-	Seed                    bool    `json:"seed"`
-	TorrentClientListenPort int     `json:"torrent_client_listen_port"`
+	BotToken                                    string  `json:"bot_token"`
+	SudoUsers                                   []int64 `json:"sudo_users"`
+	AuthorizedChats                             []int64 `json:"authorized_chats"`
+	OwnerId                                     int64   `json:"owner_id"`
+	DownloadDir                                 string  `json:"download_dir"`
+	IsTeamDrive                                 bool    `json:"is_team_drive"`
+	GdriveParentId                              string  `json:"gdrive_parent_id"`
+	StatusUpdateInterval                        int     `json:"status_update_interval"`
+	AutoDeleteTimeout                           int     `json:"auto_delete_timeout"`
+	DbUri                                       string  `json:"db_uri"`
+	UseSa                                       bool    `json:"use_sa"`
+	IndexUrl                                    string  `json:"index_url"`
+	TgAppId                                     string  `json:"tg_app_id"`
+	TgAppHash                                   string  `json:"tg_app_hash"`
+	MegaEmail                                   string  `json:"mega_email"`
+	MegaPassword                                string  `json:"mega_password"`
+	MegaAPIKey                                  string  `json:"mega_api_key"`
+	StatusMessagesPerPage                       int     `json:"status_messages_per_page"`
+	EncryptionPassword                          string  `json:"encryption_password"`
+	Seed                                        bool    `json:"seed"`
+	HealthCheckRouterURL                        string  `json:"health_check_router_url"`
+	TransferServiceURL                          string  `json:"transfer_service_url"`
+	UsenetClientURL                             string  `json:"usenet_client_url"`
+	UsenetClientUsername                        string  `json:"usenet_client_username"`
+	UsenetClientPassword                        string  `json:"usenet_client_password"`
+	TorrentClientListenPort                     int     `json:"torrent_client_listen_port"`
+	TorrentClientHTTPUserAgent                  string  `json:"torrent_client_http_user_agent"`
+	TorrentClientBep20                          string  `json:"torrent_client_bep_20"`
+	TorrentClientUpnpID                         string  `json:"torrent_client_upnp_id"`
+	TorrentClientMinDialTimeout                 int     `json:"torrent_client_min_dial_timeout"`
+	TorrentClientEstablishedConnsPerTorrent     int     `json:"torrent_client_established_conns_per_torrent"`
+	TorrentClientExtendedHandshakeClientVersion string  `json:"torrent_client_extended_handshake_client_version"`
 }
 
 var Config *ConfigJson = InitConfig()
@@ -83,29 +93,64 @@ func InitConfig() *ConfigJson {
 	if err != nil {
 		log.Fatal(err)
 	}
-	Config.SUDO_USERS = append(Config.SUDO_USERS, Config.OWNER_ID)
-	log.Println(Config.SUDO_USERS)
+	Config.SudoUsers = append(Config.SudoUsers, Config.OwnerId)
+	log.Println(Config.SudoUsers)
 	return &Config
 }
 
 func GetBotToken() string {
-	return Config.BOT_TOKEN
+	return Config.BotToken
 }
 
 func GetSudoUsers() []int64 {
-	return Config.SUDO_USERS
+	return Config.SudoUsers
 }
 
 func GetAuthorizedChats() []int64 {
-	return Config.AUTHORIZED_CHATS
+	return Config.AuthorizedChats
 }
 
 func GetTgAppId() string {
-	return Config.TG_APP_ID
+	return Config.TgAppId
 }
 
 func GetMegaEmail() string {
 	return Config.MegaEmail
+}
+
+func GetHealthCheckRouterURL() string {
+	if Config.HealthCheckRouterURL == "" {
+		return "localhost:7870"
+	}
+	return Config.HealthCheckRouterURL
+}
+
+func GetTransferServiceURL() string {
+	if Config.TransferServiceURL == "" {
+		return "http://127.0.0.1:6969/api/v1"
+	}
+	return Config.TransferServiceURL
+}
+
+func GetUsenetClientURL() string {
+	if Config.UsenetClientURL == "" {
+		return "http://127.0.0.1:6789"
+	}
+	return Config.UsenetClientURL
+}
+
+func GetUsenetClientUsername() string {
+	if Config.UsenetClientUsername == "" {
+		return "nzbget"
+	}
+	return Config.UsenetClientUsername
+}
+
+func GetUsenetClientPassword() string {
+	if Config.UsenetClientPassword == "" {
+		return "tegbzn6789"
+	}
+	return Config.UsenetClientPassword
 }
 
 func GetTorrentClientListenPort() int {
@@ -113,6 +158,41 @@ func GetTorrentClientListenPort() int {
 		return 42069
 	}
 	return Config.TorrentClientListenPort
+}
+
+func GetTorrentClientBep20() string {
+	if Config.TorrentClientBep20 == "" {
+		return "-qB4380-"
+	}
+	return Config.TorrentClientBep20
+}
+
+func GetTorrentClientUpnpID() string {
+	if Config.TorrentClientUpnpID == "" {
+		return "qBittorrent 4.3.8"
+	}
+	return Config.TorrentClientUpnpID
+}
+
+func GetTorrentClientExtendedHandshakeClientVersion() string {
+	if Config.TorrentClientExtendedHandshakeClientVersion == "" {
+		return "qBittorrent/4.3.8"
+	}
+	return Config.TorrentClientExtendedHandshakeClientVersion
+}
+
+func GetTorrentClientMinDialTimeout() time.Duration {
+	if Config.TorrentClientMinDialTimeout == 0 {
+		return 10 * time.Second
+	}
+	return time.Duration(Config.TorrentClientMinDialTimeout) * time.Second
+}
+
+func GetTorrentClientEstablishedConnsPerTorrent() int {
+	if Config.TorrentClientEstablishedConnsPerTorrent == 0 {
+		return 100
+	}
+	return Config.TorrentClientEstablishedConnsPerTorrent
 }
 
 func GetStatusMessagesPerPage() int {
@@ -129,12 +209,12 @@ func GetEncryptionPassword() string {
 	return Config.EncryptionPassword
 }
 
-func GetMegaPasssword() string {
+func GetMegaPassword() string {
 	return Config.MegaPassword
 }
 
 func GetTgAppHash() string {
-	return Config.TG_APP_HASH
+	return Config.TgAppHash
 }
 
 func GetMaxMessageTextLength() int {
@@ -142,15 +222,15 @@ func GetMaxMessageTextLength() int {
 }
 
 func UseSa() bool {
-	return Config.USE_SA
+	return Config.UseSa
 }
 
 func IsUserOwner(userId int64) bool {
-	return Config.OWNER_ID == userId
+	return Config.OwnerId == userId
 }
 
 func IsUserSudo(userId int64) bool {
-	for _, i := range Config.SUDO_USERS {
+	for _, i := range Config.SudoUsers {
 		if i == userId {
 			return true
 		}
@@ -167,22 +247,29 @@ func GetSeed() bool {
 }
 
 func GetDownloadDir() string {
-	return Config.DOWNLOAD_DIR
+	return Config.DownloadDir
 }
 
 func GetIndexUrl() string {
-	return Config.INDEX_URL
+	return Config.IndexUrl
 }
 
 func GetAutoDeleteTimeOut() time.Duration {
-	return time.Duration(Config.AUTO_DELETE_TIMEOUT) * time.Second
+	return time.Duration(Config.AutoDeleteTimeout) * time.Second
 }
 
 func GetGDriveParentId() string {
-	if Config.GDRIVE_PARENT_ID == "" {
+	if Config.GdriveParentId == "" {
 		return "root"
 	}
-	return Config.GDRIVE_PARENT_ID
+	return Config.GdriveParentId
+}
+
+func GetTorrentClientHTTPUserAgent() string {
+	if Config.TorrentClientHTTPUserAgent == "" {
+		return "qBittorrent/4.3.8"
+	}
+	return Config.TorrentClientHTTPUserAgent
 }
 
 func GetHttpUserAgent() string {
@@ -190,15 +277,15 @@ func GetHttpUserAgent() string {
 }
 
 func IsTeamDrive() bool {
-	return Config.IS_TEAM_DRIVE
+	return Config.IsTeamDrive
 }
 
 func GetStatusUpdateInterval() time.Duration {
-	return time.Duration(Config.STATUS_UPDATE_INTERVAL) * time.Second
+	return time.Duration(Config.StatusUpdateInterval) * time.Second
 }
 
 func GetDbUri() string {
-	return Config.DB_URI
+	return Config.DbUri
 }
 
 func GetHumanBytes(b int64) string {
@@ -227,8 +314,8 @@ func RemoveByPath(pth string) error {
 	return os.RemoveAll(pth)
 }
 
-func GetFileContentTypePath(file_path string) (string, error) {
-	file, err := os.Open(file_path)
+func GetFileContentTypePath(filePath string) (string, error) {
+	file, err := os.Open(filePath)
 	if err != nil {
 		return "", err
 	}
@@ -363,9 +450,9 @@ func GetProgressBarString(current, total int) string {
 	cPart = p%8 - 1
 	outStr += strings.Repeat(pStr, cFull)
 	if cPart >= 0 {
-		outStr += PROGRESS_INCOMPLETE[cPart]
+		outStr += ProgressIncomplete[cPart]
 	}
-	outStr += strings.Repeat(sStr, PROGRESS_MAX_SIZE-cFull)
+	outStr += strings.Repeat(sStr, ProgressMaxSize-cFull)
 	return fmt.Sprintf("[%s]", outStr)
 }
 
@@ -407,15 +494,6 @@ func FormatTGFileLink(sub string, token string) string {
 	return fmt.Sprintf("https://api.telegram.org/file/bot%s/%s", token, sub)
 }
 
-func ExitCleanup() {
-	killSignal := make(chan os.Signal, 1)
-	signal.Notify(killSignal, os.Interrupt)
-	<-killSignal
-	log.Println("Exit Cleanup")
-	RemoveByPath(GetDownloadDir())
-	os.Exit(1)
-}
-
 func ParseStringToInt64(str string) int64 {
 	if n, err := strconv.Atoi(str); err == nil {
 		return int64(n)
@@ -449,7 +527,7 @@ func ParseInterfaceToInt64(i interface{}) int64 {
 }
 
 func GetFileIdByGDriveLink(link string) string {
-	match := regexp.MustCompile(DRIVE_LINK_REGEX)
+	match := regexp.MustCompile(DriveLinkRegex)
 	matches := match.FindStringSubmatch(link)
 	if len(matches) >= 2 {
 		return matches[len(matches)-2]
@@ -502,7 +580,12 @@ func GetLinksFromTextFileLink(url string) ([]string, error) {
 	if err != nil {
 		return links, err
 	}
-	defer res.Body.Close()
+	defer func(Body io.ReadCloser) {
+		err := Body.Close()
+		if err != nil {
+			log.Printf("GetLinksFromTextFileLink: Error while closing response handle: %s : %v", url, err)
+		}
+	}(res.Body)
 	cnt, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		return links, err
@@ -533,14 +616,14 @@ func IsMegaFolderLink(link string) bool {
 
 func MegaLinkToFolderId(link string) (string, string) {
 	data := strings.Split(link, "#")
-	var folderid string
-	var folderkey string
+	var folderId string
+	var folderKey string
 	if len(data) > 1 {
-		folderkey = data[1]
+		folderKey = data[1]
 	}
 	dt := strings.Split(data[0], "/")
-	folderid = dt[len(dt)-1]
-	return folderid, folderkey
+	folderId = dt[len(dt)-1]
+	return folderId, folderKey
 }
 
 func IsMegaLink(link string) bool {

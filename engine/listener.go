@@ -51,7 +51,7 @@ func (m *MirrorListener) OnDownloadComplete() {
 	dl := m.GetDownload()
 	name := dl.Name()
 	size := dl.TotalLength()
-	path := dl.Path()
+	p := dl.Path()
 	L().Infof("[DownloadComplete]: %s (%d)", name, size)
 	if m.isSeed {
 		MoveMirrorToSeeding(m.GetUid(), m.GetDownload())
@@ -62,40 +62,35 @@ func (m *MirrorListener) OnDownloadComplete() {
 		tarStatus.Index_ = dl.Index()
 		AddMirrorLocal(m.GetUid(), tarStatus)
 		var err error
-		path, err = archiver.TarPath(path)
+		p, err = archiver.TarPath(p)
 		if err != nil {
-			L().Errorf("Failed to archive the contents, uploading as it is: %s: %v", path, err)
+			L().Errorf("Failed to archive the contents, uploading as it is: %s: %v", p, err)
 			SendMessage(m.bot, fmt.Sprintf("Failed to archive the contents, uploading as it is: %s\nERR: %s\nGid: <code>%s</code>", dl.Name(), err.Error(), dl.Gid()), m.Update.Message)
 		}
 	}
 	if m.doUnArchive {
 		unarchiver := NewUnArchiver()
-		totalSize, err := unarchiver.CalculateTotalSize(path)
+		totalSize, err := unarchiver.CalculateTotalSize(p)
 		if err != nil {
-			L().Errorf("Failed to get archive contents size, uploading as it is: %s: %v", path, err)
+			L().Errorf("Failed to get archive contents size, uploading as it is: %s: %v", p, err)
 			SendMessage(m.bot, fmt.Sprintf("Failed to get archive contents size, uploading as it is: %s\nERR: %s\nGid: <code>%s</code>", dl.Name(), err.Error(), dl.Gid()), m.Update.Message)
 		} else {
 			unarchiver.SetTotal(totalSize)
 			unArchiverStatus := NewUnArchiverStatus(dl.Gid(), dl.Name(), nil, unarchiver)
 			unArchiverStatus.Index_ = dl.Index()
 			AddMirrorLocal(m.GetUid(), unArchiverStatus)
-			path, err = unarchiver.UnArchivePath(path)
+			p, err = unarchiver.UnArchivePath(p)
 			if err != nil {
-				L().Errorf("Failed to unarchive the contents, uploading as it is: %s: %v", path, err)
+				L().Errorf("Failed to unarchive the contents, uploading as it is: %s: %v", p, err)
 				SendMessage(m.bot, fmt.Sprintf("Failed to unarchive the contents, uploading as it is: %s\nERR: %s\nGid: <code>%s</code>", dl.Name(), err.Error(), dl.Gid()), m.Update.Message)
+			} else {
+				size = totalSize
 			}
 		}
 	}
-	drive := NewGDriveClient(size, dl.GetListener())
-	drive.Init("")
-	drive.Authorize()
-	driveStatus := NewGoogleDriveStatus(drive, utils.GetFileBaseName(path), dl.Gid())
-	driveStatus.Index_ = dl.Index()
-	AddMirrorLocal(m.GetUid(), driveStatus)
-	UpdateAllMessages(m.bot)
 	var parentId string
 	if m.parentId != "" {
-		_, err := drive.GetFileMetadata(m.parentId, 1)
+		_, err := transferServiceClient.GetFileMetadata(m.parentId)
 		if err != nil {
 			L().Warn("Error while checking for user supplied parentId so uploading to main parentId: ", err)
 			parentId = utils.GetGDriveParentId()
@@ -106,8 +101,23 @@ func (m *MirrorListener) OnDownloadComplete() {
 	} else {
 		parentId = utils.GetGDriveParentId()
 	}
-	upload_limit_chan <- 1
-	drive.Upload(path, parentId)
+	trGid, err := transferServiceClient.AddUpload(&UploadRequest{
+		Path:        p,
+		ParentId:    parentId,
+		Concurrency: 10,
+		Size:        size,
+	})
+	if err != nil {
+		L().Error(err)
+		m.OnUploadError(err.Error())
+	} else {
+		trListener := NewGoogleDriveTransferListener(m, nil, false, trGid)
+		driveStatus := NewGoogleDriveTransferStatus(trGid, p, dl.GetListener(), nil)
+		driveStatus.Index_ = dl.Index()
+		AddMirrorLocal(m.GetUid(), driveStatus)
+		trListener.StartListener()
+		UpdateAllMessages(m.bot)
+	}
 }
 
 func (m *MirrorListener) OnDownloadError(err string) {
@@ -153,16 +163,16 @@ func (m *MirrorListener) OnUploadComplete(link string) {
 	L().Infof("[UploadComplete]: %s (%d)", name, size)
 	link = strings.ReplaceAll(link, "'", "")
 	msg := fmt.Sprintf("<a href='%s'>%s</a> (%s)", link, dl.Name(), utils.GetHumanBytes(dl.TotalLength()))
-	in_url := utils.GetIndexUrl()
-	if in_url != "" {
+	inUrl := utils.GetIndexUrl()
+	if inUrl != "" {
 		if m.customParentId {
 			msg += "\n\nShareable Link: Mirror belongs to a custom parentId"
 		} else {
-			in_url = fmt.Sprintf("%s/%s", in_url, name)
+			inUrl = fmt.Sprintf("%s/%s", inUrl, name)
 			if utils.IsPathDir(dl.Path()) {
-				in_url += "/"
+				inUrl += "/"
 			}
-			msg += fmt.Sprintf("\n\nShareable Link: <a href='%s'>here</a>", in_url)
+			msg += fmt.Sprintf("\n\nShareable Link: <a href='%s'>here</a>", inUrl)
 		}
 	}
 	if m.isSeed {
@@ -200,7 +210,11 @@ func (m *MirrorListener) OnSeedingError(err error) {
 }
 
 func (m *MirrorListener) CleanDownload() {
-	utils.RemoveByPath(path.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(m.GetUid())))
+	err := utils.RemoveByPath(path.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(m.GetUid())))
+	if err != nil {
+		L().Errorf("MirrorListener: CleanDownload: RemoveByPath: %v", err)
+		return
+	}
 }
 
 func NewMirrorListener(b *gotgbot.Bot, update *ext.Context, isTar bool, doUnArchive bool, parentId string) MirrorListener {
@@ -249,27 +263,23 @@ func (m *CloneListener) OnCloneError(err string) {
 	m.Clean()
 	msg := "Your clone has been stopped due to: %s"
 	SendMessage(m.bot, fmt.Sprintf(msg, err), m.Update.Message)
-
 }
 
-func (m *CloneListener) OnCloneComplete(link string, is_dir bool) {
+func (m *CloneListener) OnCloneComplete(link string) {
 	dl := m.GetDownload()
 	name := dl.Name()
 	size := dl.TotalLength()
 	L().Infof("[CloneComplete]: %s (%d)", name, size)
 	link = strings.ReplaceAll(link, "'", "")
-	msg := fmt.Sprintf("<a href='%s'>%s</a> (%s)", link, dl.Name(), utils.GetHumanBytes(dl.TotalLength()))
-	in_url := utils.GetIndexUrl()
-	if in_url != "" {
-		in_url = in_url + "/" + name
-		if is_dir {
-			in_url += "/"
-		}
-		msg += fmt.Sprintf("\n\n Shareable Link: <a href='%s'>here</a>", in_url)
+	name = strings.ReplaceAll(dl.Name(), "'", "")
+	msg := fmt.Sprintf("<a href='%s'>%s</a> (%s)", link, name, utils.GetHumanBytes(dl.CompletedLength()))
+	inUrl := utils.GetIndexUrl()
+	if inUrl != "" {
+		inUrl = inUrl + "/" + name
+		msg += fmt.Sprintf("\n\nShareable Link: <a href='%s'>here</a>", inUrl)
 	}
 	m.Clean()
 	SendMessage(m.bot, msg, m.Update.Message)
-
 }
 
 func NewCloneListener(b *gotgbot.Bot, update *ext.Context, parentId string) CloneListener {

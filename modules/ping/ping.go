@@ -18,13 +18,13 @@ func PingHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 		return nil
 	}
 	startTime := time.Now()
-	message, err := engine.SendMessage(b, "Starting ping", ctx.EffectiveMessage)
-	if err != nil {
-		engine.L().Error(err)
+	message := engine.SendMessage(b, "Starting ping", ctx.EffectiveMessage)
+	if message == nil {
+		return nil
 	}
 	endTime := time.Now()
 	elapsed := int(math.Round(float64(endTime.Sub(startTime).Milliseconds())))
-	_, _ = engine.EditMessage(b, fmt.Sprintf("Pong %d ms", elapsed), message)
+	engine.EditMessage(b, fmt.Sprintf("Pong %d ms", elapsed), message)
 	return nil
 }
 
