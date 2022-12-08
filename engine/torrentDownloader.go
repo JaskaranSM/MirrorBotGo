@@ -3,6 +3,7 @@ package engine
 import (
 	"MirrorBotGo/utils"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -78,11 +79,11 @@ func (a *AnacrolixTorrentDownloadListener) OnMetadataDownloadComplete() {
 	a.StartSeedingSpeedObserver()
 }
 
-func (a *AnacrolixTorrentDownloadListener) OnDownloadStop() {
-	L().Infof("[ALXTorrent]: OnDownloadStop: %s", a.torrentHandle.Name())
+func (a *AnacrolixTorrentDownloadListener) OnDownloadStop(err error) {
+	L().Infof("[ALXTorrent]: OnDownloadStop: %s | %v", a.torrentHandle.Name(), err)
 	a.StopSeedingSpeedObserver()
 	a.StopListener()
-	a.listener.OnDownloadError("Canceled by user.")
+	a.listener.OnDownloadError(err.Error())
 }
 
 func (a *AnacrolixTorrentDownloadListener) OnSeedingStart() {
@@ -112,7 +113,7 @@ func (a *AnacrolixTorrentDownloadListener) ListenForEvents() {
 			if a.IsSeeding {
 				a.OnSeedingError()
 			} else {
-				a.OnDownloadStop()
+				a.OnDownloadStop(errors.New("cancelled by user"))
 			}
 		case <-a.torrentHandle.Complete.On():
 			if !a.IsComplete {
@@ -232,6 +233,11 @@ func (a *AnacrolixTorrentDownloader) AddDownload(link string, listener *MirrorLi
 	listener.isTorrent = true
 	listener.isSeed = isSeed
 	anacrolixListener := NewAnacrolixTorrentDownloadListener(t, listener, isSeed)
+	t.SetOnWriteChunkError(func(err error) {
+		t.Drop()
+		L().Errorf("[ALXTorrent]: OnWriteChunkError: %v", err)
+		anacrolixListener.OnDownloadStop(err)
+	})
 	anacrolixListener.StartListener()
 	gid := utils.RandString(16)
 	status := NewAnacrolixTorrentDownloadStatus(gid, listener, anacrolixListener, t)
