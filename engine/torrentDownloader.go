@@ -13,6 +13,7 @@ import (
 	"github.com/anacrolix/torrent"
 	"github.com/anacrolix/torrent/metainfo"
 	"github.com/anacrolix/torrent/storage"
+	"golang.org/x/time/rate"
 )
 
 var anacrolixClient *torrent.Client = getAnacrolixTorrentClient(utils.GetSeed())
@@ -24,8 +25,19 @@ func GetAnacrolixTorrentClientStatus() bytes.Buffer {
 	return buffer
 }
 
+func setupRateLimiters(config *torrent.ClientConfig) {
+	uploadRate, err := utils.GetTorrentClientMaxUploadRate()
+	if err != nil {
+		L().Errorf("failed to get torrent client max upload rate: %v", err)
+		return
+	}
+	L().Infof("[ALXTorrent]: setting max upload rate to: %s | %d", utils.GetHumanBytes(int64(uploadRate)), uploadRate)
+	config.UploadRateLimiter = rate.NewLimiter(rate.Limit(uploadRate), 256<<10)
+}
+
 func getAnacrolixTorrentClient(seed bool) *torrent.Client {
 	config := torrent.NewDefaultClientConfig()
+	setupRateLimiters(config)
 	config.EstablishedConnsPerTorrent = utils.GetTorrentClientEstablishedConnsPerTorrent()
 	config.HTTPUserAgent = utils.GetTorrentClientHTTPUserAgent()
 	config.Bep20 = utils.GetTorrentClientBep20()
@@ -217,7 +229,7 @@ func (a *AnacrolixTorrentDownloader) AddDownload(link string, listener *MirrorLi
 			if err != nil {
 				L().Errorf("[ALXTorrent]: AddDownload: os.RemoveAll (torrent already present in client): %s, %v", link, err)
 			}
-			return fmt.Errorf("Infohash %s is already registered in the client", tor.InfoHash().HexString())
+			return fmt.Errorf("infohash %s is already registered in the client", tor.InfoHash().HexString())
 		}
 	}
 	t, _, err := anacrolixClient.AddTorrentSpec(spec)

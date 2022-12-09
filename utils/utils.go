@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/dustin/go-humanize"
 	"io"
 	"io/ioutil"
 	"log"
@@ -76,6 +77,7 @@ type ConfigJson struct {
 	TorrentClientHTTPUserAgent                  string  `json:"torrent_client_http_user_agent"`
 	TorrentClientBep20                          string  `json:"torrent_client_bep_20"`
 	TorrentClientUpnpID                         string  `json:"torrent_client_upnp_id"`
+	TorrentClientMaxUploadRate                  string  `json:"torrent_client_max_upload_rate"`
 	TorrentClientMinDialTimeout                 int     `json:"torrent_client_min_dial_timeout"`
 	TorrentClientEstablishedConnsPerTorrent     int     `json:"torrent_client_established_conns_per_torrent"`
 	TorrentClientExtendedHandshakeClientVersion string  `json:"torrent_client_extended_handshake_client_version"`
@@ -193,6 +195,10 @@ func GetTorrentClientEstablishedConnsPerTorrent() int {
 		return 100
 	}
 	return Config.TorrentClientEstablishedConnsPerTorrent
+}
+
+func GetTorrentClientMaxUploadRate() (uint64, error) {
+	return humanize.ParseBytes(Config.TorrentClientMaxUploadRate)
 }
 
 func GetStatusMessagesPerPage() int {
