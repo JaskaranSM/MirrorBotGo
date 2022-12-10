@@ -221,14 +221,14 @@ func SeedTorrentHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, false, true, true)
+	return Mirror(b, ctx, false, false, true, utils.GetSeed())
 }
 
 func SilentSeedTorrentHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, false, false, true)
+	return Mirror(b, ctx, false, false, false, utils.GetSeed())
 }
 
 func LoadMirrorHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
