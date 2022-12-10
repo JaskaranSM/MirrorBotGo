@@ -156,6 +156,9 @@ func (m *MegaSDKRestClient) AddDl(link string, dir string) (*MegaSDKRestAddDl, e
 	if adddl.Adddl == "failed" {
 		return adddl, errors.New(adddl.Message)
 	}
+	if adddl.Gid == "" {
+		return nil, errors.New("internal error occurred")
+	}
 	return adddl, nil
 }
 
@@ -261,6 +264,11 @@ func NewMegaDownload(link string, listener *MirrorListener) error {
 			if err != nil {
 				state = MegaSDKRestStateFailed
 				do = false
+			}
+			if dlinfo == nil {
+				L().Errorf("critical mega error: %v", err)
+				do = false
+				return
 			}
 			dl := GetMirrorByGid(dlinfo.Gid)
 			if dl != nil {
