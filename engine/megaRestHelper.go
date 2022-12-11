@@ -298,7 +298,7 @@ type MegaDownloadStatus struct {
 func (m *MegaDownloadStatus) GetStats() *MegaSDKRestDownloadInfo {
 	dlinfo, err := megaClient.GetDownloadInfo(m.Gid())
 	if err != nil {
-		L().Errorf("MegaDownloadSTatus: %s", err.Error())
+		L().Errorf("MegaDownloadStatus: %s", err.Error())
 	}
 	if dlinfo == nil {
 		dlinfo = &MegaSDKRestDownloadInfo{}
