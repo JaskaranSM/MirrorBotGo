@@ -5,6 +5,7 @@ import (
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
 	"fmt"
+	"strconv"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
@@ -66,8 +67,30 @@ func CancelAllMirrorsHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	return nil
 }
 
+func CancelMirrorByIDHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
+		return nil
+	}
+	message := ctx.EffectiveMessage
+	id := utils.ParseMessageArgs(message.Text)
+	idInt, err := strconv.Atoi(id)
+	if err != nil {
+		engine.SendMessage(b, err.Error(), message)
+		return nil
+	}
+	dl := engine.GetMirrorByIndex(idInt)
+	if dl == nil {
+		engine.SendMessage(b, "mirror doesnt exist with that ID", message)
+		return nil
+	}
+	dl.CancelMirror()
+	engine.SendMessage(b, fmt.Sprintf("CancelMirror() called on <code>%s</code>", dl.Name()), message)
+	return nil
+}
+
 func LoadCancelMirrorHandler(updater *ext.Updater, l *zap.SugaredLogger) {
 	defer l.Info("CancelMirror Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("cancel", CancelMirrorHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("cancelall", CancelAllMirrorsHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("cid", CancelMirrorByIDHandler))
 }

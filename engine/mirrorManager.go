@@ -68,6 +68,15 @@ func GetMirrorByUid(uid int64) MirrorStatus {
 	return nil
 }
 
+func GetMirrorByIndex(index int) MirrorStatus {
+	for _, dl := range AllMirrors {
+		if dl.Index() == index {
+			return dl
+		}
+	}
+	return nil
+}
+
 func GetSeedingMirrorByUid(uid int64) MirrorStatus {
 	for i, dl := range SeedingMirrors {
 		if i == uid {

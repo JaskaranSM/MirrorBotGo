@@ -175,7 +175,8 @@ func GetReadableProgressMessage(page int) string {
 			msg += fmt.Sprintf("%s of ", utils.GetHumanBytes(dl.CompletedLength()))
 			msg += fmt.Sprintf("%s at ", utils.GetHumanBytes(dl.TotalLength()))
 			msg += fmt.Sprintf("%s/s, ", utils.GetHumanBytes(int64(dl.Speed())))
-			msg += fmt.Sprintf("\nGID: <code>%s</code>", dls[i].Gid())
+			msg += fmt.Sprintf("\nGID: <code>%s</code> ", dls[i].Gid())
+			msg += fmt.Sprintf("I: <code>%d</code>", dls[i].Index())
 			msg += "\n\n"
 			continue
 		}
@@ -196,7 +197,8 @@ func GetReadableProgressMessage(page int) string {
 			if dl.IsTorrent() {
 				msg += fmt.Sprintf(" | P: %d | S: %d", dl.GetPeers(), dl.GetSeeders())
 			}
-			msg += fmt.Sprintf("\nGID: <code>%s</code>", dls[i].Gid())
+			msg += fmt.Sprintf("\nGID: <code>%s</code> ", dls[i].Gid())
+			msg += fmt.Sprintf("I: <code>%d</code>", dls[i].Index())
 
 		}
 		msg += "\n\n"
