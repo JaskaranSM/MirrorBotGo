@@ -347,7 +347,7 @@ func NewMegaDownload(link string, listener *MirrorListener) error {
 		L().Errorf("NewMegaDownload: os.MkdirAll: %s : %v", dir, err)
 		return err
 	}
-	adddl, err := megaClient.AddDownload(link, utils.GetDownloadDir())
+	adddl, err := megaClient.AddDownload(link, dir)
 	if err != nil {
 		return err
 	}
