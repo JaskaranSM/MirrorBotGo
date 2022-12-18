@@ -3,16 +3,13 @@ package engine
 import (
 	"MirrorBotGo/utils"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path"
-	"strings"
 	"sync"
 	"time"
 )
@@ -27,41 +24,35 @@ const (
 	MegaSDKRestStateCompleted  = 6
 	MegaSDKRestStateCancelled  = 7
 	MegaSDKRestStateFailed     = 8
+
+	MegaNoError         = 0
+	MegaInfoNotProvided = 401
+	MegaNotFound        = 404
 )
 
 var megaLoggedIn bool = false
 
-type MegaSDKRestLogin struct {
-	Login   string `json:"login"`
-	Message string `json:"message"`
+type MegaSDKRestResp struct {
+	Gid         string `json:"gid"`
+	ErrorCode   int    `json:"error_code"`
+	ErrorString string `json:"error_string"`
 }
 
-func (m *MegaSDKRestLogin) Unmarshal(data []byte) error {
-	return json.Unmarshal(data, m)
-}
-
-type MegaSDKRestAddDl struct {
-	Adddl   string `json:"adddl"`
-	Message string `json:"message"`
-	Gid     string `json:"gid"`
-	Dir     string `json:"dir"`
-}
-
-func (m *MegaSDKRestAddDl) Unmarshal(data []byte) error {
+func (m *MegaSDKRestResp) Unmarshal(data []byte) error {
 	return json.Unmarshal(data, m)
 }
 
 type MegaSDKRestDownloadInfo struct {
-	Dlinfo          string `json:"dlinfo"`
-	Message         string `json:"message"`
-	Name            string `json:"name"`
 	ErrorCode       int    `json:"error_code"`
 	ErrorString     string `json:"error_string"`
-	Gid             string `json:"gid"`
+	Name            string `json:"name"`
 	Speed           int64  `json:"speed"`
 	CompletedLength int64  `json:"completed_length"`
 	TotalLength     int64  `json:"total_length"`
 	State           int    `json:"state"`
+	IsCompleted     bool   `json:"is_completed"`
+	IsFailed        bool   `json:"is_failed"`
+	IsCancelled     bool   `json:"is_cancelled"`
 }
 
 func (m *MegaSDKRestDownloadInfo) Unmarshal(data []byte) error {
@@ -79,10 +70,18 @@ type MegaSDKRestClient struct {
 	mut    sync.Mutex
 }
 
-func (m *MegaSDKRestClient) checkAndRaiseError(resData []byte) error {
-	if strings.Contains(string(resData), "failed") {
-		L().Errorf("MegaSDKRest: %s", string(resData))
-		return errors.New("internal error occured")
+func (m *MegaSDKRestClient) checkAndRaiseError(errorCode int, errorString string) error {
+	if errorCode == MegaNoError {
+		return nil
+	}
+	if errorString != "" {
+		return fmt.Errorf("MegaSDKRestpp: %s : %d", errorString, errorCode)
+	}
+	if errorCode == MegaInfoNotProvided {
+		return fmt.Errorf("MegaSdkRestpp: info not provided properly: %s %d", errorString, errorCode)
+	}
+	if errorCode == MegaNotFound {
+		return fmt.Errorf("MegaSdkRestpp: not found: %s %d", errorString, errorCode)
 	}
 	return nil
 }
@@ -98,7 +97,7 @@ func (m *MegaSDKRestClient) checkLogin() {
 	megaLoggedIn = true
 }
 
-func (m *MegaSDKRestClient) Login(email string, password string) (*MegaSDKRestLogin, error) {
+func (m *MegaSDKRestClient) Login(email string, password string) (*MegaSDKRestResp, error) {
 	res, err := http.PostForm(m.apiURL+"/login", url.Values{
 		"email":    []string{email},
 		"password": []string{password},
@@ -116,22 +115,19 @@ func (m *MegaSDKRestClient) Login(email string, password string) (*MegaSDKRestLo
 	if err != nil {
 		return nil, err
 	}
-	var login *MegaSDKRestLogin = &MegaSDKRestLogin{}
+	var login *MegaSDKRestResp = &MegaSDKRestResp{}
 	err = login.Unmarshal(resData)
 	if err != nil {
 		return nil, err
 	}
-	if login.Login == "failed" {
-		return login, errors.New(login.Message)
-	}
-	return login, nil
+	return login, m.checkAndRaiseError(login.ErrorCode, login.ErrorString)
 }
 
-func (m *MegaSDKRestClient) AddDl(link string, dir string) (*MegaSDKRestAddDl, error) {
+func (m *MegaSDKRestClient) AddDownload(link string, dir string) (*MegaSDKRestResp, error) {
 	m.mut.Lock()
 	defer m.mut.Unlock()
 	m.checkLogin()
-	res, err := http.PostForm(m.apiURL+"/adddl", url.Values{
+	res, err := http.PostForm(m.apiURL+"/adddownload", url.Values{
 		"link": []string{link},
 		"dir":  []string{dir},
 	})
@@ -148,24 +144,18 @@ func (m *MegaSDKRestClient) AddDl(link string, dir string) (*MegaSDKRestAddDl, e
 	if err != nil {
 		return nil, err
 	}
-	var adddl *MegaSDKRestAddDl = &MegaSDKRestAddDl{}
+	var adddl *MegaSDKRestResp = &MegaSDKRestResp{}
 	err = adddl.Unmarshal(resData)
 	if err != nil {
 		return nil, err
 	}
-	if adddl.Adddl == "failed" {
-		return adddl, errors.New(adddl.Message)
-	}
-	if adddl.Gid == "" {
-		return nil, errors.New("internal error occurred")
-	}
-	return adddl, nil
+	return adddl, m.checkAndRaiseError(adddl.ErrorCode, adddl.ErrorString)
 }
 
-func (m *MegaSDKRestClient) CancelDl(gid string) error {
+func (m *MegaSDKRestClient) CancelDownload(gid string) error {
 	m.mut.Lock()
 	defer m.mut.Unlock()
-	res, err := http.PostForm(m.apiURL+"/canceldl", url.Values{
+	res, err := http.PostForm(m.apiURL+"/canceldownload", url.Values{
 		"gid": []string{gid},
 	})
 	if err != nil {
@@ -181,13 +171,20 @@ func (m *MegaSDKRestClient) CancelDl(gid string) error {
 	if err != nil {
 		return err
 	}
-	return m.checkAndRaiseError(resData)
+	var cancel *MegaSDKRestResp = &MegaSDKRestResp{}
+	err = cancel.Unmarshal(resData)
+	if err != nil {
+		return err
+	}
+	return m.checkAndRaiseError(cancel.ErrorCode, cancel.ErrorString)
 }
 
 func (m *MegaSDKRestClient) GetDownloadInfo(gid string) (*MegaSDKRestDownloadInfo, error) {
 	m.mut.Lock()
 	defer m.mut.Unlock()
-	res, err := http.Get(m.apiURL + fmt.Sprintf("/dlinfo/%s", gid))
+	res, err := http.PostForm(m.apiURL+"/getstatus", url.Values{
+		"gid": []string{gid},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -201,19 +198,15 @@ func (m *MegaSDKRestClient) GetDownloadInfo(gid string) (*MegaSDKRestDownloadInf
 	if err != nil {
 		return nil, err
 	}
-	err = m.checkAndRaiseError(resData)
-	if err != nil {
-		return nil, err
-	}
 	var downloadInfo *MegaSDKRestDownloadInfo = &MegaSDKRestDownloadInfo{}
 	err = downloadInfo.Unmarshal(resData)
 	if err != nil {
 		return nil, err
 	}
-	return downloadInfo, nil
+	return downloadInfo, m.checkAndRaiseError(downloadInfo.ErrorCode, downloadInfo.ErrorString)
 }
 
-var megaClient *MegaSDKRestClient = NewMegaSDKRestClient("http://localhost:6090")
+var megaClient *MegaSDKRestClient = NewMegaSDKRestClient("http://localhost:8069")
 
 func PerformMegaLogin() error {
 	_, err := megaClient.Login(utils.GetMegaEmail(), utils.GetMegaPassword())
@@ -223,8 +216,58 @@ func PerformMegaLogin() error {
 	return err
 }
 
-func init() {
-	StartMegaSDKRestServer(utils.GetMegaAPIKey())
+func NewMegaDownloadListener(gid string, listener *MirrorListener) *MegaDownloadListener {
+	return &MegaDownloadListener{
+		gid:               gid,
+		listener:          listener,
+		isListenerRunning: false,
+	}
+}
+
+type MegaDownloadListener struct {
+	gid               string
+	listener          *MirrorListener
+	isListenerRunning bool
+}
+
+func (m *MegaDownloadListener) StartListener() {
+	m.isListenerRunning = true
+	go m.ListenForEvents()
+}
+
+func (m *MegaDownloadListener) StopListener() {
+	m.isListenerRunning = false
+}
+
+func (m *MegaDownloadListener) OnDownloadError(err error) {
+	m.StopListener()
+	m.listener.OnDownloadError(err.Error())
+}
+
+func (m *MegaDownloadListener) OnDownloadComplete() {
+	m.StopListener()
+	m.listener.OnDownloadComplete()
+}
+
+func (m *MegaDownloadListener) ListenForEvents() {
+	for m.isListenerRunning {
+		status, err := megaClient.GetDownloadInfo(m.gid)
+		if err != nil {
+			m.OnDownloadError(err)
+			continue
+		}
+		if status.IsFailed {
+			m.OnDownloadError(fmt.Errorf("%s", status.ErrorString))
+			continue
+		} else if status.IsCancelled {
+			m.OnDownloadError(fmt.Errorf("cancelled by user"))
+			continue
+		} else if status.IsCompleted {
+			m.OnDownloadComplete()
+			continue
+		}
+		time.Sleep(1 * time.Second)
+	}
 }
 
 func NewMegaDownload(link string, listener *MirrorListener) error {
@@ -234,54 +277,15 @@ func NewMegaDownload(link string, listener *MirrorListener) error {
 		L().Errorf("NewMegaDownload: os.MkdirAll: %s : %v", dir, err)
 		return err
 	}
-	adddl, err := megaClient.AddDl(link, dir)
+	adddl, err := megaClient.AddDownload(link, dir)
 	if err != nil {
 		return err
 	}
-	go func() {
-		state := MegaSDKRestStateActive
-		do := true
-		for do {
-			switch state {
-			case MegaSDKRestStateFailed:
-				do = false
-			case MegaSDKRestStateCancelled:
-				do = false
-			case MegaSDKRestStateCompleted:
-				do = false
-			}
-			dlinfo, err := megaClient.GetDownloadInfo(adddl.Gid)
-			if err != nil {
-				state = MegaSDKRestStateFailed
-				do = false
-				continue
-			}
-			state = dlinfo.State
-			time.Sleep(500 * time.Millisecond)
-		}
-		if state == MegaSDKRestStateFailed || state == MegaSDKRestStateCancelled {
-			dlinfo, err := megaClient.GetDownloadInfo(adddl.Gid)
-			if err != nil {
-				state = MegaSDKRestStateFailed
-				do = false
-			}
-			if dlinfo == nil {
-				L().Errorf("critical mega error: %v", err)
-				do = false
-				return
-			}
-			dl := GetMirrorByGid(dlinfo.Gid)
-			if dl != nil {
-				if state == MegaSDKRestStateCancelled {
-					dl.GetListener().OnDownloadError("Canceled by user")
-				} else {
-					dl.GetListener().OnDownloadError(dlinfo.ErrorString)
-				}
-				return
-			}
-		}
-		listener.OnDownloadComplete()
-	}()
+	if adddl.Gid == "" {
+		return fmt.Errorf("MegaSDKRestpp: internal error occured")
+	}
+	megaDownloadListener := NewMegaDownloadListener(adddl.Gid, listener)
+	megaDownloadListener.StartListener()
 	status := NewMegaDownloadStatus(adddl.Gid, listener)
 	status.Index_ = GenerateMirrorIndex()
 	AddMirrorLocal(listener.GetUid(), status)
@@ -382,7 +386,7 @@ func (m *MegaDownloadStatus) GetCloneListener() *CloneListener {
 }
 
 func (m *MegaDownloadStatus) CancelMirror() bool {
-	err := megaClient.CancelDl(m.Gid())
+	err := megaClient.CancelDownload(m.Gid())
 	if err != nil {
 		L().Errorf("MegaDownloadStatus: CancelMirror: %s: %s: %v", m.Name(), m.Gid(), err)
 		return false
@@ -398,15 +402,5 @@ func NewMegaDownloadStatus(gid string, listener *MirrorListener) *MegaDownloadSt
 	return &MegaDownloadStatus{
 		gid:      gid,
 		listener: listener,
-	}
-}
-
-func StartMegaSDKRestServer(apiKey string) {
-	cmd := exec.Command("megasdkrest", "--apikey", apiKey)
-	err := cmd.Start()
-	if err != nil {
-		L().Errorf("MegaSDKRest: %s", err.Error())
-	} else {
-		L().Info("MegaSDKRest: server started")
 	}
 }
