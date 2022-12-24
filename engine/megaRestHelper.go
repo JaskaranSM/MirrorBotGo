@@ -262,7 +262,7 @@ func (m *MegaSDKRestClient) GetDownloadInfo(gid string) (*MegaSDKRestDownloadInf
 	return downloadInfo, m.checkAndRaiseError(downloadInfo.ErrorCode, downloadInfo.ErrorString)
 }
 
-var megaClient *MegaSDKRestClient = NewMegaSDKRestClient("http://localhost:5000", http.DefaultClient)
+var megaClient *MegaSDKRestClient = NewMegaSDKRestClient(utils.GetMegaSDKRestServiceURL(), http.DefaultClient)
 
 func PerformMegaLogin() error {
 	_, err := megaClient.Login(utils.GetMegaEmail(), utils.GetMegaPassword())

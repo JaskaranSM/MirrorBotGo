@@ -65,6 +65,7 @@ type ConfigJson struct {
 	MegaEmail                                   string  `json:"mega_email"`
 	MegaPassword                                string  `json:"mega_password"`
 	MegaAPIKey                                  string  `json:"mega_api_key"`
+	MegaSDKRestServiceURL                       string  `json:"mega_sdk_rest_service_url"`
 	StatusMessagesPerPage                       int     `json:"status_messages_per_page"`
 	EncryptionPassword                          string  `json:"encryption_password"`
 	Seed                                        bool    `json:"seed"`
@@ -246,6 +247,13 @@ func IsUserSudo(userId int64) bool {
 
 func GetMegaAPIKey() string {
 	return Config.MegaAPIKey
+}
+
+func GetMegaSDKRestServiceURL() string {
+	if Config.MegaSDKRestServiceURL == "" {
+		return "http://localhost:8069"
+	}
+	return Config.MegaSDKRestServiceURL
 }
 
 func GetSeed() bool {
