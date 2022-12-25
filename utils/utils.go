@@ -82,6 +82,7 @@ type ConfigJson struct {
 	TorrentClientMinDialTimeout                 int     `json:"torrent_client_min_dial_timeout"`
 	TorrentClientEstablishedConnsPerTorrent     int     `json:"torrent_client_established_conns_per_torrent"`
 	TorrentClientExtendedHandshakeClientVersion string  `json:"torrent_client_extended_handshake_client_version"`
+	TorrentUseTrackerList                       bool    `json:"torrent_use_tracker_list"`
 }
 
 var Config *ConfigJson = InitConfig()
@@ -277,6 +278,10 @@ func GetGDriveParentId() string {
 		return "root"
 	}
 	return Config.GdriveParentId
+}
+
+func GetTorrentUseTrackerList() bool {
+	return Config.TorrentUseTrackerList
 }
 
 func GetTorrentClientHTTPUserAgent() string {

@@ -58,6 +58,23 @@ func getAnacrolixTorrentDownloader() *AnacrolixTorrentDownloader {
 	return &AnacrolixTorrentDownloader{}
 }
 
+func GetTrackersList() []string {
+	links, err := utils.GetLinksFromTextFileLink("https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_all.txt")
+	if err != nil {
+		L().Error(err)
+	}
+	return links
+}
+
+func checkTrackerInSpec(spec *torrent.TorrentSpec, tracker string) bool {
+	for _, tr := range spec.Trackers {
+		if tr[0] == tracker {
+			return true
+		}
+	}
+	return false
+}
+
 type AnacrolixTorrentDownloadListener struct {
 	torrentHandle     *torrent.Torrent
 	listener          *MirrorListener
@@ -230,6 +247,16 @@ func (a *AnacrolixTorrentDownloader) AddDownload(link string, listener *MirrorLi
 				L().Errorf("[ALXTorrent]: AddDownload: os.RemoveAll (torrent already present in client): %s, %v", link, err)
 			}
 			return fmt.Errorf("infohash %s is already registered in the client", tor.InfoHash().HexString())
+		}
+	}
+	if utils.GetTorrentUseTrackerList() {
+		newTrackers := GetTrackersList()
+		for _, tr := range newTrackers {
+			if !checkTrackerInSpec(spec, tr) {
+				spec.Trackers = append(spec.Trackers, []string{
+					tr,
+				})
+			}
 		}
 	}
 	t, _, err := anacrolixClient.AddTorrentSpec(spec)
