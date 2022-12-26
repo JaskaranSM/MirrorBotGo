@@ -59,7 +59,7 @@ func getAnacrolixTorrentDownloader() *AnacrolixTorrentDownloader {
 }
 
 func GetTrackersList() []string {
-	links, err := utils.GetLinksFromTextFileLink("https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_all.txt")
+	links, err := utils.GetLinksFromTextFileLink(utils.GetTorrentTrackerListURL())
 	if err != nil {
 		L().Error(err)
 	}

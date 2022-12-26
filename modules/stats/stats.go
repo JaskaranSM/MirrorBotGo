@@ -77,7 +77,7 @@ func StatsHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	message := ctx.EffectiveMessage
 	out := ""
 	uptime := time.Now().Sub(startTime)
-	diskStats := du.NewDiskUsage("/")
+	diskStats := du.NewDiskUsage(utils.GetDownloadDir())
 	out += fmt.Sprintf("BotUptime: %s\n", utils.HumanizeDuration(uptime))
 	out += fmt.Sprintf("MirrorsRunning: %d\n", engine.GetAllMirrorsCount())
 	out += fmt.Sprintf("Total: %s\n", utils.GetHumanBytes(int64(diskStats.Size())))

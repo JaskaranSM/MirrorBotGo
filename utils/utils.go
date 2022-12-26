@@ -83,6 +83,7 @@ type ConfigJson struct {
 	TorrentClientEstablishedConnsPerTorrent     int     `json:"torrent_client_established_conns_per_torrent"`
 	TorrentClientExtendedHandshakeClientVersion string  `json:"torrent_client_extended_handshake_client_version"`
 	TorrentUseTrackerList                       bool    `json:"torrent_use_tracker_list"`
+	TorrentTrackerListURL                       string  `json:"torrent_tracker_list_url"`
 }
 
 var Config *ConfigJson = InitConfig()
@@ -278,6 +279,13 @@ func GetGDriveParentId() string {
 		return "root"
 	}
 	return Config.GdriveParentId
+}
+
+func GetTorrentTrackerListURL() string {
+	if Config.TorrentTrackerListURL == "" {
+		return "https://raw.githubusercontent.com/ngosang/trackerslist/master/trackers_all.txt"
+	}
+	return Config.TorrentTrackerListURL
 }
 
 func GetTorrentUseTrackerList() bool {
@@ -613,7 +621,7 @@ func GetLinksFromTextFileLink(url string) ([]string, error) {
 	data := strings.Split(cntString, "\n")
 	for _, d := range data {
 		if d != "" {
-			links = append(links, d)
+			links = append(links, strings.TrimSpace(d))
 		}
 	}
 	return links, nil
