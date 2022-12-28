@@ -197,18 +197,19 @@ func NewAnacrolixTorrentDownloadListener(t *torrent.Torrent, listener *MirrorLis
 type AnacrolixTorrentDownloader struct {
 }
 
-func (a *AnacrolixTorrentDownloader) GetTorrentSpec(link string) (*torrent.TorrentSpec, error) {
+func (a *AnacrolixTorrentDownloader) GetTorrentSpec(link string) (*torrent.TorrentSpec, bool, error) {
 	var spec *torrent.TorrentSpec
+	var isPrivate bool
 	var err error
 	if utils.IsMagnetLink(link) {
 		spec, err = torrent.TorrentSpecFromMagnetUri(link)
 		if err != nil {
-			return spec, err
+			return spec, isPrivate, err
 		}
 	} else {
 		reader, err := utils.GetReaderHandleByUrl(link)
 		if err != nil {
-			return spec, err
+			return spec, isPrivate, err
 		}
 		defer func(reader io.ReadCloser) {
 			err := reader.Close()
@@ -218,19 +219,26 @@ func (a *AnacrolixTorrentDownloader) GetTorrentSpec(link string) (*torrent.Torre
 		}(reader)
 		meta, err := metainfo.Load(reader)
 		if err != nil {
-			return spec, err
+			return spec, isPrivate, err
+		}
+		info, err := meta.UnmarshalInfo()
+		if err != nil {
+			return spec, isPrivate, err
+		}
+		if info.Private != nil {
+			isPrivate = *info.Private
 		}
 		spec, err = torrent.TorrentSpecFromMetaInfoErr(meta)
 		if err != nil {
-			return spec, err
+			return spec, isPrivate, err
 		}
 	}
-	return spec, err
+	return spec, isPrivate, err
 }
 
 func (a *AnacrolixTorrentDownloader) AddDownload(link string, listener *MirrorListener, isSeed bool) error {
 	dir := path.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(listener.GetUid()))
-	spec, err := a.GetTorrentSpec(link)
+	spec, isPrivate, err := a.GetTorrentSpec(link)
 	if err != nil {
 		return err
 	}
@@ -249,7 +257,7 @@ func (a *AnacrolixTorrentDownloader) AddDownload(link string, listener *MirrorLi
 			return fmt.Errorf("infohash %s is already registered in the client", tor.InfoHash().HexString())
 		}
 	}
-	if utils.GetTorrentUseTrackerList() {
+	if utils.GetTorrentUseTrackerList() && !isPrivate {
 		newTrackers := GetTrackersList()
 		for _, tr := range newTrackers {
 			if !checkTrackerInSpec(spec, tr) {
