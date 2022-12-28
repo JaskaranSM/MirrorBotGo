@@ -314,7 +314,8 @@ func (a *AnacrolixTorrentDownloadStatus) CompletedLength() int64 {
 	if a.anacrolixListener.IsSeeding {
 		return a.anacrolixListener.UploadedBytes
 	}
-	return a.torrentHandle.BytesCompleted()
+	data := a.torrentHandle.Stats().BytesReadUsefulData
+	return data.Int64()
 }
 
 func (a *AnacrolixTorrentDownloadStatus) GetListener() *MirrorListener {

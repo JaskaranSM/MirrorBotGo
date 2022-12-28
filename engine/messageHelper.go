@@ -240,9 +240,13 @@ func SendStatusMessage(b *gotgbot.Bot, message *gotgbot.Message) error {
 	var progress string
 	msg := GetMessageByChatId(message.Chat.Id)
 	if msg != nil {
-		DeleteMessage(b, msg)
 		DeleteMessageByChatId(message.Chat.Id)
 	}
+	go func() {
+		if msg != nil {
+			DeleteMessage(b, msg)
+		}
+	}()
 
 	progress = GetReadableProgressMessage(0)
 	if GetAllMirrorsCount() > StatusMessageChunkSize {
