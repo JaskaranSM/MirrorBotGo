@@ -195,7 +195,7 @@ func GetReadableProgressMessage(page int) string {
 				msg += "ETA: -"
 			}
 			if dl.IsTorrent() {
-				msg += fmt.Sprintf(" | P: %d | S: %d", dl.GetPeers(), dl.GetSeeders())
+				msg += fmt.Sprintf(" | P: %d | S: %d | PC: %d/%d", dl.GetPeers(), dl.GetSeeders(), dl.PiecesCompleted(), dl.PiecesTotal())
 			}
 			msg += fmt.Sprintf("\nGID: <code>%s</code> ", dls[i].Gid())
 			msg += fmt.Sprintf("I: <code>%d</code>", dls[i].Index())

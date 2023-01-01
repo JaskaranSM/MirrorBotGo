@@ -404,6 +404,14 @@ func (g *GotdDownloadStatus) IsTorrent() bool {
 	return false
 }
 
+func (g *GotdDownloadStatus) PiecesCompleted() int {
+	return 0
+}
+
+func (g *GotdDownloadStatus) PiecesTotal() int {
+	return 0
+}
+
 func (g *GotdDownloadStatus) GetPeers() int {
 	return 0
 }

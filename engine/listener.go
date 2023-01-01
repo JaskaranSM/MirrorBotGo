@@ -297,6 +297,8 @@ type MirrorStatus interface {
 	Percentage() float32
 	GetStatusType() string
 	IsTorrent() bool
+	PiecesCompleted() int
+	PiecesTotal() int
 	GetPeers() int
 	GetSeeders() int
 	Index() int

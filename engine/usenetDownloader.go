@@ -321,6 +321,14 @@ func (u *UsenetDownloadStatus) IsTorrent() bool {
 	return false
 }
 
+func (u *UsenetDownloadStatus) PiecesCompleted() int {
+	return 0
+}
+
+func (u *UsenetDownloadStatus) PiecesTotal() int {
+	return 0
+}
+
 func (u *UsenetDownloadStatus) GetPeers() int {
 	return 0
 }

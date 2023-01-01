@@ -438,6 +438,14 @@ func (g *GoogleDriveTransferStatus) IsTorrent() bool {
 	return false
 }
 
+func (g *GoogleDriveTransferStatus) PiecesCompleted() int {
+	return 0
+}
+
+func (g *GoogleDriveTransferStatus) PiecesTotal() int {
+	return 0
+}
+
 func (g *GoogleDriveTransferStatus) GetPeers() int {
 	return 0
 }

@@ -435,6 +435,14 @@ func (m *MegaDownloadStatus) IsTorrent() bool {
 	return false
 }
 
+func (m *MegaDownloadStatus) PiecesCompleted() int {
+	return 0
+}
+
+func (m *MegaDownloadStatus) PiecesTotal() int {
+	return 0
+}
+
 func (m *MegaDownloadStatus) GetPeers() int {
 	return 0
 }

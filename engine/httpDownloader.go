@@ -69,6 +69,14 @@ func (h *HTTPDownloadStatus) GetPeers() int {
 	return 0
 }
 
+func (h *HTTPDownloadStatus) PiecesCompleted() int {
+	return 0
+}
+
+func (h *HTTPDownloadStatus) PiecesTotal() int {
+	return 0
+}
+
 func (h *HTTPDownloadStatus) GetSeeders() int {
 	return 0
 }

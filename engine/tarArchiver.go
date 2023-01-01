@@ -63,6 +63,14 @@ func (t *TarStatus) IsTorrent() bool {
 	return false
 }
 
+func (t *TarStatus) PiecesCompleted() int {
+	return 0
+}
+
+func (t *TarStatus) PiecesTotal() int {
+	return 0
+}
+
 func (t *TarStatus) GetPeers() int {
 	return 0
 }
@@ -87,7 +95,7 @@ func NewTarStatus(gid string, name string, listener *MirrorListener, archiver *T
 	return &TarStatus{gid: gid, name: name, listener: listener, tar: archiver}
 }
 
-//TarArchiver struct
+// TarArchiver struct
 type TarArchiver struct {
 	Speed     int64
 	StartTime time.Time
@@ -97,7 +105,7 @@ type TarArchiver struct {
 	ETA       time.Duration
 }
 
-//NewTarArchiver constructor
+// NewTarArchiver constructor
 func NewTarArchiver(total int64) *TarArchiver {
 	return &TarArchiver{Total: total, StartTime: time.Now()}
 }
@@ -129,7 +137,7 @@ func (t *TarArchiver) Write(b []byte) (int, error) {
 	return length, nil
 }
 
-//TarPath start tarring
+// TarPath start tarring
 func (t *TarArchiver) TarPath(path string) (string, error) {
 	outPath := path + ".tar"
 	L().Infof("[TarPath]: %s -> %s", path, outPath)

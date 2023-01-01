@@ -69,6 +69,14 @@ func (t *UnArchiverStatus) IsTorrent() bool {
 	return false
 }
 
+func (t *UnArchiverStatus) PiecesCompleted() int {
+	return 0
+}
+
+func (t *UnArchiverStatus) PiecesTotal() int {
+	return 0
+}
+
 func (t *UnArchiverStatus) GetPeers() int {
 	return 0
 }

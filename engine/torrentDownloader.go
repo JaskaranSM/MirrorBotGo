@@ -87,6 +87,7 @@ type AnacrolixTorrentDownloadListener struct {
 	SeedingSpeed      int64
 	UploadedBytes     int64
 	SeedStartTime     time.Time
+	storage           storage.ClientImplCloser
 	IsObserverRunning bool
 }
 
@@ -94,6 +95,10 @@ func (a *AnacrolixTorrentDownloadListener) OnDownloadComplete() {
 	L().Infof("[ALXTorrent]: OnDownloadComplete: %s", a.torrentHandle.Name())
 	if !a.isSeed {
 		a.torrentHandle.Drop()
+		err := a.storage.Close()
+		if err != nil {
+			L().Errorf("[ALXTorrent]: storage.close: %v", err)
+		}
 		a.StopListener()
 	} else {
 		a.IsSeeding = true
@@ -112,6 +117,10 @@ func (a *AnacrolixTorrentDownloadListener) OnDownloadStop(err error) {
 	L().Infof("[ALXTorrent]: OnDownloadStop: %s | %v", a.torrentHandle.Name(), err)
 	a.StopSeedingSpeedObserver()
 	a.StopListener()
+	serr := a.storage.Close()
+	if err != nil {
+		L().Errorf("[ALXTorrent]: storage.close: %v", serr)
+	}
 	a.listener.OnDownloadError(err.Error())
 }
 
@@ -127,6 +136,10 @@ func (a *AnacrolixTorrentDownloadListener) OnSeedingError() {
 	a.StopListener()
 	ratio := float64(a.UploadedBytes) / float64(a.torrentHandle.Length())
 	seedTime := time.Now().Sub(a.SeedStartTime)
+	err := a.storage.Close()
+	if err != nil {
+		L().Errorf("[ALXTorrent]: storage.close: %v", err)
+	}
 	a.listener.OnSeedingError(fmt.Errorf("Cancelled by user. Ratio: %.2f, SeedTime: %s", ratio, utils.HumanizeDuration(seedTime)))
 }
 
@@ -247,7 +260,8 @@ func (a *AnacrolixTorrentDownloader) AddDownload(link string, listener *MirrorLi
 		L().Errorf("[ALXTorrent]: AddDownload: os.MkdirAll: %s, %v", link, err)
 		return err
 	}
-	spec.Storage = storage.NewMMap(dir)
+	mmapStorage := storage.NewMMap(dir)
+	spec.Storage = mmapStorage
 	for _, tor := range anacrolixClient.Torrents() {
 		if tor.InfoHash().HexString() == spec.InfoHash.HexString() {
 			err = os.RemoveAll(dir)
@@ -285,6 +299,7 @@ func (a *AnacrolixTorrentDownloader) AddDownload(link string, listener *MirrorLi
 		L().Errorf("[ALXTorrent]: OnWriteChunkError: %v", err)
 		anacrolixListener.OnDownloadStop(err)
 	})
+	anacrolixListener.storage = mmapStorage
 	anacrolixListener.StartListener()
 	gid := utils.RandString(16)
 	status := NewAnacrolixTorrentDownloadStatus(gid, listener, anacrolixListener, t)
@@ -382,6 +397,21 @@ func (a *AnacrolixTorrentDownloadStatus) Path() string {
 
 func (a *AnacrolixTorrentDownloadStatus) IsTorrent() bool {
 	return true
+}
+
+func (a *AnacrolixTorrentDownloadStatus) PiecesCompleted() int {
+	var completedPieces int = 0
+	for i := 0; i < a.torrentHandle.NumPieces(); i++ {
+		state := a.torrentHandle.PieceState(i)
+		if state.Complete && state.Ok {
+			completedPieces += 1
+		}
+	}
+	return completedPieces
+}
+
+func (a *AnacrolixTorrentDownloadStatus) PiecesTotal() int {
+	return a.torrentHandle.NumPieces()
 }
 
 func (a *AnacrolixTorrentDownloadStatus) GetPeers() int {
