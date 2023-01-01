@@ -118,7 +118,7 @@ func (a *AnacrolixTorrentDownloadListener) OnDownloadStop(err error) {
 	a.StopSeedingSpeedObserver()
 	a.StopListener()
 	serr := a.storage.Close()
-	if err != nil {
+	if serr != nil {
 		L().Errorf("[ALXTorrent]: storage.close: %v", serr)
 	}
 	a.listener.OnDownloadError(err.Error())
