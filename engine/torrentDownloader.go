@@ -400,6 +400,9 @@ func (a *AnacrolixTorrentDownloadStatus) IsTorrent() bool {
 }
 
 func (a *AnacrolixTorrentDownloadStatus) PiecesCompleted() int {
+	if !a.anacrolixListener.haveInfo {
+		return 0
+	}
 	var completedPieces int = 0
 	for i := 0; i < a.torrentHandle.NumPieces(); i++ {
 		state := a.torrentHandle.PieceState(i)
@@ -411,6 +414,9 @@ func (a *AnacrolixTorrentDownloadStatus) PiecesCompleted() int {
 }
 
 func (a *AnacrolixTorrentDownloadStatus) PiecesTotal() int {
+	if !a.anacrolixListener.haveInfo {
+		return 0
+	}
 	return a.torrentHandle.NumPieces()
 }
 
