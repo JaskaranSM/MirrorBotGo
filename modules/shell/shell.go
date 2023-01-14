@@ -3,6 +3,7 @@ package shell
 import (
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
+	"fmt"
 	"os/exec"
 	"strings"
 	"time"
@@ -78,12 +79,13 @@ func ShellHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 			UpdateMessage(output.GetContent(), b, outMsg)
 		}
 	}()
+	errorTxt := ""
 	err = RunCommand(cmd, output)
 	if err != nil {
-		return err
+		errorTxt = fmt.Sprintf("err: %v", err)
 	}
 	UpdateMessage(output.GetContent(), b, outMsg)
-	engine.SendMessage(b, "Execution completed", m)
+	engine.SendMessage(b, fmt.Sprintf("Execution completed\n%s", errorTxt), m)
 	return nil
 }
 
