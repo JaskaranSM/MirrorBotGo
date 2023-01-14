@@ -319,7 +319,9 @@ func (p *ProgressSpinner) SpinProgress(b *gotgbot.Bot) {
 			p.Stop()
 			break
 		}
+		mutex.Lock()
 		UpdateAllMessages(b)
+		mutex.Unlock()
 		time.Sleep(p.UpdateInterval)
 	}
 }
