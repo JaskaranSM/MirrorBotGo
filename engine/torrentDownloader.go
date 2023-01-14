@@ -251,61 +251,70 @@ func (a *AnacrolixTorrentDownloader) GetTorrentSpec(link string) (*torrent.Torre
 
 func (a *AnacrolixTorrentDownloader) AddDownload(link string, listener *MirrorListener, isSeed bool) error {
 	dir := path.Join(utils.GetDownloadDir(), utils.ParseInt64ToString(listener.GetUid()))
-	spec, isPrivate, err := a.GetTorrentSpec(link)
-	if err != nil {
-		return err
-	}
-	err = os.MkdirAll(dir, 0755)
-	if err != nil {
-		L().Errorf("[ALXTorrent]: AddDownload: os.MkdirAll: %s, %v", link, err)
-		return err
-	}
-	mmapStorage := storage.NewMMap(dir)
-	spec.Storage = mmapStorage
-	for _, tor := range anacrolixClient.Torrents() {
-		if tor.InfoHash().HexString() == spec.InfoHash.HexString() {
-			err = os.RemoveAll(dir)
-			if err != nil {
-				L().Errorf("[ALXTorrent]: AddDownload: os.RemoveAll (torrent already present in client): %s, %v", link, err)
-			}
-			return fmt.Errorf("infohash %s is already registered in the client", tor.InfoHash().HexString())
-		}
-	}
-	if utils.GetTorrentUseTrackerList() && !isPrivate {
-		newTrackers := GetTrackersList()
-		for _, tr := range newTrackers {
-			if !checkTrackerInSpec(spec, tr) {
-				spec.Trackers = append(spec.Trackers, []string{
-					tr,
-				})
-			}
-		}
-	}
-	t, _, err := anacrolixClient.AddTorrentSpec(spec)
-	if err != nil {
-		func() {
-			err := os.RemoveAll(dir)
-			if err != nil {
-				L().Errorf("[ALXTorrent]: AddDownload: os.RemoveAll (failed to add torrent spec): %s, %v", link, err)
-			} //we do not want this error to be sent to the user.
-		}()
-		return err
-	}
-	listener.isTorrent = true
-	listener.isSeed = isSeed
-	anacrolixListener := NewAnacrolixTorrentDownloadListener(t, listener, isSeed)
-	t.SetOnWriteChunkError(func(err error) {
-		t.Drop()
-		L().Errorf("[ALXTorrent]: OnWriteChunkError: %v", err)
-		anacrolixListener.OnDownloadStop(err)
-	})
-	anacrolixListener.storage = mmapStorage
-	anacrolixListener.StartListener()
 	gid := utils.RandString(16)
-	status := NewAnacrolixTorrentDownloadStatus(gid, listener, anacrolixListener, t)
-	status.Index_ = GenerateMirrorIndex()
-	AddMirrorLocal(listener.GetUid(), status)
-	status.GetListener().OnDownloadStart(status.Gid())
+	initializingStatus := NewInitializingStatus(utils.TrimString(link), gid, dir, listener)
+	initializingStatus.Index_ = GenerateMirrorIndex()
+	AddMirrorLocal(listener.GetUid(), initializingStatus)
+	go func() {
+		spec, isPrivate, err := a.GetTorrentSpec(link)
+		if err != nil {
+			listener.OnDownloadError(err.Error())
+			return
+		}
+		err = os.MkdirAll(dir, 0755)
+		if err != nil {
+			L().Errorf("[ALXTorrent]: AddDownload: os.MkdirAll: %s, %v", link, err)
+			listener.OnDownloadError(err.Error())
+			return
+		}
+		mmapStorage := storage.NewMMap(dir)
+		spec.Storage = mmapStorage
+		for _, tor := range anacrolixClient.Torrents() {
+			if tor.InfoHash().HexString() == spec.InfoHash.HexString() {
+				err = os.RemoveAll(dir)
+				if err != nil {
+					L().Errorf("[ALXTorrent]: AddDownload: os.RemoveAll (torrent already present in client): %s, %v", link, err)
+				}
+				listener.OnDownloadError(fmt.Sprintf("infohash %s is already registered in the client", tor.InfoHash().HexString()))
+				return
+			}
+		}
+		if utils.GetTorrentUseTrackerList() && !isPrivate {
+			newTrackers := GetTrackersList()
+			for _, tr := range newTrackers {
+				if !checkTrackerInSpec(spec, tr) {
+					spec.Trackers = append(spec.Trackers, []string{
+						tr,
+					})
+				}
+			}
+		}
+		t, _, err := anacrolixClient.AddTorrentSpec(spec)
+		if err != nil {
+			func() {
+				err := os.RemoveAll(dir)
+				if err != nil {
+					L().Errorf("[ALXTorrent]: AddDownload: os.RemoveAll (failed to add torrent spec): %s, %v", link, err)
+				} //we do not want this error to be sent to the user.
+			}()
+			listener.OnDownloadError(err.Error())
+			return
+		}
+		listener.isTorrent = true
+		listener.isSeed = isSeed
+		anacrolixListener := NewAnacrolixTorrentDownloadListener(t, listener, isSeed)
+		t.SetOnWriteChunkError(func(err error) {
+			t.Drop()
+			L().Errorf("[ALXTorrent]: OnWriteChunkError: %v", err)
+			anacrolixListener.OnDownloadStop(err)
+		})
+		anacrolixListener.storage = mmapStorage
+		anacrolixListener.StartListener()
+		status := NewAnacrolixTorrentDownloadStatus(gid, listener, anacrolixListener, t)
+		status.Index_ = initializingStatus.Index()
+		AddMirrorLocal(listener.GetUid(), status)
+		status.GetListener().OnDownloadStart(status.Gid())
+	}()
 	return nil
 }
 

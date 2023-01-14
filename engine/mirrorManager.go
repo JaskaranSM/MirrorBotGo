@@ -19,6 +19,7 @@ const (
 	MirrorStatusUnArchiving  = "UnArchiving"
 	MirrorStatusEncrypting   = "Encrypting"
 	MirrorStatusDecrypting   = "Decrypting"
+	MirrorStatusInitializing = "Initializing"
 	MirrorStatusCloning      = "Cloning"
 	MirrorStatusSeeding      = "Seeding"
 	MirrorStatusWaiting      = "Queued"

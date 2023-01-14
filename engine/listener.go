@@ -286,6 +286,88 @@ func NewCloneListener(b *gotgbot.Bot, update *ext.Context, parentId string) Clon
 	return CloneListener{bot: b, Update: update, parentId: parentId}
 }
 
+func NewInitializingStatus(name string, gid string, dir string, listener *MirrorListener) *InitializingStatus {
+	return &InitializingStatus{
+		name:     name,
+		gid:      gid,
+		dir:      dir,
+		listener: listener,
+	}
+}
+
+type InitializingStatus struct {
+	name     string
+	gid      string
+	listener *MirrorListener
+	dir      string //we do not know the "Path()" yet
+	Index_   int
+}
+
+func (i *InitializingStatus) Name() string {
+	return i.name
+}
+
+func (i *InitializingStatus) CompletedLength() int64 {
+	return 0
+}
+
+func (i *InitializingStatus) TotalLength() int64 {
+	return 0
+}
+
+func (i *InitializingStatus) Speed() int64 {
+	return 0
+}
+
+func (i *InitializingStatus) ETA() *time.Duration {
+	dur := time.Duration(0)
+	return &dur
+}
+
+func (i *InitializingStatus) Percentage() float32 {
+	return 0.0
+}
+
+func (i *InitializingStatus) Gid() string {
+	return i.gid
+}
+
+func (i *InitializingStatus) Path() string {
+	return i.dir
+}
+
+func (i *InitializingStatus) GetStatusType() string {
+	return MirrorStatusInitializing
+}
+
+func (i *InitializingStatus) IsTorrent() bool {
+	return false
+}
+func (i *InitializingStatus) PiecesCompleted() int {
+	return 0
+}
+func (i *InitializingStatus) PiecesTotal() int {
+	return 0
+}
+func (i *InitializingStatus) GetPeers() int {
+	return 0
+}
+func (i *InitializingStatus) GetSeeders() int {
+	return 0
+}
+func (i *InitializingStatus) Index() int {
+	return i.Index_
+}
+func (i *InitializingStatus) GetListener() *MirrorListener {
+	return i.listener
+}
+func (i *InitializingStatus) GetCloneListener() *CloneListener {
+	return nil
+}
+func (i *InitializingStatus) CancelMirror() bool {
+	return false
+}
+
 type MirrorStatus interface {
 	Name() string
 	CompletedLength() int64

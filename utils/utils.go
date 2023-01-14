@@ -697,3 +697,10 @@ func GetEnvironmentArgs(key string) map[string]string {
 	}
 	return args
 }
+
+func TrimString(text string) string {
+	if len(text) > 20 {
+		return string(text[:20]) + "..."
+	}
+	return text
+}

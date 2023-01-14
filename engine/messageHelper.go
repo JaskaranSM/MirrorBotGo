@@ -131,7 +131,7 @@ func DeleteAllMessages(b *gotgbot.Bot) {
 
 func GetCpuUsage() string {
 	out := ""
-	data, err := cpu.Percent(time.Second, false)
+	data, err := cpu.Percent(10*time.Millisecond, false)
 	if err != nil {
 		return "NA"
 	}
@@ -320,7 +320,7 @@ func (p *ProgressSpinner) SpinProgress(b *gotgbot.Bot) {
 			break
 		}
 		UpdateAllMessages(b)
-		time.Sleep(p.UpdateInterval - time.Second) //GetCpuUsage sleeps for time.Second
+		time.Sleep(p.UpdateInterval)
 	}
 }
 
