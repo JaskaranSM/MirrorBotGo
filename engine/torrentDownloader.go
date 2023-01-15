@@ -25,6 +25,14 @@ func GetAnacrolixTorrentClientStatus() bytes.Buffer {
 	return buffer
 }
 
+func SetTorrentClientConnections(count int) int {
+	var previous int
+	for _, t := range anacrolixClient.Torrents() {
+		previous = t.SetMaxEstablishedConns(count)
+	}
+	return previous
+}
+
 func setupRateLimiters(config *torrent.ClientConfig) {
 	uploadRate, err := utils.GetTorrentClientMaxUploadRate()
 	if err != nil {
