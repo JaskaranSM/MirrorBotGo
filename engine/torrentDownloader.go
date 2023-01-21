@@ -76,8 +76,10 @@ func GetTrackersList() []string {
 
 func checkTrackerInSpec(spec *torrent.TorrentSpec, tracker string) bool {
 	for _, tr := range spec.Trackers {
-		if tr[0] == tracker {
-			return true
+		if len(tr) > 0 {
+			if tr[0] == tracker {
+				return true
+			}
 		}
 	}
 	return false
