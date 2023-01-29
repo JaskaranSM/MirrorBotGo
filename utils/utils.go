@@ -571,6 +571,9 @@ func GetFileIdByGDriveLinkParams(link string) string {
 }
 
 func GetFileIdByGDriveLink(link string) string {
+	if !strings.Contains(link, "https://drive.google.com") {
+		return ""
+	}
 	id := GetFileIdByGDriveLinkParams(link)
 	if id != "" {
 		return id

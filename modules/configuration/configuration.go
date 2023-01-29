@@ -308,8 +308,8 @@ func GetLinkHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 		return nil
 	}
 	message := ctx.EffectiveMessage
-	args := ctx.Args()
-	if len(args) < 2 {
+	link := utils.ParseMessageArgs(message.Text)
+	if link == "" {
 		engine.SendMessage(b, "/cmd {link}", message)
 		return nil
 	}
@@ -323,7 +323,7 @@ func GetLinkHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 		engine.SendMessage(b, err.Error(), message)
 		return nil
 	}
-	ddl, err := engine.ExtractDDL(args[1], extractors, secrets, b, ctx)
+	ddl, err := engine.ExtractDDL(link, extractors, secrets, b, ctx)
 	if err != nil {
 		engine.SendMessage(b, fmt.Sprintf("extraction failed: %v", err), message)
 		return nil
