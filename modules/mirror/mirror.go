@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func extract(link string) (string, error) {
+func extract(link string, b *gotgbot.Bot, ctx *ext.Context) (string, error) {
 	if !db.IsExtractable(link) {
 		return "", fmt.Errorf("link is not extractable")
 	}
@@ -25,7 +25,7 @@ func extract(link string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	newLink, err := engine.ExtractDDL(link, extractors, secrets)
+	newLink, err := engine.ExtractDDL(link, extractors, secrets, b, ctx)
 	if err != nil {
 		return "", err
 	}
@@ -99,7 +99,7 @@ func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, send
 	fileId := utils.GetFileIdByGDriveLink(link)
 	listener := engine.NewMirrorListener(b, ctx, isTar, doUnArchive, parentId)
 	if link != "" {
-		newLink, err := extract(link)
+		newLink, err := extract(link, b, ctx)
 		if err != nil {
 			engine.L().Infof("Failed to extract ddl even: %v", err)
 		} else {

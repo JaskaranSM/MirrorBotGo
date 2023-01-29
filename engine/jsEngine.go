@@ -4,11 +4,44 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/dop251/goja"
 	"io"
 	"net/http"
+	"net/url"
+	"sync"
 )
+
+type Jar struct {
+	lk      sync.Mutex
+	cookies map[string][]*http.Cookie
+}
+
+func NewJar() *Jar {
+	jar := new(Jar)
+	jar.cookies = make(map[string][]*http.Cookie)
+	return jar
+}
+
+// SetCookies handles the receipt of the cookies in a reply for the
+// given URL.  It may or may not choose to save the cookies, depending
+// on the jar's policy and implementation.
+func (jar *Jar) SetCookies(u *url.URL, cookies []*http.Cookie) {
+	jar.lk.Lock()
+	jar.cookies[u.Host] = cookies
+	jar.lk.Unlock()
+}
+
+// Cookies returns the cookies to send in a request for the given URL.
+// It is up to the implementation to honor the standard cookie use
+// restrictions such as in RFC 6265.
+func (jar *Jar) Cookies(u *url.URL) []*http.Cookie {
+	return jar.cookies[u.Host]
+}
+
+var jar = NewJar()
 
 type Response struct {
 	Headers  map[string]string `json:"headers"`
@@ -60,7 +93,10 @@ func RequestWithRuntime(r *goja.Runtime) func(this goja.Value, args ...goja.Valu
 				})
 			}
 		}
-		res, err := http.DefaultClient.Do(req)
+		client := http.Client{
+			Jar: jar,
+		}
+		res, err := client.Do(req)
 		if err != nil {
 			return nil, err
 		}
@@ -135,6 +171,13 @@ func FindAllJS(r *goja.Runtime) func(this goja.Value, args ...goja.Value) (goja.
 	}
 }
 
+func LogWithBot(r *goja.Runtime, b *gotgbot.Bot, ctx *ext.Context) func(this goja.Value, args ...goja.Value) (goja.Value, error) {
+	return func(this goja.Value, args ...goja.Value) (goja.Value, error) {
+		SendMessage(b, this.String(), ctx.EffectiveMessage)
+		return nil, nil
+	}
+}
+
 func HookUpHTTPRequesting(r *goja.Runtime) (*goja.Runtime, error) {
 	err := r.Set("request_go", RequestWithRuntime(r))
 	return r, err
@@ -142,6 +185,11 @@ func HookUpHTTPRequesting(r *goja.Runtime) (*goja.Runtime, error) {
 
 func HookUpHTMLParsing(r *goja.Runtime) (*goja.Runtime, error) {
 	err := r.Set("findNodes_go", FindAllJS(r))
+	return r, err
+}
+
+func HookUpLogWithBot(r *goja.Runtime, b *gotgbot.Bot, ctx *ext.Context) (*goja.Runtime, error) {
+	err := r.Set("log", LogWithBot(r, b, ctx))
 	return r, err
 }
 
@@ -157,13 +205,17 @@ class URLParser{constructor(s){this.url=s}parse(){let s="",t="",l="",r="",e=this
 var Base64={_keyStr:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=",encode:function(e){var t="";var n,r,i,s,o,u,a;var f=0;e=Base64._utf8_encode(e);while(f<e.length){n=e.charCodeAt(f++);r=e.charCodeAt(f++);i=e.charCodeAt(f++);s=n>>2;o=(n&3)<<4|r>>4;u=(r&15)<<2|i>>6;a=i&63;if(isNaN(r)){u=a=64}else if(isNaN(i)){a=64}t=t+this._keyStr.charAt(s)+this._keyStr.charAt(o)+this._keyStr.charAt(u)+this._keyStr.charAt(a)}return t},decode:function(e){var t="";var n,r,i;var s,o,u,a;var f=0;e=e.replace(/[^A-Za-z0-9\+\/\=]/g,"");while(f<e.length){s=this._keyStr.indexOf(e.charAt(f++));o=this._keyStr.indexOf(e.charAt(f++));u=this._keyStr.indexOf(e.charAt(f++));a=this._keyStr.indexOf(e.charAt(f++));n=s<<2|o>>4;r=(o&15)<<4|u>>2;i=(u&3)<<6|a;t=t+String.fromCharCode(n);if(u!=64){t=t+String.fromCharCode(r)}if(a!=64){t=t+String.fromCharCode(i)}}t=Base64._utf8_decode(t);return t},_utf8_encode:function(e){e=e.replace(/\r\n/g,"\n");var t="";for(var n=0;n<e.length;n++){var r=e.charCodeAt(n);if(r<128){t+=String.fromCharCode(r)}else if(r>127&&r<2048){t+=String.fromCharCode(r>>6|192);t+=String.fromCharCode(r&63|128)}else{t+=String.fromCharCode(r>>12|224);t+=String.fromCharCode(r>>6&63|128);t+=String.fromCharCode(r&63|128)}}return t},_utf8_decode:function(e){var t="";var n=0;var r=c1=c2=0;while(n<e.length){r=e.charCodeAt(n);if(r<128){t+=String.fromCharCode(r);n++}else if(r>191&&r<224){c2=e.charCodeAt(n+1);t+=String.fromCharCode((r&31)<<6|c2&63);n+=2}else{c2=e.charCodeAt(n+1);c3=e.charCodeAt(n+2);t+=String.fromCharCode((r&15)<<12|(c2&63)<<6|c3&63);n+=3}}return t}}
 `
 
-func CreateJSRuntime(secrets map[string]string) (*goja.Runtime, error) {
+func CreateJSRuntime(secrets map[string]string, b *gotgbot.Bot, ctx *ext.Context) (*goja.Runtime, error) {
 	r := goja.New()
 	_, err := HookUpHTTPRequesting(r)
 	if err != nil {
 		return r, err
 	}
 	_, err = HookUpHTMLParsing(r)
+	if err != nil {
+		return r, err
+	}
+	_, err = HookUpLogWithBot(r, b, ctx)
 	if err != nil {
 		return r, err
 	}

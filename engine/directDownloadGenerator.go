@@ -3,6 +3,8 @@ package engine
 import (
 	"errors"
 	"fmt"
+	"github.com/PaulSonOfLars/gotgbot/v2"
+	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/dop251/goja"
 	"regexp"
 	"strings"
@@ -15,8 +17,8 @@ func escapeError(err error) error {
 	return errors.New(strings.ReplaceAll(strings.ReplaceAll(err.Error(), "<", ""), ">", ""))
 }
 
-func extractDDLJS(link string, script string, secrets map[string]string) (string, error) {
-	r, err := CreateJSRuntime(secrets)
+func extractDDLJS(link string, script string, secrets map[string]string, b *gotgbot.Bot, ctx *ext.Context) (string, error) {
+	r, err := CreateJSRuntime(secrets, b, ctx)
 	if err != nil {
 		return "", escapeError(err)
 	}
@@ -47,7 +49,7 @@ func extractDDLJS(link string, script string, secrets map[string]string) (string
 	return value.String(), nil
 }
 
-func ExtractDDL(link string, extractors map[string]string, secrets map[string]string) (string, error) {
+func ExtractDDL(link string, extractors map[string]string, secrets map[string]string, b *gotgbot.Bot, ctx *ext.Context) (string, error) {
 	for regex, script := range extractors {
 		matched, err := regexp.MatchString(regex, link)
 		if err != nil {
@@ -56,7 +58,7 @@ func ExtractDDL(link string, extractors map[string]string, secrets map[string]st
 		if !matched {
 			continue
 		}
-		return extractDDLJS(link, script, secrets)
+		return extractDDLJS(link, script, secrets, b, ctx)
 	}
 	return "", fmt.Errorf("no extractor found for this url, do download normally")
 }
