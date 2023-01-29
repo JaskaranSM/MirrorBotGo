@@ -4,6 +4,7 @@ import (
 	"MirrorBotGo/db"
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
+	"fmt"
 	"strings"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -11,6 +12,25 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"go.uber.org/zap"
 )
+
+func extract(link string, b *gotgbot.Bot, ctx *ext.Context) (string, error) {
+	if !db.IsExtractable(link) {
+		return "", fmt.Errorf("link is not extractable")
+	}
+	extractors, err := db.GetExtractors()
+	if err != nil {
+		return "", err
+	}
+	secrets, err := db.GetSecrets()
+	if err != nil {
+		return "", err
+	}
+	newLink, err := engine.ExtractDDL(link, extractors, secrets, b, ctx)
+	if err != nil {
+		return "", err
+	}
+	return newLink, nil
+}
 
 func Clone(b *gotgbot.Bot, ctx *ext.Context, sendStatusMessage bool) error {
 	message := ctx.EffectiveMessage
@@ -25,6 +45,12 @@ func Clone(b *gotgbot.Bot, ctx *ext.Context, sendStatusMessage bool) error {
 			link = strings.TrimSpace(data[0])
 		} else {
 			parentId = utils.GetGDriveParentId()
+		}
+		newLink, err := extract(link, b, ctx)
+		if err != nil {
+			engine.L().Infof("clone: extraction failed: %s", link)
+		} else {
+			link = newLink
 		}
 		fileId := utils.GetFileIdByGDriveLink(link)
 		if fileId == "" {

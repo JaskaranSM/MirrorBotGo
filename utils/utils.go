@@ -553,12 +553,7 @@ func ParseInterfaceToInt64(i interface{}) int64 {
 	return i.(int64)
 }
 
-func GetFileIdByGDriveLink(link string) string {
-	match := regexp.MustCompile(DriveLinkRegex)
-	matches := match.FindStringSubmatch(link)
-	if len(matches) >= 2 {
-		return matches[len(matches)-2]
-	}
+func GetFileIdByGDriveLinkParams(link string) string {
 	urlParsed, err := url.Parse(link)
 	if err != nil {
 		return ""
@@ -571,6 +566,19 @@ func GetFileIdByGDriveLink(link string) string {
 		if i == "id" {
 			return j[0]
 		}
+	}
+	return ""
+}
+
+func GetFileIdByGDriveLink(link string) string {
+	id := GetFileIdByGDriveLinkParams(link)
+	if id != "" {
+		return id
+	}
+	match := regexp.MustCompile(DriveLinkRegex)
+	matches := match.FindStringSubmatch(link)
+	if len(matches) >= 2 {
+		return matches[len(matches)-2]
 	}
 	return ""
 }
