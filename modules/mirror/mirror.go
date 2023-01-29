@@ -4,6 +4,7 @@ import (
 	"MirrorBotGo/db"
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
+	"fmt"
 	"strings"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -11,6 +12,25 @@ import (
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
 	"go.uber.org/zap"
 )
+
+func extract(link string) (string, error) {
+	if !db.IsExtractable(link) {
+		return "", fmt.Errorf("link is not extractable")
+	}
+	extractors, err := db.GetExtractors()
+	if err != nil {
+		return "", err
+	}
+	secrets, err := db.GetSecrets()
+	if err != nil {
+		return "", err
+	}
+	newLink, err := engine.ExtractDDL(link, extractors, secrets)
+	if err != nil {
+		return "", err
+	}
+	return newLink, nil
+}
 
 func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, sendStatusMessage bool, isSeed bool) error {
 	message := ctx.EffectiveMessage
@@ -79,6 +99,13 @@ func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, send
 	fileId := utils.GetFileIdByGDriveLink(link)
 	listener := engine.NewMirrorListener(b, ctx, isTar, doUnArchive, parentId)
 	if link != "" {
+		newLink, err := extract(link)
+		if err != nil {
+			engine.L().Infof("Failed to extract ddl even: %v", err)
+		} else {
+			link = newLink
+			fileId = utils.GetFileIdByGDriveLink(link)
+		}
 		isTorrent, _ = utils.IsTorrentLink(link)
 	}
 	if isTgDownload {

@@ -126,13 +126,17 @@ func (m *MirrorListener) OnDownloadError(err string) {
 	}
 	m.isCanceled = true
 	dl := m.GetDownload()
-	name := dl.Name()
-	size := dl.TotalLength()
-	L().Errorf("[DownloadError]: %s (%d)", name, size)
-	m.Clean()
+	if dl != nil {
+		name := dl.Name()
+		size := dl.TotalLength()
+		L().Errorf("[DownloadError]: %s (%d)", name, size)
+		m.Clean()
+	}
 	msg := "Your download has been stopped due to: %s"
 	SendMessage(m.bot, fmt.Sprintf(msg, err), m.Update.Message)
-	m.CleanDownload()
+	if dl != nil {
+		m.CleanDownload()
+	}
 }
 
 func (m *MirrorListener) OnUploadError(err string) {

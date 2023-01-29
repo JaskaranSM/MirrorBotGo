@@ -1,10 +1,12 @@
 package configuration
 
 import (
+	"MirrorBotGo/db"
 	"MirrorBotGo/engine"
 	"MirrorBotGo/utils"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
@@ -141,6 +143,195 @@ func GetMirrorMessageHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	return nil
 }
 
+func AddDDLScriptHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
+		return nil
+	}
+	message := ctx.EffectiveMessage
+	args := ctx.Args()
+	if len(args) < 2 {
+		engine.SendMessage(b, "/cmd {regex}\n{}code", message)
+		return nil
+	}
+	regex := args[1]
+	data := strings.SplitN(message.Text, "\n", 2)
+	if len(data) < 2 {
+		engine.SendMessage(b, "/cmd {regex}\n{}code", message)
+		return nil
+	}
+	script := data[1]
+	err := db.UpdateExtractor(regex, script)
+	if err != nil {
+		engine.SendMessage(b, err.Error(), message)
+		return nil
+	}
+	engine.SendMessage(b, fmt.Sprintf("script with regex %s has been added", regex), message)
+	return nil
+}
+
+func GetAllDDLsHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
+		return nil
+	}
+	message := ctx.EffectiveMessage
+	out := ""
+	extractors, err := db.GetExtractors()
+	if err != nil {
+		engine.SendMessage(b, err.Error(), message)
+		return nil
+	}
+	for k, _ := range extractors {
+		out += fmt.Sprintf("<code>%s</code>\n", k)
+	}
+	if out == "" {
+		engine.SendMessage(b, "no extractor found", message)
+		return nil
+	}
+	engine.SendMessage(b, out, message)
+	return nil
+}
+
+func GetDLLCodeByRegexHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
+		return nil
+	}
+	message := ctx.EffectiveMessage
+	regex := utils.ParseMessageArgs(message.Text)
+	if regex == "" {
+		engine.SendMessage(b, "/cmd {regex}", message)
+		return nil
+	}
+	extractors, err := db.GetExtractors()
+	if err != nil {
+		engine.SendMessage(b, err.Error(), message)
+		return nil
+	}
+	script, ok := extractors[regex]
+	if !ok {
+		engine.SendMessage(b, "extractor not found", message)
+		return nil
+	}
+	engine.SendMessage(b, fmt.Sprintf("<code>%s</code>", script), message)
+	return nil
+}
+
+func RemoveDDLHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
+		return nil
+	}
+	message := ctx.EffectiveMessage
+	args := strings.SplitN(message.Text, " ", 2)
+	if len(args) < 2 {
+		engine.SendMessage(b, "/cmd {regex}", message)
+		return nil
+	}
+	regex := args[1]
+	err := db.RemoveExtractor(regex)
+	if err != nil {
+		engine.SendMessage(b, err.Error(), message)
+		return nil
+	}
+	engine.SendMessage(b, fmt.Sprintf("script with regex %s has been removed", regex), message)
+	return nil
+}
+
+func AddSecretHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
+		return nil
+	}
+	message := ctx.EffectiveMessage
+	args := strings.SplitN(message.Text, " ", 2)
+	if len(args) < 2 {
+		engine.SendMessage(b, "/cmd {secret}={value}", message)
+		return nil
+	}
+	if !strings.Contains(args[1], "=") {
+		engine.SendMessage(b, "/cmd {secret}={value}", message)
+		return nil
+	}
+	secret := strings.SplitN(args[1], "=", 2)
+	secretKey := secret[0]
+	secretValue := secret[1]
+	err := db.UpdateSecret(secretKey, secretValue)
+	if err != nil {
+		engine.SendMessage(b, err.Error(), message)
+		return nil
+	}
+	engine.SendMessage(b, fmt.Sprintf("secret with key %s has been added", secretKey), message)
+	return nil
+}
+
+func RemoveSecretHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
+		return nil
+	}
+	message := ctx.EffectiveMessage
+	args := strings.SplitN(message.Text, " ", 2)
+	if len(args) < 2 {
+		engine.SendMessage(b, "/cmd {secret}", message)
+		return nil
+	}
+	secretKey := args[1]
+	err := db.RemoveSecret(secretKey)
+	if err != nil {
+		engine.SendMessage(b, err.Error(), message)
+		return nil
+	}
+	engine.SendMessage(b, fmt.Sprintf("secret with key %s has been removed", secretKey), message)
+	return nil
+}
+
+func GetAllSecretsHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
+		return nil
+	}
+	message := ctx.EffectiveMessage
+	out := ""
+	secrets, err := db.GetSecrets()
+	if err != nil {
+		engine.SendMessage(b, err.Error(), message)
+		return nil
+	}
+	for k, v := range secrets {
+		out += fmt.Sprintf("<code>%s=%s</code>\n", k, v)
+	}
+	if out == "" {
+		engine.SendMessage(b, "no secret found", message)
+		return nil
+	}
+	engine.SendMessage(b, out, message)
+	return nil
+}
+
+func GetLinkHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
+		return nil
+	}
+	message := ctx.EffectiveMessage
+	args := ctx.Args()
+	if len(args) < 2 {
+		engine.SendMessage(b, "/cmd {link}", message)
+		return nil
+	}
+	extractors, err := db.GetExtractors()
+	if err != nil {
+		engine.SendMessage(b, err.Error(), message)
+		return nil
+	}
+	secrets, err := db.GetSecrets()
+	if err != nil {
+		engine.SendMessage(b, err.Error(), message)
+		return nil
+	}
+	ddl, err := engine.ExtractDDL(args[1], extractors, secrets)
+	if err != nil {
+		engine.SendMessage(b, fmt.Sprintf("extraction failed: %v", err), message)
+		return nil
+	}
+	engine.SendMessage(b, ddl, message)
+	return nil
+}
+
 func LoadConfigurationHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 	defer l.Info("Configuration Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("setgotdthreads", SetGotdDownloadThreadsCountHandler))
@@ -148,4 +339,12 @@ func LoadConfigurationHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 	updater.Dispatcher.AddHandler(handlers.NewCommand("megalogin", MegaLoginHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("mirrormsg", GetMirrorMessageHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("settorrentconnections", SetTorrentClientConnectionsHandlers))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("addscript", AddDDLScriptHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("removescript", RemoveDDLHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("getallscripts", GetAllDDLsHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("getscript", GetDLLCodeByRegexHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("addsecret", AddSecretHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("removesecret", RemoveSecretHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("getsecrets", GetAllSecretsHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("getlink", GetLinkHandler))
 }
