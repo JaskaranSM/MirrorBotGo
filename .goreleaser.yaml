@@ -16,16 +16,12 @@ builds:
     goos:
       - linux
       - windows
-      - darwin
     goarch:
       - amd64
       - arm64
     mod_timestamp: '{{ .CommitTimestamp }}'
     ldflags:
       - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{ .CommitDate }} -X main.builtBy=goreleaser
-
-universal_binaries:
-  - replace: false
 
 checksum:
   name_template: 'checksums.txt'
@@ -79,15 +75,17 @@ docker_manifests:
       - "ghcr.io/jaskaransm/mirrorbotgo:{{ .Tag }}-arm64"
 
 archives:
-  - name_template: '{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}{{ if .Arm }}v{{ .Arm }}{{ end }}'
-    replacements:
-      darwin: Darwin
-      linux: Linux
-      windows: Windows
-      amd64: x86_64
+  - name_template: >-
+      {{ .ProjectName }}_
+      {{- title .Os }}_
+      {{- if eq .Arch "amd64" }}x86_64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
     format_overrides:
     - goos: windows
       format: zip
+    rlcp: true
     files:
       - README.md
       - sample_config.json
