@@ -38,6 +38,10 @@ func (h *HTTPDownloadStatus) Gid() string {
 }
 
 func (h *HTTPDownloadStatus) ETA() *time.Duration {
+	if h.TotalLength() == 0 {
+		dur := time.Duration(0)
+		return &dur
+	}
 	if h.Speed() != 0 {
 		dur := utils.CalculateETA(h.TotalLength()-h.CompletedLength(), h.Speed())
 		return &dur
@@ -58,6 +62,9 @@ func (h *HTTPDownloadStatus) Path() string {
 }
 
 func (h *HTTPDownloadStatus) Percentage() float32 {
+	if h.TotalLength() == 0 {
+		return float32(0)
+	}
 	return float32(h.CompletedLength()*100) / float32(h.TotalLength())
 }
 

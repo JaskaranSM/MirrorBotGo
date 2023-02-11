@@ -84,6 +84,7 @@ type ConfigJson struct {
 	TorrentClientExtendedHandshakeClientVersion string  `json:"torrent_client_extended_handshake_client_version"`
 	TorrentUseTrackerList                       bool    `json:"torrent_use_tracker_list"`
 	TorrentTrackerListURL                       string  `json:"torrent_tracker_list_url"`
+	ZipStreamerURL                              string  `json:"zip_streamer_url"`
 }
 
 var Config *ConfigJson = InitConfig()
@@ -224,6 +225,10 @@ func GetMegaPassword() string {
 
 func GetTgAppHash() string {
 	return Config.TgAppHash
+}
+
+func GetZipStreamerURL() string {
+	return Config.ZipStreamerURL
 }
 
 func GetMaxMessageTextLength() int {
