@@ -2,19 +2,22 @@ version: "3.9"
 
 services:
   bot:
-    image: ghcr.io/jaskaransm/mirrorbotgo:latest
+    image: ghcr.io/jaskaransm/mirrorbotgo
     container_name: MirrorBotGo
-    restart: unless-stopped
     # environment:
     #   - TZ=
     volumes:
-      - ./config/accounts:/app/accounts:ro
       - ./config/config.json:/app/config.json:ro
-      
-      ## for normal google account auth
-      # - ./config/credentials.json:/app/credentials.json:ro 
-      # - ./config/token.json:/app/token.json:ro  
-    # network_mode: container:vpn
+      # make sure to change the download path in config.json
+      # to /app/downloads if you uncomment the below line
+      # - ./downloads:/app/downloads
+    # network_mode: "container:vpn"
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -f http://localhost:7870/health || exit 1" ]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   db:
     image: mongo:6
