@@ -39,12 +39,24 @@ jobs:
       - name: Set up Cosign
         uses: sigstore/cosign-installer@v2.8.1
 
+      - name: Set up go work and cherry-pick anacrolix/torrent
+        run: |
+          cd ..
+          git clone https://github.com/anacrolix/torrent -b v1.48.0
+          go work init MirrorBotGo
+          cd torrent
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git cherry-pick e8971ea0f1bfb26e2e05eea6e98a547dfb231bb9
+          cd ..
+          go work use torrent
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@v3
         with:
           distribution: goreleaser
           version: latest
-          args: release --rm-dist
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           COSIGN_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
