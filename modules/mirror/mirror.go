@@ -32,7 +32,7 @@ func extract(link string, b *gotgbot.Bot, ctx *ext.Context) (string, error) {
 	return newLink, nil
 }
 
-func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, sendStatusMessage bool, isSeed bool) error {
+func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, sendStatusMessage bool, isSeed bool, isAnacrolix bool) error {
 	message := ctx.EffectiveMessage
 	var link string
 	var isTgDownload bool = false
@@ -131,7 +131,12 @@ func Mirror(b *gotgbot.Bot, ctx *ext.Context, isTar bool, doUnArchive bool, send
 			return nil
 		}
 	} else if utils.IsMagnetLink(link) || isTorrent {
-		err := engine.NewAnacrolixTorrentDownload(link, &listener, isSeed)
+		var err error
+		if isAnacrolix {
+			err = engine.NewAnacrolixTorrentDownload(link, &listener, isSeed)
+		} else {
+			err = engine.NewKedgeDownload(link, &listener, isSeed)
+		}
 		if err != nil {
 			engine.SendMessage(b, err.Error(), message)
 			return nil
@@ -164,98 +169,112 @@ func MirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, false, true, false)
+	return Mirror(b, ctx, false, false, true, false, false)
 }
 
 func SilentMirrorhandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, false, false, false)
+	return Mirror(b, ctx, false, false, false, false, false)
 }
 
 func TarMirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, true, false, true, false)
+	return Mirror(b, ctx, true, false, true, false, false)
 }
 
 func SilentTarMirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, true, false, false, false)
+	return Mirror(b, ctx, true, false, false, false, false)
 }
 
 func UnArchMirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, true, true, false)
+	return Mirror(b, ctx, false, true, true, false, false)
 }
 
 func SilentUnArchMirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, true, false, false)
+	return Mirror(b, ctx, false, true, false, false, false)
 }
 
 func TorrentHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, false, true, false)
+	return Mirror(b, ctx, false, false, true, false, false)
 }
 
 func SilentTorrenthandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, false, false, false)
+	return Mirror(b, ctx, false, false, false, false, false)
 }
 
 func TarTorrentHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, true, false, true, false)
+	return Mirror(b, ctx, true, false, true, false, false)
 }
 
 func SilentTarTorrentHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, true, false, false, false)
+	return Mirror(b, ctx, true, false, false, false, false)
 }
 
 func UnArchTorrentHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, true, true, false)
+	return Mirror(b, ctx, false, true, true, false, false)
 }
 
 func SilentUnArchTorrentHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, true, false, false)
+	return Mirror(b, ctx, false, true, false, false, false)
 }
 
 func SeedTorrentHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, false, true, utils.GetSeed())
+	return Mirror(b, ctx, false, false, true, utils.GetSeed(), false)
 }
 
 func SilentSeedTorrentHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
 	}
-	return Mirror(b, ctx, false, false, false, utils.GetSeed())
+	return Mirror(b, ctx, false, false, false, utils.GetSeed(), false)
+}
+
+func AnacrolixMirrorHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
+		return nil
+	}
+	return Mirror(b, ctx, false, false, true, false, true)
+}
+
+func AnacrolixSeedHandler(b *gotgbot.Bot, ctx *ext.Context) error {
+	if !db.IsAuthorized(ctx.EffectiveMessage) {
+		return nil
+	}
+	return Mirror(b, ctx, false, false, true, utils.GetSeed(), true)
 }
 
 func LoadMirrorHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
@@ -275,4 +294,8 @@ func LoadMirrorHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 	updater.Dispatcher.AddHandler(handlers.NewCommand("unarchtorrents", SilentUnArchTorrentHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("seedtorrent", SeedTorrentHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("seedtorrents", SilentSeedTorrentHandler))
+
+	updater.Dispatcher.AddHandler(handlers.NewCommand("anacrolix", AnacrolixMirrorHandler))
+	updater.Dispatcher.AddHandler(handlers.NewCommand("seedanacrolix", AnacrolixSeedHandler))
+
 }
