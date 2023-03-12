@@ -387,7 +387,7 @@ func (k *KedgeDownloader) AddDownload(link string, listener *MirrorListener, isS
 }
 
 func NewKedgeDownload(link string, listener *MirrorListener, isSeed bool) error {
-	kedgeDownloader := NewKedgeDownloader(kedge.New(), &http.Client{}, "http://localhost:16180/api")
+	kedgeDownloader := NewKedgeDownloader(kedge.New(), &http.Client{}, utils.GetKedgeURL())
 	return kedgeDownloader.AddDownload(link, listener, isSeed)
 }
 

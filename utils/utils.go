@@ -84,6 +84,7 @@ type ConfigJson struct {
 	TorrentClientExtendedHandshakeClientVersion string  `json:"torrent_client_extended_handshake_client_version"`
 	TorrentUseTrackerList                       bool    `json:"torrent_use_tracker_list"`
 	TorrentTrackerListURL                       string  `json:"torrent_tracker_list_url"`
+	KedgeURL                                    string  `json:"kedge_url"`
 	ZipStreamerURL                              string  `json:"zip_streamer_url"`
 }
 
@@ -110,6 +111,13 @@ func GetBotToken() string {
 
 func GetSudoUsers() []int64 {
 	return Config.SudoUsers
+}
+
+func GetKedgeURL() string {
+	if Config.KedgeURL == "" {
+		return "http://localhost:16180/api"
+	}
+	return Config.KedgeURL
 }
 
 func GetAuthorizedChats() []int64 {
