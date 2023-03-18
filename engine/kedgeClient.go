@@ -517,12 +517,18 @@ func (k *KedgeDownloadStatus) PiecesCompleted() int {
 
 func (k *KedgeDownloadStatus) PiecesTotal() int {
 	//TODO: find a way to do it properly from kedge API
+	//Edit: Found, torrent_info has it, need to expose in API
 	//because we need at least one completed piece to determine the piece size
 	completedPieces := k.PiecesCompleted()
 	if completedPieces == 0 {
 		return 0
 	}
-	completedLength := k.CompletedLength()
+	var completedLength int64
+	if k.lastStats != nil {
+		completedLength = k.lastStats.TotalDone
+	} else {
+		completedLength = k.pullStatus().TotalDone
+	}
 	pieceSize := completedLength / int64(completedPieces)
 	return int(k.TotalLength() / pieceSize)
 }
