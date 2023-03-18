@@ -451,7 +451,13 @@ func (k *KedgeDownloadStatus) TotalLength() int64 {
 
 func (k *KedgeDownloadStatus) CompletedLength() int64 {
 	if k.lastStats != nil {
+		if k.kedgeListener.IsSeeding {
+			return k.lastStats.TotalUpload
+		}
 		return k.lastStats.TotalDone
+	}
+	if k.kedgeListener.IsSeeding {
+		return k.pullStatus().TotalUpload
 	}
 	return k.pullStatus().TotalDone
 }
