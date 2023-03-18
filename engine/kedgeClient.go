@@ -362,7 +362,7 @@ func (k *KedgeDownloader) PrepDownload(gid string, link string, dir string, list
 		err = k.AddTorrent(&buffer, dir, false)
 	}
 	if err != nil {
-		L().Errorf("[kedge]: AddDownload: trying to write metainfo to buffer: %v", err)
+		L().Errorf("[kedge]: AddDownload: trying to add torrent to kegde: %v", err)
 		listener.OnDownloadError(err.Error())
 		return
 	}
