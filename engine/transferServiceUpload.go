@@ -375,6 +375,9 @@ func (g *GoogleDriveTransferStatus) getStatus() *TransferStatusResponse {
 		L().Errorf("[TransferServiceStatus]: %v", err)
 		if ts == nil {
 			ts = &TransferStatusResponse{}
+			if !g.isCancelled {
+				defer g.CancelMirror() //fire cancel mirror on this lost mirror
+			}
 		}
 	}
 	return ts
@@ -503,6 +506,7 @@ type GoogleDriveTransferListener struct {
 	isClone           bool
 	gid               string
 	isListenerRunning bool
+	lastStatus        *TransferStatusResponse
 	handled           bool
 }
 
@@ -580,11 +584,25 @@ func (g *GoogleDriveTransferListener) ListenForEvents() {
 	for g.isListenerRunning {
 		status, err := transferServiceClient.GetStatusByGid(g.gid)
 		if err != nil {
+			if g.lastStatus != nil {
+				switch g.lastStatus.TransferType {
+				case "download":
+					g.OnDownloadError(err.Error())
+					return
+				case "upload":
+					g.OnUploadError(err.Error())
+					return
+				case "clone":
+					g.OnCloneError(err.Error())
+					return
+				}
+			}
 			L().Errorf("GoogleDriveTransferListener: %v", err)
 			if status == nil {
 				status = &TransferStatusResponse{}
 			}
 		}
+		g.lastStatus = status
 		switch status.TransferType {
 		case "download":
 			if status.IsCompleted {

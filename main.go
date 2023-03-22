@@ -19,6 +19,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"time"
 
 	_ "net/http/pprof"
 
@@ -63,6 +64,9 @@ func main() {
 	l.Info("Starting Bot.")
 	b, err := gotgbot.NewBot(token, &gotgbot.BotOpts{
 		Client: http.Client{},
+		DefaultRequestOpts: &gotgbot.RequestOpts{
+			Timeout: 20 * time.Second,
+		},
 	})
 	if err != nil {
 		l.Fatal(err)
