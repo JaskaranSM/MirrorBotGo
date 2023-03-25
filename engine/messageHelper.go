@@ -116,7 +116,7 @@ func isMessageNotFoundError(err error) bool {
 	if err == nil {
 		return false
 	}
-	return strings.Contains(err.Error(), "not found")
+	return strings.Contains(strings.ToLower(err.Error()), "not found")
 }
 
 func EditMessageImpl(b *gotgbot.Bot, messageText string, message *gotgbot.Message, markup *gotgbot.InlineKeyboardMarkup) *gotgbot.Message {
@@ -513,6 +513,7 @@ func (m *MessageSenderQueue) Processor() {
 			m.SetRateLimited(false)
 		}()
 		var item MessageSendItem
+		m.rlMut.Lock()
 		if m.rateLimited {
 			item = m.PopBack()
 			L().Infof("MessageSenderQueue: Spam Detected: Chat: %d, User: %d", item.ChatId, item.UserId)
@@ -520,6 +521,7 @@ func (m *MessageSenderQueue) Processor() {
 		} else {
 			item = m.PopFront()
 		}
+		m.rlMut.Unlock()
 		if item.Callback != nil {
 			item.Callback()
 		}
