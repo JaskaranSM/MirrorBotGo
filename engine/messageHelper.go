@@ -20,6 +20,9 @@ var mutex sync.Mutex
 var threadProfile = pprof.Lookup("threadcreate")
 var FailedToSendMessageError error = errors.New("failed to send message")
 
+const MaxRetries = 5
+const SleepMultiplier = 1.5
+
 var StatusMessageChunkSize int = utils.GetStatusMessagesPerPage()
 
 func init() {
@@ -59,60 +62,92 @@ func DeleteMessageByChatId(chatId int64) {
 	}
 }
 
-func SendMessage(b *gotgbot.Bot, messageText string, message *gotgbot.Message) *gotgbot.Message {
-	msg, err := b.SendMessage(
-		message.Chat.Id, filterBotToken(messageText), &gotgbot.SendMessageOpts{
+func SendMessageImpl(b *gotgbot.Bot, messageText string, message *gotgbot.Message, markup *gotgbot.InlineKeyboardMarkup) *gotgbot.Message {
+	var retries = 1
+	var msg *gotgbot.Message
+	var err error
+	sendMessage := func() (*gotgbot.Message, error) {
+		opts := &gotgbot.SendMessageOpts{
 			ReplyToMessageId: message.MessageId,
 			ParseMode:        "HTML",
-		},
-	)
-	if err != nil {
-		L().Errorf("SendMessage: %s | %d | %d : %v", messageText, message.Chat.Id, message.MessageId, err)
+		}
+		if markup != nil {
+			opts.ReplyMarkup = *markup
+		}
+		return b.SendMessage(
+			message.Chat.Id, filterBotToken(messageText), opts,
+		)
+	}
+	for retries <= MaxRetries {
+		msg, err = sendMessage()
+		if err == nil {
+			break
+		} else {
+			retries += 1
+			sleepTime := time.Duration(SleepMultiplier*float32(retries)) * time.Second
+			L().Errorf("SendMessage: %v, sleeping for %s, retry: %d", err, sleepTime, retries)
+			time.Sleep(sleepTime)
+		}
 	}
 	return msg
 }
 
+func SendMessage(b *gotgbot.Bot, messageText string, message *gotgbot.Message) *gotgbot.Message {
+	return SendMessageImpl(b, messageText, message, nil)
+}
+
 func SendMessageMarkup(b *gotgbot.Bot, messageText string, message *gotgbot.Message, markup gotgbot.InlineKeyboardMarkup) *gotgbot.Message {
-	msg, err := b.SendMessage(
-		message.Chat.Id, filterBotToken(messageText), &gotgbot.SendMessageOpts{
-			ReplyToMessageId: message.MessageId,
-			ParseMode:        "HTML",
-			ReplyMarkup:      markup,
-		},
-	)
-	if err != nil {
-		L().Errorf("SendMessageMarkup: %s | %d | %d | %v", messageText, message.Chat.Id, message.MessageId, err)
+	return SendMessageImpl(b, messageText, message, &markup)
+}
+
+func isEditMessageContentSameError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "specified new message content and reply markup are exactly the same as a current content and reply markup of the message")
+}
+
+func EditMessageImpl(b *gotgbot.Bot, messageText string, message *gotgbot.Message, markup *gotgbot.InlineKeyboardMarkup) *gotgbot.Message {
+	var retries = 1
+	var msg *gotgbot.Message
+	var err error
+	editMessage := func() (*gotgbot.Message, error) {
+		opts := &gotgbot.EditMessageTextOpts{
+			ChatId:    message.Chat.Id,
+			MessageId: message.MessageId,
+			ParseMode: "HTML",
+		}
+		if markup != nil {
+			opts.ReplyMarkup = *markup
+		}
+		m, _, err := b.EditMessageText(
+			filterBotToken(messageText), opts,
+		)
+		return m, err
+	}
+	for retries <= MaxRetries {
+		msg, err = editMessage()
+		if err == nil {
+			break
+		} else {
+			if isEditMessageContentSameError(err) { //ignore this error
+				break
+			}
+			retries += 1
+			sleepTime := time.Duration(SleepMultiplier*float32(retries)) * time.Second
+			L().Errorf("editMessage: %v, sleeping for %s, retry: %d", err, sleepTime, retries)
+			time.Sleep(sleepTime)
+		}
 	}
 	return msg
 }
 
 func EditMessage(b *gotgbot.Bot, messageText string, message *gotgbot.Message) *gotgbot.Message {
-	m, _, err := b.EditMessageText(
-		filterBotToken(messageText), &gotgbot.EditMessageTextOpts{
-			ChatId:    message.Chat.Id,
-			MessageId: message.MessageId,
-			ParseMode: "HTML",
-		},
-	)
-	if err != nil {
-		L().Errorf("EditMessage: %s | %d | %d | %v", messageText, message.Chat.Id, message.MessageId, err)
-	}
-	return m
+	return EditMessageImpl(b, messageText, message, nil)
 }
 
 func EditMessageMarkup(b *gotgbot.Bot, messageText string, message *gotgbot.Message, markup gotgbot.InlineKeyboardMarkup) *gotgbot.Message {
-	m, _, err := b.EditMessageText(
-		filterBotToken(messageText), &gotgbot.EditMessageTextOpts{
-			ChatId:      message.Chat.Id,
-			MessageId:   message.MessageId,
-			ParseMode:   "HTML",
-			ReplyMarkup: markup,
-		},
-	)
-	if err != nil {
-		L().Errorf("EditMessageMarkup: %s | %d | %d | %v", messageText, message.Chat.Id, message.MessageId, err)
-	}
-	return m
+	return EditMessageImpl(b, messageText, message, &markup)
 }
 
 func DeleteMessage(b *gotgbot.Bot, message *gotgbot.Message) bool {
