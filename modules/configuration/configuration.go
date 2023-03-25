@@ -66,35 +66,6 @@ func MegaLoginHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	return nil
 }
 
-func SetTorrentClientConnectionsHandlers(b *gotgbot.Bot, ctx *ext.Context) error {
-	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
-		return nil
-	}
-	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
-		return nil
-	}
-	message := ctx.EffectiveMessage
-	connectionCountString := utils.ParseMessageArgs(message.Text)
-	if connectionCountString == "" {
-		engine.SendMessage(b, "Provide arg bruh", message)
-		return nil
-	}
-	connectionCount, err := strconv.Atoi(connectionCountString)
-	if err != nil {
-		engine.L().Errorf("Error parsing torrent connection count: %s", err.Error())
-		engine.SendMessage(b, fmt.Sprintf("Error parsing connection count: %s", err.Error()), message)
-	}
-	if connectionCount <= 0 {
-		engine.L().Errorf("Error setting connection count: thread count must be above 0")
-		engine.SendMessage(b, "Error setting connection count: thread count must be above 0", message)
-		return nil
-	}
-	previous := engine.SetTorrentClientConnections(connectionCount)
-	engine.L().Infof("torrent client connection limit changed %d -> %d", previous, connectionCount)
-	engine.SendMessage(b, fmt.Sprintf("Torrent client connection limit changed %d -> %d", previous, connectionCount), message)
-	return nil
-}
-
 func GetMirrorMessageHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !utils.IsUserOwner(ctx.EffectiveUser.Id) {
 		return nil
@@ -338,7 +309,6 @@ func LoadConfigurationHandlers(updater *ext.Updater, l *zap.SugaredLogger) {
 	updater.Dispatcher.AddHandler(handlers.NewCommand("getgotdthreads", GetGotdDownloadThreadsCountHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("megalogin", MegaLoginHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("mirrormsg", GetMirrorMessageHandler))
-	updater.Dispatcher.AddHandler(handlers.NewCommand("settorrentconnections", SetTorrentClientConnectionsHandlers))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("addscript", AddDDLScriptHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("removescript", RemoveDDLHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("getallscripts", GetAllDDLsHandler))

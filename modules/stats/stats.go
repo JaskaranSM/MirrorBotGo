@@ -54,22 +54,6 @@ func ProfileHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	return nil
 }
 
-func TorrentStatsHandler(b *gotgbot.Bot, ctx *ext.Context) error {
-	if !utils.IsUserOwner(ctx.EffectiveMessage.From.Id) {
-		return nil
-	}
-	message := ctx.EffectiveMessage
-	out := engine.GetAnacrolixTorrentClientStatus()
-	_, err := b.SendDocument(message.Chat.Id, gotgbot.NamedFile{
-		FileName: "torrentstats.txt",
-		File:     &out,
-	}, nil)
-	if err != nil {
-		engine.L().Error(err)
-	}
-	return nil
-}
-
 func StatsHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 	if !db.IsAuthorized(ctx.EffectiveMessage) {
 		return nil
@@ -96,6 +80,5 @@ func StatsHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 func LoadStatsHandler(updater *ext.Updater, l *zap.SugaredLogger) {
 	defer l.Info("Stats Module Loaded.")
 	updater.Dispatcher.AddHandler(handlers.NewCommand("stats", StatsHandler))
-	updater.Dispatcher.AddHandler(handlers.NewCommand("torrentstats", TorrentStatsHandler))
 	updater.Dispatcher.AddHandler(handlers.NewCommand("profile", ProfileHandler))
 }
