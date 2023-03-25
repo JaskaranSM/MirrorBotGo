@@ -247,8 +247,11 @@ func SendStatusMessage(b *gotgbot.Bot, message *gotgbot.Message) error {
 			DeleteMessage(b, msg)
 		}
 	}()
-
-	progress = GetReadableProgressMessage(0)
+	if GetAllMirrorsCount()+GetAllSeedingMirrorsCount() == 0 {
+		progress = "No active mirrors"
+	} else {
+		progress = GetReadableProgressMessage(0)
+	}
 	if GetAllMirrorsCount() > StatusMessageChunkSize {
 		newMsg = SendMessageMarkup(b, progress, message, GetPaginationMarkup(false, true, "0", utils.ParseIntToString(len(GetAllMirrorsChunked(StatusMessageChunkSize))-1)))
 		if newMsg == nil {
@@ -281,9 +284,16 @@ func UpdateAllMessages(b *gotgbot.Bot) {
 	for _, msg := range GetAllMessages() {
 		var previous bool
 		var next bool
-		progress := GetReadableProgressMessage(int(msg.Date))
-		chunks := GetAllMirrorsChunked(StatusMessageChunkSize)
+		var progress string
+		if GetAllMirrorsCount()+GetAllSeedingMirrorsCount() == 0 {
+			progress = "No active mirrors"
+			EditMessage(b, progress, msg)
+			continue
+		} else {
+			progress = GetReadableProgressMessage(int(msg.Date))
+		}
 		if msg.Text != progress {
+			chunks := GetAllMirrorsChunked(StatusMessageChunkSize)
 			if mirrorsCount > StatusMessageChunkSize {
 				if msg.Date > int64(len(chunks)) {
 					msg.Date = int64(len(chunks)) - 1
@@ -314,19 +324,24 @@ func (p *ProgressSpinner) IsRunning() bool {
 
 func (p *ProgressSpinner) SpinProgress(b *gotgbot.Bot) {
 	for p.IsRunning() {
+		L().Info("running spinner")
+		L().Infof("Total mirrors: %d", GetAllMirrorsCount()+GetAllSeedingMirrorsCount())
+		mutex.Lock()
+		UpdateAllMessages(b)
+		mutex.Unlock()
+		time.Sleep(p.UpdateInterval)
 		if GetAllMirrorsCount()+GetAllSeedingMirrorsCount() == 0 {
 			DeleteAllMessages(b)
 			p.Stop()
 			break
 		}
-		mutex.Lock()
-		UpdateAllMessages(b)
-		mutex.Unlock()
-		time.Sleep(p.UpdateInterval)
 	}
 }
 
 func (p *ProgressSpinner) Start(b *gotgbot.Bot) {
+	if p.isRunning {
+		return
+	}
 	p.isRunning = true
 	go p.SpinProgress(b)
 }

@@ -3,8 +3,6 @@ package mirrorstatus
 import (
 	"MirrorBotGo/db"
 	"MirrorBotGo/engine"
-	"MirrorBotGo/utils"
-
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext"
 	"github.com/PaulSonOfLars/gotgbot/v2/ext/handlers"
@@ -16,16 +14,12 @@ func MirrorStatusHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 		return nil
 	}
 	message := ctx.EffectiveMessage
-	if engine.GetAllMirrorsCount() == 0 {
-		out := engine.SendMessage(b, "No Active Mirrors.", message)
-		engine.AutoDeleteMessages(b, utils.GetAutoDeleteTimeOut(), out, message)
-		return nil
-	}
 	err := engine.SendStatusMessage(b, message)
 	if err != nil {
 		engine.SendMessage(b, err.Error(), message)
 		return nil
 	}
+	engine.Spinner.Start(b)
 	engine.DeleteMessage(b, message)
 	return nil
 }
