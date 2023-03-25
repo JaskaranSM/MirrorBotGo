@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"runtime"
 	"runtime/pprof"
+	"strings"
 	"sync"
 	"time"
 
@@ -60,7 +61,7 @@ func DeleteMessageByChatId(chatId int64) {
 
 func SendMessage(b *gotgbot.Bot, messageText string, message *gotgbot.Message) *gotgbot.Message {
 	msg, err := b.SendMessage(
-		message.Chat.Id, messageText, &gotgbot.SendMessageOpts{
+		message.Chat.Id, filterBotToken(messageText), &gotgbot.SendMessageOpts{
 			ReplyToMessageId: message.MessageId,
 			ParseMode:        "HTML",
 		},
@@ -73,7 +74,7 @@ func SendMessage(b *gotgbot.Bot, messageText string, message *gotgbot.Message) *
 
 func SendMessageMarkup(b *gotgbot.Bot, messageText string, message *gotgbot.Message, markup gotgbot.InlineKeyboardMarkup) *gotgbot.Message {
 	msg, err := b.SendMessage(
-		message.Chat.Id, messageText, &gotgbot.SendMessageOpts{
+		message.Chat.Id, filterBotToken(messageText), &gotgbot.SendMessageOpts{
 			ReplyToMessageId: message.MessageId,
 			ParseMode:        "HTML",
 			ReplyMarkup:      markup,
@@ -87,7 +88,7 @@ func SendMessageMarkup(b *gotgbot.Bot, messageText string, message *gotgbot.Mess
 
 func EditMessage(b *gotgbot.Bot, messageText string, message *gotgbot.Message) *gotgbot.Message {
 	m, _, err := b.EditMessageText(
-		messageText, &gotgbot.EditMessageTextOpts{
+		filterBotToken(messageText), &gotgbot.EditMessageTextOpts{
 			ChatId:    message.Chat.Id,
 			MessageId: message.MessageId,
 			ParseMode: "HTML",
@@ -101,7 +102,7 @@ func EditMessage(b *gotgbot.Bot, messageText string, message *gotgbot.Message) *
 
 func EditMessageMarkup(b *gotgbot.Bot, messageText string, message *gotgbot.Message, markup gotgbot.InlineKeyboardMarkup) *gotgbot.Message {
 	m, _, err := b.EditMessageText(
-		messageText, &gotgbot.EditMessageTextOpts{
+		filterBotToken(messageText), &gotgbot.EditMessageTextOpts{
 			ChatId:      message.Chat.Id,
 			MessageId:   message.MessageId,
 			ParseMode:   "HTML",
@@ -324,8 +325,6 @@ func (p *ProgressSpinner) IsRunning() bool {
 
 func (p *ProgressSpinner) SpinProgress(b *gotgbot.Bot) {
 	for p.IsRunning() {
-		L().Info("running spinner")
-		L().Infof("Total mirrors: %d", GetAllMirrorsCount()+GetAllSeedingMirrorsCount())
 		mutex.Lock()
 		UpdateAllMessages(b)
 		mutex.Unlock()
@@ -348,4 +347,8 @@ func (p *ProgressSpinner) Start(b *gotgbot.Bot) {
 
 func (p *ProgressSpinner) Stop() {
 	p.isRunning = false
+}
+
+func filterBotToken(text string) string {
+	return strings.ReplaceAll(text, utils.GetBotToken(), "REDACTED")
 }
