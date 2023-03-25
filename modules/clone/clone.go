@@ -59,7 +59,7 @@ func Clone(b *gotgbot.Bot, ctx *ext.Context, sendStatusMessage bool) error {
 			listener := engine.NewCloneListener(b, ctx, parentId)
 			engine.NewGDriveCloneTransferService(fileId, parentId, &listener)
 			if sendStatusMessage {
-				err := engine.SendStatusMessage(b, message)
+				err := engine.SendStatusMessage(b, message, false)
 				if err != nil {
 					engine.SendMessage(b, err.Error(), message)
 				}

@@ -14,13 +14,12 @@ func MirrorStatusHandler(b *gotgbot.Bot, ctx *ext.Context) error {
 		return nil
 	}
 	message := ctx.EffectiveMessage
-	err := engine.SendStatusMessage(b, message)
+	err := engine.SendStatusMessage(b, message, true)
 	if err != nil {
 		engine.SendMessage(b, err.Error(), message)
 		return nil
 	}
 	engine.Spinner.Start(b)
-	engine.DeleteMessage(b, message)
 	return nil
 }
 

@@ -86,6 +86,8 @@ type ConfigJson struct {
 	TorrentTrackerListURL                       string  `json:"torrent_tracker_list_url"`
 	KedgeURL                                    string  `json:"kedge_url"`
 	ZipStreamerURL                              string  `json:"zip_streamer_url"`
+	SpamFilterMessagesPerDuration               int     `json:"spam_filter_messages_per_duration"`
+	SpamFilterDurationValue                     int     `json:"spam_filter_duration_value"`
 }
 
 var Config *ConfigJson = InitConfig()
@@ -103,6 +105,20 @@ func InitConfig() *ConfigJson {
 	Config.SudoUsers = append(Config.SudoUsers, Config.OwnerId)
 	log.Println(Config.SudoUsers)
 	return &Config
+}
+
+func GetSpamFilterMessagesPerDuration() int {
+	if Config.SpamFilterMessagesPerDuration == 0 {
+		return 1
+	}
+	return Config.SpamFilterMessagesPerDuration
+}
+
+func GetSpamFilterDurationValue() int {
+	if Config.SpamFilterDurationValue == 0 {
+		return 10
+	}
+	return Config.SpamFilterDurationValue
 }
 
 func GetBotToken() string {

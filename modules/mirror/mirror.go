@@ -46,7 +46,7 @@ func HandleSendStatusMessage(opts *PrepareMirrorOptions) {
 	if !opts.SendStatusMessage {
 		return
 	}
-	err := engine.SendStatusMessage(opts.B, opts.Message)
+	err := engine.SendStatusMessage(opts.B, opts.Message, false)
 	if err != nil {
 		engine.L().Error(err)
 		engine.SendMessage(opts.B, err.Error(), opts.Message)

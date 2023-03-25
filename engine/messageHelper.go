@@ -4,6 +4,7 @@ import (
 	"MirrorBotGo/utils"
 	"errors"
 	"fmt"
+	"go.uber.org/ratelimit"
 	"runtime"
 	"runtime/pprof"
 	"strings"
@@ -16,6 +17,7 @@ import (
 
 var StatusMessageStorage map[int64]*gotgbot.Message // chatId : message
 var Spinner *ProgressSpinner = getSpinner()
+var SenderQueue = NewStatusMessageTransmissionManager()
 var mutex sync.Mutex
 var threadProfile = pprof.Lookup("threadcreate")
 var FailedToSendMessageError error = errors.New("failed to send message")
@@ -83,6 +85,9 @@ func SendMessageImpl(b *gotgbot.Bot, messageText string, message *gotgbot.Messag
 		if err == nil {
 			break
 		} else {
+			if isMessageNotFoundError(err) {
+				break
+			}
 			retries += 1
 			sleepTime := time.Duration(SleepMultiplier*float32(retries)) * time.Second
 			L().Errorf("SendMessage: %v, sleeping for %s, retry: %d", err, sleepTime, retries)
@@ -105,6 +110,13 @@ func isEditMessageContentSameError(err error) bool {
 		return false
 	}
 	return strings.Contains(err.Error(), "specified new message content and reply markup are exactly the same as a current content and reply markup of the message")
+}
+
+func isMessageNotFoundError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "not found")
 }
 
 func EditMessageImpl(b *gotgbot.Bot, messageText string, message *gotgbot.Message, markup *gotgbot.InlineKeyboardMarkup) *gotgbot.Message {
@@ -130,7 +142,7 @@ func EditMessageImpl(b *gotgbot.Bot, messageText string, message *gotgbot.Messag
 		if err == nil {
 			break
 		} else {
-			if isEditMessageContentSameError(err) { //ignore this error
+			if isEditMessageContentSameError(err) || isMessageNotFoundError(err) { //ignore this error
 				break
 			}
 			retries += 1
@@ -269,38 +281,54 @@ func GetPaginationMarkup(previous bool, next bool, prString string, nxString str
 	return markup
 }
 
-func SendStatusMessage(b *gotgbot.Bot, message *gotgbot.Message) error {
-	mutex.Lock()
-	defer mutex.Unlock()
-	var newMsg *gotgbot.Message
-	var progress string
-	msg := GetMessageByChatId(message.Chat.Id)
-	if msg != nil {
-		DeleteMessageByChatId(message.Chat.Id)
-	}
-	go func() {
+func SendStatusMessage(b *gotgbot.Bot, message *gotgbot.Message, deleteCommandMessage bool) error {
+	senderFunc := func() error {
+		mutex.Lock()
+		defer mutex.Unlock()
+		var newMsg *gotgbot.Message
+		var progress string
+		msg := GetMessageByChatId(message.Chat.Id)
 		if msg != nil {
-			DeleteMessage(b, msg)
+			DeleteMessageByChatId(message.Chat.Id)
 		}
-	}()
-	if GetAllMirrorsCount()+GetAllSeedingMirrorsCount() == 0 {
-		progress = "No active mirrors"
-	} else {
-		progress = GetReadableProgressMessage(0)
+		go func() {
+			if msg != nil {
+				DeleteMessage(b, msg)
+			}
+		}()
+		if GetAllMirrorsCount()+GetAllSeedingMirrorsCount() == 0 {
+			progress = "No active mirrors"
+		} else {
+			progress = GetReadableProgressMessage(0)
+		}
+		if GetAllMirrorsCount() > StatusMessageChunkSize {
+			newMsg = SendMessageMarkup(b, progress, message, GetPaginationMarkup(false, true, "0", utils.ParseIntToString(len(GetAllMirrorsChunked(StatusMessageChunkSize))-1)))
+			if newMsg == nil {
+				return FailedToSendMessageError
+			}
+		} else {
+			newMsg = SendMessage(b, progress, message)
+			if newMsg == nil {
+				return FailedToSendMessageError
+			}
+		}
+		if deleteCommandMessage {
+			DeleteMessage(b, message)
+		}
+		newMsg.Date = 0
+		AddStatusMessage(newMsg)
+		return nil
 	}
-	if GetAllMirrorsCount() > StatusMessageChunkSize {
-		newMsg = SendMessageMarkup(b, progress, message, GetPaginationMarkup(false, true, "0", utils.ParseIntToString(len(GetAllMirrorsChunked(StatusMessageChunkSize))-1)))
-		if newMsg == nil {
-			return FailedToSendMessageError
-		}
-	} else {
-		newMsg = SendMessage(b, progress, message)
-		if newMsg == nil {
-			return FailedToSendMessageError
-		}
-	}
-	newMsg.Date = 0
-	AddStatusMessage(newMsg)
+	SenderQueue.QueueMessage(message.Chat.Id, MessageSendItem{
+		Callback: func() {
+			err := senderFunc()
+			if err != nil {
+				L().Error(err)
+			}
+		},
+		UserId: message.From.Id,
+		ChatId: message.Chat.Id,
+	})
 	return nil
 }
 
@@ -386,4 +414,147 @@ func (p *ProgressSpinner) Stop() {
 
 func filterBotToken(text string) string {
 	return strings.ReplaceAll(text, utils.GetBotToken(), "REDACTED")
+}
+
+func NewMessageSenderQueue() *MessageSenderQueue {
+	var lock sync.Mutex
+	queue := &MessageSenderQueue{
+		cond: sync.NewCond(&lock),
+		mut:  &lock,
+		rl:   ratelimit.New(utils.GetSpamFilterMessagesPerDuration(), ratelimit.Per(time.Second*time.Duration(utils.GetSpamFilterDurationValue()))),
+	}
+	queue.Start()
+	return queue
+}
+
+type MessageSendItem struct {
+	Callback func()
+	UserId   int64
+	ChatId   int64
+}
+
+type MessageSenderQueue struct {
+	queue       []MessageSendItem
+	mut         *sync.Mutex
+	cond        *sync.Cond
+	isRunning   bool
+	rl          ratelimit.Limiter
+	rlMut       sync.Mutex
+	rateLimited bool
+}
+
+func (m *MessageSenderQueue) Enqueue(i MessageSendItem) {
+	m.queue = append(m.queue, i)
+	m.cond.Signal()
+}
+
+func (m *MessageSenderQueue) Push(callback MessageSendItem) {
+	m.mut.Lock()
+	defer m.mut.Unlock()
+	m.Enqueue(callback)
+}
+
+func (m *MessageSenderQueue) Dequeue() MessageSendItem {
+	for len(m.queue) == 0 {
+		m.cond.Wait()
+	}
+	toRemove := m.queue[0]
+	m.queue = m.queue[1:len(m.queue)]
+	return toRemove
+}
+
+func (m *MessageSenderQueue) PopFront() MessageSendItem {
+	m.mut.Lock()
+	defer m.mut.Unlock()
+	return m.Dequeue()
+}
+
+func (m *MessageSenderQueue) DequeueLast() MessageSendItem {
+	for len(m.queue) == 0 {
+		m.cond.Wait()
+	}
+	toRemove := m.queue[len(m.queue)-1]
+	m.queue = m.queue[:len(m.queue)-1]
+	return toRemove
+}
+
+func (m *MessageSenderQueue) PopBack() MessageSendItem {
+	m.mut.Lock()
+	defer m.mut.Unlock()
+	return m.DequeueLast()
+}
+
+func (m *MessageSenderQueue) Length() int {
+	m.mut.Lock()
+	defer m.mut.Unlock()
+	return len(m.queue)
+}
+
+func (m *MessageSenderQueue) Clear() {
+	m.mut.Lock()
+	defer m.mut.Unlock()
+	m.queue = make([]MessageSendItem, 0)
+}
+
+func (m *MessageSenderQueue) SetRateLimited(value bool) {
+	m.rlMut.Lock()
+	m.rateLimited = value
+	m.rlMut.Unlock()
+}
+
+func (m *MessageSenderQueue) Processor() {
+	for m.isRunning {
+		go func() {
+			if m.rateLimited {
+				return
+			}
+			m.SetRateLimited(true)
+			m.rl.Take()
+			m.SetRateLimited(false)
+		}()
+		var item MessageSendItem
+		if m.rateLimited {
+			item = m.PopBack()
+			L().Infof("MessageSenderQueue: Spam Detected: Chat: %d, User: %d", item.ChatId, item.UserId)
+			m.Clear()
+		} else {
+			item = m.PopFront()
+		}
+		if item.Callback != nil {
+			item.Callback()
+		}
+	}
+}
+
+func (m *MessageSenderQueue) Start() {
+	m.isRunning = true
+	go m.Processor()
+}
+
+func (m *MessageSenderQueue) Stop() {
+	m.isRunning = false
+}
+
+func NewStatusMessageTransmissionManager() *StatusMessageTransmissionManager {
+	return &StatusMessageTransmissionManager{
+		storage: make(map[int64]*MessageSenderQueue),
+	}
+}
+
+// StatusMessageTransmissionManager : This struct manages the sending of status messages, one queue per chat is enforced
+// to ensure the rate limiting is only enabled per chat and does not affect status messages in other chats
+type StatusMessageTransmissionManager struct {
+	storage map[int64]*MessageSenderQueue
+	mut     sync.Mutex
+}
+
+func (s *StatusMessageTransmissionManager) QueueMessage(chatId int64, item MessageSendItem) {
+	s.mut.Lock()
+	defer s.mut.Unlock()
+	queue, ok := s.storage[chatId]
+	if !ok {
+		queue = NewMessageSenderQueue()
+		s.storage[chatId] = queue
+	}
+	queue.Push(item)
 }
