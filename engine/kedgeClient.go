@@ -119,6 +119,7 @@ type KedgeDownloadListener struct {
 	IsListenerRunning bool
 	statusGetter      func(string) (*TorrentStatus, error)
 	stopTorrent       func(string) error
+	cacheLastStats    func()
 	IsQueued          bool
 	haveInfo          bool
 	isSeed            bool
@@ -150,6 +151,7 @@ func (k *KedgeDownloadListener) OnDownloadComplete() {
 		k.IsSeeding = true
 		k.OnSeedingStart()
 	} else {
+		k.cacheLastStats()
 		err := k.stopTorrent(k.props.Spec.InfoHash.HexString())
 		if err != nil {
 			L().Errorf("kedge error while stopping torrent in download complete: %v", err)
@@ -376,9 +378,10 @@ func (k *KedgeDownloader) PrepDownload(gid string, link string, dir string, list
 	listener.isTorrent = true
 	listener.isSeed = isSeed
 	kedgeListener := NewKedgeDownloadListener(k.client, props, listener, k.GetTorrentStatus, k.client.Drop, isSeed)
-	kedgeListener.StartListener()
 	status := NewKedgeDownloadStatus(gid, listener, kedgeListener, k.GetTorrentStatus, k.client.Drop, props)
 	status.Index_ = index
+	kedgeListener.cacheLastStats = status.cacheLastStatus
+	kedgeListener.StartListener()
 	AddMirrorLocal(listener.GetUid(), status)
 	status.GetListener().OnDownloadStart(status.Gid())
 }
@@ -554,6 +557,10 @@ func (k *KedgeDownloadStatus) GetCloneListener() *CloneListener {
 
 func (k *KedgeDownloadStatus) Index() int {
 	return k.Index_
+}
+
+func (k *KedgeDownloadStatus) cacheLastStatus() {
+	k.lastStats = k.pullStatus()
 }
 
 func (k *KedgeDownloadStatus) CancelMirror() bool {
