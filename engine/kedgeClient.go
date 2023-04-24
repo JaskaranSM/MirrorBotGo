@@ -495,6 +495,12 @@ func (k *KedgeDownloadStatus) Percentage() float32 {
 }
 
 func (k *KedgeDownloadStatus) ETA() *time.Duration {
+	if k.kedgeListener.IsSeeding {
+		if k.CompletedLength() >= k.TotalLength() {
+			dur := time.Now().Sub(k.kedgeListener.SeedStartTime)
+			return &dur
+		}
+	}
 	dur := utils.CalculateETA(k.TotalLength()-k.CompletedLength(), k.Speed())
 	return &dur
 }

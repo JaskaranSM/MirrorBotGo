@@ -101,7 +101,13 @@ func PrepareMirror(opts *PrepareMirrorOptions) error {
 
 	link = utils.ParseMessageArgs(opts.Message.Text)
 	engine.L().Info(link)
-	fileId := utils.GetFileIdByGDriveLink(opts.Message.Text)
+	newLink, err := extract(link, opts.B, opts.Ctx)
+	if err != nil {
+		engine.L().Infof("Failed to extract ddl even: %v", err)
+	} else {
+		link = newLink
+	}
+	fileId := utils.GetFileIdByGDriveLink(link)
 	if fileId != "" {
 		engine.NewGDriveDownloadTransferService(fileId, &listener)
 		defer func() {
@@ -124,13 +130,6 @@ func PrepareMirror(opts *PrepareMirrorOptions) error {
 	if link == "" && fileId == "" {
 		engine.SendMessage(opts.B, "No source provided", opts.Message)
 		return nil
-	}
-	newLink, err := extract(link, opts.B, opts.Ctx)
-	if err != nil {
-		engine.L().Infof("Failed to extract ddl even: %v", err)
-	} else {
-		link = newLink
-		fileId = utils.GetFileIdByGDriveLink(link)
 	}
 	isTorrent, _ = utils.IsTorrentLink(link)
 
