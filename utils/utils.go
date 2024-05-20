@@ -3,7 +3,6 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/dustin/go-humanize"
 	"io"
 	"io/ioutil"
 	"log"
@@ -19,6 +18,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/dustin/go-humanize"
 
 	"github.com/gabriel-vasile/mimetype"
 	"github.com/lithammer/shortuuid"
@@ -88,6 +89,7 @@ type ConfigJson struct {
 	ZipStreamerURL                              string  `json:"zip_streamer_url"`
 	SpamFilterMessagesPerDuration               int     `json:"spam_filter_messages_per_duration"`
 	SpamFilterDurationValue                     int     `json:"spam_filter_duration_value"`
+	StatusMessageAutoDeleteTime                 int     `json:"status_message_auto_delete_time"`
 }
 
 var Config *ConfigJson = InitConfig()
@@ -743,4 +745,17 @@ func TrimString(text string) string {
 		return string(text[:20]) + "..."
 	}
 	return text
+}
+
+func GetStatusMessageAutoDeleteTime() int {
+	return Config.StatusMessageAutoDeleteTime
+}
+
+func ParseMessageFloodWaitDuration(err error) (int, error) {
+	if err == nil {
+		return -1, fmt.Errorf("error cannot be nil for this function")
+	}
+	valueInString := strings.SplitN(err.Error(), "retry after ", 2)[1]
+	value, err := strconv.Atoi(valueInString)
+	return value, err
 }

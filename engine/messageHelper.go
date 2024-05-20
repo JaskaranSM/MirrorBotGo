@@ -4,12 +4,13 @@ import (
 	"MirrorBotGo/utils"
 	"errors"
 	"fmt"
-	"go.uber.org/ratelimit"
 	"runtime"
 	"runtime/pprof"
 	"strings"
 	"sync"
 	"time"
+
+	"go.uber.org/ratelimit"
 
 	"github.com/PaulSonOfLars/gotgbot/v2"
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -88,10 +89,26 @@ func SendMessageImpl(b *gotgbot.Bot, messageText string, message *gotgbot.Messag
 			if isMessageNotFoundError(err) {
 				break
 			}
+			var sleepTime time.Duration
 			retries += 1
-			sleepTime := time.Duration(SleepMultiplier*float32(retries)) * time.Second
-			L().Errorf("SendMessage: %v, sleeping for %s, retry: %d", err, sleepTime, retries)
-			time.Sleep(sleepTime)
+			if isMessageFloodWaitError(err) {
+				L().Infof("flood wait error detected: %v", err)
+				parsedDuration, err := utils.ParseMessageFloodWaitDuration(err)
+				if err != nil {
+					L().Errorf("error while parsing flood wait sleep duration: %v", err)
+				} else {
+					sleepTime = time.Duration(parsedDuration) * time.Second
+				}
+			} else {
+				sleepTime = time.Duration(SleepMultiplier*float32(retries)) * time.Second
+			}
+			if sleepTime < time.Duration(120)*time.Second {
+				time.Sleep(sleepTime)
+				L().Errorf("sendMessage: %v, sleeping for %s, retry: %d", err, sleepTime, retries)
+			} else {
+				L().Errorf("sendMessage: %v, sleep duration is more than 120 seconds, giving up!!!", err)
+				break
+			}
 		}
 	}
 	return msg
@@ -110,6 +127,13 @@ func isEditMessageContentSameError(err error) bool {
 		return false
 	}
 	return strings.Contains(err.Error(), "specified new message content and reply markup are exactly the same as a current content and reply markup of the message")
+}
+
+func isMessageFloodWaitError(err error) bool {
+	if err == nil {
+		return false
+	}
+	return strings.Contains(err.Error(), "retry after ")
 }
 
 func isMessageNotFoundError(err error) bool {
@@ -142,13 +166,34 @@ func EditMessageImpl(b *gotgbot.Bot, messageText string, message *gotgbot.Messag
 		if err == nil {
 			break
 		} else {
-			if isEditMessageContentSameError(err) || isMessageNotFoundError(err) { //ignore this error
+			if isEditMessageContentSameError(err) { //ignore this error
 				break
 			}
+			if isMessageNotFoundError(err) {
+				L().Infof("message to edit not found: %v, dropping from StatusManager.", message.MessageId)
+				DeleteStatusMessage(b, message)
+				break
+			}
+			var sleepTime time.Duration
 			retries += 1
-			sleepTime := time.Duration(SleepMultiplier*float32(retries)) * time.Second
-			L().Errorf("editMessage: %v, sleeping for %s, retry: %d", err, sleepTime, retries)
-			time.Sleep(sleepTime)
+			if isMessageFloodWaitError(err) {
+				L().Infof("flood wait error detected: %v", err)
+				parsedDuration, err := utils.ParseMessageFloodWaitDuration(err)
+				if err != nil {
+					L().Errorf("error while parsing flood wait sleep duration: %v", err)
+				} else {
+					sleepTime = time.Duration(parsedDuration) * time.Second
+				}
+			} else {
+				sleepTime = time.Duration(SleepMultiplier*float32(retries)) * time.Second
+			}
+			if sleepTime < time.Duration(120)*time.Second {
+				time.Sleep(sleepTime)
+				L().Errorf("editMessage: %v, sleeping for %s, retry: %d", err, sleepTime, retries)
+			} else {
+				L().Errorf("editMessage: %v, sleep duration is more than 120 seconds, giving up!!!", err)
+				break
+			}
 		}
 	}
 	return msg
@@ -175,6 +220,11 @@ func DeleteAllMessages(b *gotgbot.Bot) {
 		DeleteMessage(b, m)
 		DeleteMessageByChatId(m.Chat.Id)
 	}
+}
+
+func DeleteStatusMessage(b *gotgbot.Bot, message *gotgbot.Message) {
+	DeleteMessage(b, message)
+	DeleteMessageByChatId(message.Chat.Id)
 }
 
 func GetCpuUsage() string {
@@ -317,6 +367,10 @@ func SendStatusMessage(b *gotgbot.Bot, message *gotgbot.Message, deleteCommandMe
 		}
 		newMsg.Date = 0
 		AddStatusMessage(newMsg)
+		duration := utils.GetStatusMessageAutoDeleteTime()
+		if duration > 0 {
+			AutoDeleteMessages(b, time.Duration(duration)*time.Second, newMsg)
+		}
 		return nil
 	}
 	SenderQueue.QueueMessage(message.Chat.Id, MessageSendItem{
