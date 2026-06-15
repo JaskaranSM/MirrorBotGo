@@ -1,4 +1,3 @@
-/mirrorbot
 /data/
 /downloads/
 /accounts/
@@ -10,4 +9,3 @@ log.txt
 .env
 credentials.json
 token.json
-mirrorbot
