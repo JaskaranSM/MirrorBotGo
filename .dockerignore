@@ -1,0 +1,13 @@
+.git
+data
+downloads
+accounts
+pgdata
+*.db
+*.db-shm
+*.db-wal
+log.txt
+.env
+credentials.json
+token.json
+mirrorbot

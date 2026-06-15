@@ -1,0 +1,38 @@
+services:
+  mirrorbot:
+    build: .
+    # image: ghcr.io/youruser/mirrorbot:latest   # or use a prebuilt image
+    container_name: mirrorbot
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data             # SQLite DB + state
+      - ./downloads:/app/downloads   # scratch download dir
+      - ./accounts:/app/accounts     # Google Drive service-account JSONs (USE_SA=true)
+      # For OAuth instead of service accounts, mount these and set USE_SA=false:
+      # - ./credentials.json:/app/credentials.json
+      # - ./token.json:/app/token.json
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:7870/health"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    # Uncomment to run alongside Postgres:
+    # depends_on:
+    #   - db
+
+  # Optional PostgreSQL backend. To use it, set in .env:
+  #   DB_DRIVER=postgres
+  #   DB_DSN=postgres://mirrorbot:mirrorbot@db:5432/mirrorbot?sslmode=disable
+  # db:
+  #   image: postgres:16
+  #   container_name: mirrorbot-db
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_USER: mirrorbot
+  #     POSTGRES_PASSWORD: mirrorbot
+  #     POSTGRES_DB: mirrorbot
+  #   volumes:
+  #     - ./pgdata:/var/lib/postgresql/data
