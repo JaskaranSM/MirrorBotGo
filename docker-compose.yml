@@ -1,7 +1,9 @@
 services:
   mirrorbot:
+    # Builds locally and tags as the ghcr image; or comment out `build` to pull
+    # the prebuilt image. monitoring-init reuses this same image for its config.
     build: .
-    # image: ghcr.io/youruser/mirrorbot:latest   # or use a prebuilt image
+    image: ghcr.io/jaskaransm/mirrorbotgo-rewrite:latest
     container_name: mirrorbot
     restart: unless-stopped
     env_file:
@@ -23,21 +25,36 @@ services:
     # depends_on:
     #   - db
 
+  # One-shot: copy the monitoring config bundled in the bot image into a shared
+  # volume so prometheus/grafana can read it. This is how the ./monitoring files
+  # "ship with" the mirrorbotgo image instead of being mounted from the host.
+  monitoring-init:
+    image: ghcr.io/jaskaransm/mirrorbotgo-rewrite:latest
+    container_name: mirrorbot-monitoring-init
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["cp -a /app/monitoring/. /cfg/"]
+    volumes:
+      - mon-config:/cfg
+    restart: "no"
+
   # Prometheus scrapes the bot's /metrics (mirrorbot:7870) and stores the series.
   prometheus:
     image: prom/prometheus:v2.54.1
     container_name: mirrorbot-prometheus
     restart: unless-stopped
     volumes:
-      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - mon-config:/cfg:ro
       - prometheus-data:/prometheus
     command:
-      - --config.file=/etc/prometheus/prometheus.yml
+      - --config.file=/cfg/prometheus.yml
       - --storage.tsdb.retention.time=15d
     ports:
       - "9090:9090"
     depends_on:
-      - mirrorbot
+      monitoring-init:
+        condition: service_completed_successfully
+      mirrorbot:
+        condition: service_started
 
   # Grafana, pre-provisioned with the Prometheus datasource and the MirrorBot dashboard.
   grafana:
@@ -48,14 +65,17 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_PATHS_PROVISIONING: /cfg/grafana/provisioning
     volumes:
-      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - mon-config:/cfg:ro
       - grafana-data:/var/lib/grafana
     ports:
       - "3000:3000"
     depends_on:
-      - prometheus
+      monitoring-init:
+        condition: service_completed_successfully
+      prometheus:
+        condition: service_started
 
   # Optional PostgreSQL backend. To use it, set in .env:
   #   DB_DRIVER=postgres
@@ -72,5 +92,6 @@ services:
   #     - ./pgdata:/var/lib/postgresql/data
 
 volumes:
+  mon-config:
   prometheus-data:
   grafana-data:

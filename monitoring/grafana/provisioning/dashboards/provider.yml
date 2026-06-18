@@ -8,5 +8,6 @@ providers:
     updateIntervalSeconds: 30
     allowUiUpdates: true
     options:
-      path: /var/lib/grafana/dashboards
+      # Dashboards live in the shared config volume mounted at /cfg.
+      path: /cfg/grafana/dashboards
       foldersFromFilesStructure: false

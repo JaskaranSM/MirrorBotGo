@@ -1,12 +1,21 @@
-# Ephemeral stack for verifying the monitoring setup WITHOUT a live bot.
-# A tiny nginx stub impersonates the bot's /metrics endpoint (service name
-# "mirrorbot", port 7870) so Prometheus's real scrape config and Grafana's real
-# provisioning are exercised end to end.
+# Ephemeral stack for verifying the monitoring setup, exercising the SAME
+# mechanism as production: the monitoring config is read from the bot image
+# (/app/monitoring) by an init step that seeds a shared volume; prometheus and
+# grafana then read it from /cfg. A tiny nginx stub impersonates the bot's
+# /metrics endpoint (service "mirrorbot", port 7870) as the scrape target.
 #
 #   docker compose -f monitoring/verify.compose.yml up -d
 #   ... checks ...
 #   docker compose -f monitoring/verify.compose.yml down -v
 services:
+  monitoring-init:
+    image: ghcr.io/jaskaransm/mirrorbotgo-rewrite:latest
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["cp -a /app/monitoring/. /cfg/"]
+    volumes:
+      - mon-config:/cfg
+    restart: "no"
+
   mirrorbot:
     image: nginx:alpine
     container_name: verify-mirrorbot
@@ -18,13 +27,16 @@ services:
     image: prom/prometheus:v2.54.1
     container_name: verify-prometheus
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - mon-config:/cfg:ro
     command:
-      - --config.file=/etc/prometheus/prometheus.yml
+      - --config.file=/cfg/prometheus.yml
     ports:
       - "9090:9090"
     depends_on:
-      - mirrorbot
+      monitoring-init:
+        condition: service_completed_successfully
+      mirrorbot:
+        condition: service_started
 
   grafana:
     image: grafana/grafana:11.2.0
@@ -33,10 +45,16 @@ services:
       GF_SECURITY_ADMIN_USER: admin
       GF_SECURITY_ADMIN_PASSWORD: admin
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_PATHS_PROVISIONING: /cfg/grafana/provisioning
     volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning:ro
-      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - mon-config:/cfg:ro
     ports:
       - "3000:3000"
     depends_on:
-      - prometheus
+      monitoring-init:
+        condition: service_completed_successfully
+      prometheus:
+        condition: service_started
+
+volumes:
+  mon-config:

@@ -15,6 +15,11 @@ RUN apk add --no-cache ca-certificates tzdata && update-ca-certificates
 WORKDIR /app
 COPY --from=build /out/mirrorbot /usr/local/bin/mirrorbot
 
+# Bundle the monitoring config (Prometheus scrape config + Grafana provisioning
+# and dashboards) into the image so it ships with the bot. A compose init step
+# copies it into a shared volume for the prometheus/grafana services.
+COPY monitoring /app/monitoring
+
 # Data, downloads and service-account dirs are expected as mounted volumes.
 ENV DOWNLOAD_DIR=/app/downloads \
     SA_DIR=/app/accounts \
