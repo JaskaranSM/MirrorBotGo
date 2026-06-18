@@ -6,6 +6,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"mirrorbot/internal/metrics"
 	"mirrorbot/internal/status"
 	"mirrorbot/internal/util"
 )
@@ -59,11 +60,11 @@ type Transfer struct {
 	name   string
 	path   string
 
-	completed atomic.Int64
-	total     atomic.Int64
-	speed     atomic.Int64
-	index     atomic.Int64
-	cancelled atomic.Bool
+	completed     atomic.Int64
+	total         atomic.Int64
+	speed         atomic.Int64
+	index         atomic.Int64
+	cancelled     atomic.Bool
 	completedFlag atomic.Bool
 	failedFlag    atomic.Bool
 
@@ -188,3 +189,31 @@ func (t *Transfer) stopObserver() {
 }
 
 func (t *Transfer) addCompleted(n int64) { t.completed.Add(n) }
+
+// metricType maps the transfer's status type to a metrics label.
+func (t *Transfer) metricType() string {
+	switch t.typ {
+	case status.Uploading:
+		return "upload"
+	case status.Downloading:
+		return "download"
+	case status.Cloning:
+		return "clone"
+	default:
+		return "unknown"
+	}
+}
+
+// recordDone emits the Prometheus result + byte counters for a finished transfer.
+func (t *Transfer) recordDone(err error) {
+	typ := t.metricType()
+	switch {
+	case err == nil:
+		metrics.Transfers.WithLabelValues(typ, metrics.ResultComplete).Inc()
+		metrics.TransferBytes.WithLabelValues(typ).Add(float64(t.completed.Load()))
+	case t.cancelled.Load() || errors.Is(err, errCancelled):
+		metrics.Transfers.WithLabelValues(typ, metrics.ResultCancelled).Inc()
+	default:
+		metrics.Transfers.WithLabelValues(typ, metrics.ResultError).Inc()
+	}
+}

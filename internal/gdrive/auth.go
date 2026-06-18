@@ -17,6 +17,8 @@ import (
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/drive/v3"
 	"google.golang.org/api/option"
+
+	"mirrorbot/internal/metrics"
 )
 
 const folderMIME = "application/vnd.google-apps.folder"
@@ -63,6 +65,7 @@ func NewAuth(cfg Config) (*Auth, error) {
 func (a *Auth) RotateSA() {
 	if len(a.saFiles) > 0 {
 		a.saIndex.Add(1)
+		metrics.DriveSARotations.Inc()
 	}
 }
 

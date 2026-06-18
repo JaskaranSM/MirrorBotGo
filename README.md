@@ -29,7 +29,8 @@ internal/tgbot        botapi wrapper: send/edit/delete (retry+flood-wait), MTPro
 internal/sources/*    torrentdl, httpdl, tgfile, bulktg download sources
 internal/gdrive       embedded Drive upload/download/clone/list/metadata
 internal/archive      tar create + archive extraction (.zip/.tar/.tar.gz)
-internal/health       /health + /healthcount
+internal/metrics      Prometheus collectors (registered to the default registry)
+internal/health       /health + /healthcount + /metrics
 ```
 
 Every unit of work (a download, an archive step, a Drive upload/clone) implements
@@ -100,6 +101,42 @@ id works).
 
 Database is `DB_DRIVER=sqlite` (default, file at `DB_DSN`) or `DB_DRIVER=postgres`
 with a `postgres://…` DSN.
+
+## Metrics
+
+Prometheus metrics are exposed at **`/metrics`** on `HEALTH_ADDR` (default `:7870`),
+alongside the standard Go runtime and process collectors.
+
+`docker compose up` brings up a full monitoring stack alongside the bot:
+
+- **Prometheus** (`:9090`) — scrapes `mirrorbot:7870` per [monitoring/prometheus.yml](monitoring/prometheus.yml).
+- **Grafana** (`:3000`, login `admin`/`admin`) — auto-provisioned with the Prometheus
+  datasource and a **MirrorBot** dashboard ([monitoring/grafana](monitoring/grafana)).
+
+To verify the monitoring stack on its own (no live bot — an nginx stub serves sample
+metrics), run:
+
+```bash
+cd monitoring && docker compose -f verify.compose.yml up -d
+# Prometheus target up + Grafana datasource/dashboard provisioned; then:
+docker compose -f verify.compose.yml down -v
+```
+
+Key series (all prefixed `mirrorbot_`):
+
+| Metric | Type | Labels | Meaning |
+|---|---|---|---|
+| `commands_total` | counter | `command` | commands received |
+| `telegram_ops_total` | counter | `op`, `result` | send/edit/delete/document/download/answer_callback outcomes |
+| `telegram_floodwaits_total` / `telegram_retries_total` | counter | — | FLOOD_WAITs hit / transport retries |
+| `active_mirrors` / `seeding_mirrors` / `bulk_sessions` | gauge | — | live counts |
+| `mirrors_started_total` / `mirrors_finished_total` | counter | `source`(, `result`) | downloads by source (torrent/http/tgfile/bulktg) |
+| `download_bytes_total` / `download_duration_seconds` | counter / histogram | `source` | bytes & duration per source |
+| `gdrive_transfers_total` / `gdrive_transfer_bytes_total` | counter | `type`(, `result`) | upload/download/clone |
+| `gdrive_sa_rotations_total` | counter | — | service-account rotations |
+| `archive_ops_total` / `archive_bytes_total` | counter | `op`(, `result`) | tar/untar |
+| `bulk_files_queued_total` | counter | — | files queued into bulk sessions |
+| `panics_total` | counter | `where` | recovered panics by location |
 
 ## Running with Docker
 

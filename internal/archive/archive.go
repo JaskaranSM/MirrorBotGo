@@ -16,11 +16,26 @@ import (
 	"sync/atomic"
 	"time"
 
+	"mirrorbot/internal/metrics"
 	"mirrorbot/internal/status"
 	"mirrorbot/internal/util"
 )
 
 var errCancelled = errors.New("cancelled by user")
+
+// recordArchive emits the op result + byte counters for a finished archive op.
+func (p *progress) recordArchive(op string, err error) {
+	res := metrics.ResultComplete
+	switch {
+	case err == nil:
+	case p.cancelled.Load() || errors.Is(err, errCancelled):
+		res = metrics.ResultCancelled
+	default:
+		res = metrics.ResultError
+	}
+	metrics.ArchiveOps.WithLabelValues(op, res).Inc()
+	metrics.ArchiveBytes.WithLabelValues(op).Add(float64(p.completed.Load()))
+}
 
 // progress is the shared status.Status backing for archive operations.
 type progress struct {
@@ -39,11 +54,11 @@ type progress struct {
 }
 
 func (p *progress) Name() string           { return p.name }
-func (p *progress) CompletedLength() int64  { return p.completed.Load() }
-func (p *progress) TotalLength() int64      { return p.total.Load() }
-func (p *progress) Speed() int64            { return p.speed.Load() }
-func (p *progress) GID() string             { return p.gid }
-func (p *progress) Path() string            { return p.path }
+func (p *progress) CompletedLength() int64 { return p.completed.Load() }
+func (p *progress) TotalLength() int64     { return p.total.Load() }
+func (p *progress) Speed() int64           { return p.speed.Load() }
+func (p *progress) GID() string            { return p.gid }
+func (p *progress) Path() string           { return p.path }
 func (p *progress) StatusType() status.StatusType {
 	if p.cancelled.Load() {
 		return status.Canceled
@@ -124,7 +139,8 @@ func NewTarArchiver(name, gid string) *TarArchiver {
 }
 
 // Tar archives srcPath into "<srcPath>.tar" and returns the new path.
-func (t *TarArchiver) Tar(srcPath string) (string, error) {
+func (t *TarArchiver) Tar(srcPath string) (_ string, retErr error) {
+	defer func() { t.recordArchive("tar", retErr) }()
 	t.path = srcPath
 	t.total.Store(localSize(srcPath))
 	t.startObserver()
@@ -203,7 +219,8 @@ func Supported(path string) bool {
 }
 
 // Extract unpacks srcPath into a sibling directory and returns the directory.
-func (u *UnArchiver) Extract(srcPath string) (string, error) {
+func (u *UnArchiver) Extract(srcPath string) (_ string, retErr error) {
+	defer func() { u.recordArchive("untar", retErr) }()
 	u.path = srcPath
 	u.startObserver()
 	defer u.stopObserver()

@@ -1,0 +1,30 @@
+# Sample MirrorBot metrics used only by monitoring/verify.compose.yml to stand in
+# for a live bot during local verification. Not used in production.
+# TYPE mirrorbot_active_mirrors gauge
+mirrorbot_active_mirrors 3
+# TYPE mirrorbot_seeding_mirrors gauge
+mirrorbot_seeding_mirrors 1
+# TYPE mirrorbot_bulk_sessions gauge
+mirrorbot_bulk_sessions 0
+# TYPE mirrorbot_commands_total counter
+mirrorbot_commands_total{command="mirror"} 42
+mirrorbot_commands_total{command="clone"} 7
+# TYPE mirrorbot_telegram_ops_total counter
+mirrorbot_telegram_ops_total{op="send",result="ok"} 240
+mirrorbot_telegram_ops_total{op="edit",result="ok"} 5300
+# TYPE mirrorbot_telegram_floodwaits_total counter
+mirrorbot_telegram_floodwaits_total 3
+# TYPE mirrorbot_mirrors_finished_total counter
+mirrorbot_mirrors_finished_total{source="torrent",result="complete"} 12
+mirrorbot_mirrors_finished_total{source="http",result="complete"} 5
+# TYPE mirrorbot_download_bytes_total counter
+mirrorbot_download_bytes_total{source="torrent"} 1048576000
+mirrorbot_download_bytes_total{source="http"} 209715200
+# TYPE mirrorbot_gdrive_transfer_bytes_total counter
+mirrorbot_gdrive_transfer_bytes_total{type="upload"} 5368709120
+# TYPE mirrorbot_panics_total counter
+mirrorbot_panics_total{where="pipeline"} 0
+# TYPE go_goroutines gauge
+go_goroutines 87
+# TYPE go_memstats_alloc_bytes gauge
+go_memstats_alloc_bytes 42000000

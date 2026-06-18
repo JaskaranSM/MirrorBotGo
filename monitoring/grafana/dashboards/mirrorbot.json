@@ -1,0 +1,85 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 39,
+  "version": 1,
+  "title": "MirrorBot",
+  "uid": "mirrorbot",
+  "tags": ["mirrorbot"],
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "10s",
+  "templating": { "list": [] },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Active mirrors",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "fieldConfig": { "defaults": { "color": { "mode": "thresholds" } }, "overrides": [] },
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(mirrorbot_active_mirrors)", "refId": "A" } ]
+    },
+    {
+      "id": 2, "type": "stat", "title": "Seeding",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(mirrorbot_seeding_mirrors)", "refId": "A" } ]
+    },
+    {
+      "id": 3, "type": "stat", "title": "Bulk sessions",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(mirrorbot_bulk_sessions)", "refId": "A" } ]
+    },
+    {
+      "id": 4, "type": "stat", "title": "Flood waits (total)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(mirrorbot_telegram_floodwaits_total)", "refId": "A" } ]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Download throughput by source",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (source) (rate(mirrorbot_download_bytes_total[5m]))", "legendFormat": "{{source}}", "refId": "A" } ]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Mirror outcomes /s",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (source, result) (rate(mirrorbot_mirrors_finished_total[5m]))", "legendFormat": "{{source}} {{result}}", "refId": "A" } ]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Telegram ops /s",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (op, result) (rate(mirrorbot_telegram_ops_total[5m]))", "legendFormat": "{{op}} {{result}}", "refId": "A" } ]
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "Drive transfer throughput by type",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "fieldConfig": { "defaults": { "unit": "Bps", "custom": { "drawStyle": "line", "fillOpacity": 10 } }, "overrides": [] },
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (type) (rate(mirrorbot_gdrive_transfer_bytes_total[5m]))", "legendFormat": "{{type}}", "refId": "A" } ]
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "Commands /s",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "bars", "fillOpacity": 40 } }, "overrides": [] },
+      "targets": [ { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum by (command) (rate(mirrorbot_commands_total[5m]))", "legendFormat": "{{command}}", "refId": "A" } ]
+    },
+    {
+      "id": 10, "type": "timeseries", "title": "Runtime (goroutines & heap)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+      "fieldConfig": { "defaults": { "custom": { "drawStyle": "line", "fillOpacity": 0 } }, "overrides": [ { "matcher": { "id": "byName", "options": "heap bytes" }, "properties": [ { "id": "unit", "value": "bytes" } ] } ] },
+      "targets": [
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "go_goroutines{job=\"mirrorbot\"}", "legendFormat": "goroutines", "refId": "A" },
+        { "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "go_memstats_alloc_bytes{job=\"mirrorbot\"}", "legendFormat": "heap bytes", "refId": "B" }
+      ]
+    }
+  ]
+}

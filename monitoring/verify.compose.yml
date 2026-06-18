@@ -1,0 +1,42 @@
+# Ephemeral stack for verifying the monitoring setup WITHOUT a live bot.
+# A tiny nginx stub impersonates the bot's /metrics endpoint (service name
+# "mirrorbot", port 7870) so Prometheus's real scrape config and Grafana's real
+# provisioning are exercised end to end.
+#
+#   docker compose -f monitoring/verify.compose.yml up -d
+#   ... checks ...
+#   docker compose -f monitoring/verify.compose.yml down -v
+services:
+  mirrorbot:
+    image: nginx:alpine
+    container_name: verify-mirrorbot
+    volumes:
+      - ./nginx-stub.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./sample-metrics.txt:/etc/sample-metrics.txt:ro
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: verify-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    depends_on:
+      - mirrorbot
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: verify-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus

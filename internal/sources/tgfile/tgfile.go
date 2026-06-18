@@ -12,6 +12,7 @@ import (
 
 	"github.com/gotd/td/tg"
 
+	"mirrorbot/internal/metrics"
 	"mirrorbot/internal/status"
 	"mirrorbot/internal/tgbot"
 	"mirrorbot/internal/util"
@@ -51,6 +52,15 @@ func New(bot *tgbot.Bot, loc tg.InputFileLocationClass, fileName string, size in
 
 // Start runs the download in the current goroutine.
 func (d *Download) Start(ctx context.Context) {
+	start := time.Now()
+	result := metrics.ResultError
+	metrics.MirrorsStarted.WithLabelValues(metrics.SourceTGFile).Inc()
+	defer func() {
+		metrics.MirrorsFinished.WithLabelValues(metrics.SourceTGFile, result).Inc()
+		metrics.DownloadBytes.WithLabelValues(metrics.SourceTGFile).Add(float64(d.completed.Load()))
+		metrics.DownloadDuration.WithLabelValues(metrics.SourceTGFile).Observe(time.Since(start).Seconds())
+	}()
+
 	if err := os.MkdirAll(d.dir, 0o755); err != nil {
 		d.fail(err)
 		return
@@ -70,12 +80,14 @@ func (d *Download) Start(ctx context.Context) {
 
 	if err != nil {
 		if d.cancelled.Load() || errors.Is(err, errCancelled) {
+			result = metrics.ResultCancelled
 			d.listener.OnDownloadError(errCancelled)
 			return
 		}
 		d.fail(err)
 		return
 	}
+	result = metrics.ResultComplete
 	d.listener.OnDownloadComplete()
 }
 

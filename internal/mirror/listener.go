@@ -11,6 +11,7 @@ import (
 
 	"mirrorbot/internal/archive"
 	"mirrorbot/internal/gdrive"
+	"mirrorbot/internal/metrics"
 	"mirrorbot/internal/status"
 	"mirrorbot/internal/tgbot"
 	"mirrorbot/internal/util"
@@ -35,10 +36,10 @@ type MirrorListener struct {
 	chatID  int64
 	replyTo int
 
-	isTar       bool
-	isSeed      bool
-	doUnArchive bool
-	parentID    string
+	isTar        bool
+	isSeed       bool
+	doUnArchive  bool
+	parentID     string
 	customParent bool
 
 	mu       sync.Mutex
@@ -73,6 +74,7 @@ func (m *MirrorListener) OnDownloadComplete() {
 func (m *MirrorListener) runComplete() {
 	defer func() {
 		if r := recover(); r != nil {
+			metrics.Panics.WithLabelValues("pipeline").Inc()
 			log.Printf("pipeline panic: uid=%d: %v", m.uid, r)
 			m.OnUploadError(fmt.Errorf("internal error: %v", r))
 		}
@@ -251,6 +253,7 @@ func (c *CloneListener) Start(srcID string) *gdrive.Transfer {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
+				metrics.Panics.WithLabelValues("clone").Inc()
 				log.Printf("clone panic: uid=%d: %v", c.uid, r)
 				c.onError(fmt.Errorf("internal error: %v", r))
 			}

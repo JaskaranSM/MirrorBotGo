@@ -11,6 +11,7 @@ import (
 
 	"mirrorbot/internal/config"
 	"mirrorbot/internal/gdrive"
+	"mirrorbot/internal/metrics"
 	"mirrorbot/internal/mirror"
 	"mirrorbot/internal/sources/torrentdl"
 	"mirrorbot/internal/store"
@@ -73,7 +74,7 @@ func New(ctx context.Context, cfg *config.Config, bot *tgbot.Bot, st *store.Stor
 		IndexURL:        cfg.IndexURL,
 	}
 
-	return &App{
+	a := &App{
 		cfg:       cfg,
 		bot:       bot,
 		store:     st,
@@ -85,7 +86,14 @@ func New(ctx context.Context, cfg *config.Config, bot *tgbot.Bot, st *store.Stor
 		bulk:      newBulkManager(),
 		startTime: time.Now(),
 		logFile:   logFile,
-	}, nil
+	}
+
+	// State-derived gauges, read live on each scrape.
+	metrics.RegisterGauge("mirrorbot_active_mirrors", "Active (non-seeding) mirrors.", func() float64 { return float64(mgr.Count()) })
+	metrics.RegisterGauge("mirrorbot_seeding_mirrors", "Seeding mirrors.", func() float64 { return float64(mgr.SeedingCount()) })
+	metrics.RegisterGauge("mirrorbot_bulk_sessions", "Active bulk Telegram listener sessions.", func() float64 { return float64(a.bulk.count()) })
+
+	return a, nil
 }
 
 // Run starts serving updates (blocks until ctx is cancelled).
@@ -111,6 +119,19 @@ func (a *App) CancelAll() {
 // Register installs all command and callback handlers on the bot.
 func (a *App) Register() {
 	api := a.bot.API()
+
+	// Count every command invocation (runs for any matched route; guarded to
+	// commands).
+	api.Use(func(next botapi.Handler) botapi.Handler {
+		return func(c *botapi.Context) error {
+			if msg := c.Message(); msg != nil {
+				if name := commandNameOf(msg.Text); name != "" {
+					metrics.Commands.WithLabelValues(name).Inc()
+				}
+			}
+			return next(c)
+		}
+	})
 
 	api.OnCommand("start", "Start the bot", a.cmdStart)
 
@@ -251,6 +272,22 @@ func effectiveUserID(msg *botapi.Message) int64 {
 		return msg.From.ID
 	}
 	return msg.Chat.ID
+}
+
+// commandNameOf extracts the bare command name from message text
+// ("/mirror@bot arg" -> "mirror"), or "" if the text is not a command.
+func commandNameOf(text string) string {
+	if !strings.HasPrefix(text, "/") {
+		return ""
+	}
+	field := text[1:]
+	if i := strings.IndexAny(field, " \t\n"); i >= 0 {
+		field = field[:i]
+	}
+	if i := strings.IndexByte(field, '@'); i >= 0 {
+		field = field[:i]
+	}
+	return field
 }
 
 // splitParent splits "link | drive-folder-link" into (link, parentFolderID).

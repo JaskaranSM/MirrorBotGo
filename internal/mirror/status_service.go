@@ -8,6 +8,8 @@ import (
 	"sync"
 	"time"
 
+	"mirrorbot/internal/metrics"
+
 	"github.com/gotd/botapi"
 
 	"mirrorbot/internal/status"
@@ -112,6 +114,7 @@ func (s *StatusService) Start() {
 func (s *StatusService) spin() {
 	defer func() {
 		if r := recover(); r != nil {
+			metrics.Panics.WithLabelValues("spinner").Inc()
 			log.Printf("status: recovered from panic in spinner: %v", r)
 			s.stop()
 		}

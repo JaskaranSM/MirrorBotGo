@@ -9,9 +9,9 @@ import (
 
 type noopListener struct{}
 
-func (noopListener) OnDownloadStart()         {}
-func (noopListener) OnDownloadComplete()       {}
-func (noopListener) OnDownloadError(error)      {}
+func (noopListener) OnDownloadStart()      {}
+func (noopListener) OnDownloadComplete()   {}
+func (noopListener) OnDownloadError(error) {}
 
 // TestLiveMagnet verifies the embedded torrent engine can fetch metadata and
 // connect to peers for a real magnet. Gated behind TORRENT_LIVE_TEST=1.

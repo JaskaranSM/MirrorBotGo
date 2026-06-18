@@ -21,6 +21,7 @@ import (
 	"github.com/anacrolix/torrent/storage"
 	"golang.org/x/time/rate"
 
+	"mirrorbot/internal/metrics"
 	"mirrorbot/internal/status"
 	"mirrorbot/internal/util"
 )
@@ -96,7 +97,10 @@ func (e *Engine) AddMetaInfo(data []byte, baseDir string, seed bool, listener st
 }
 
 func (e *Engine) add(spec *torrent.TorrentSpec, baseDir string, seed bool, listener status.Listener) (*Download, error) {
-	spec.Storage = storage.NewFile(baseDir)
+	// Use mmap storage rather than file storage: anacrolix's file backend issues
+	// blocking syscalls that make the Go runtime spawn a new OS thread on every
+	// blocked I/O, which balloons thread count under load. mmap avoids that.
+	spec.Storage = storage.NewMMap(baseDir)
 	t, isNew, err := e.client.AddTorrentSpec(spec)
 	if err != nil {
 		return nil, fmt.Errorf("add torrent: %w", err)
@@ -131,11 +135,22 @@ type Download struct {
 	seeding       atomic.Bool
 	completedFlag atomic.Bool
 
-	cancelCh chan struct{}
+	cancelCh   chan struct{}
 	cancelOnce sync.Once
+	recorded   atomic.Bool // terminal metric recorded at most once
 
 	mu            sync.Mutex
 	completedTime time.Time
+}
+
+// recordTerminal emits the source's terminal metrics once (download completed
+// or cancelled/errored); subsequent calls (e.g. cancel after seeding) are no-ops.
+func (d *Download) recordTerminal(start time.Time, result string) {
+	if d.recorded.CompareAndSwap(false, true) {
+		metrics.MirrorsFinished.WithLabelValues(metrics.SourceTorrent, result).Inc()
+		metrics.DownloadBytes.WithLabelValues(metrics.SourceTorrent).Add(float64(d.t.BytesCompleted()))
+		metrics.DownloadDuration.WithLabelValues(metrics.SourceTorrent).Observe(time.Since(start).Seconds())
+	}
 }
 
 func (d *Download) cancelChan() chan struct{} {
@@ -147,12 +162,15 @@ func (d *Download) cancelChan() chan struct{} {
 // it after registering the Download's status, to avoid a completion firing
 // before the status is tracked.
 func (d *Download) Start(ctx context.Context) {
+	start := time.Now()
+	metrics.MirrorsStarted.WithLabelValues(metrics.SourceTorrent).Inc()
 	cancel := d.cancelChan()
 	select {
 	case <-d.t.GotInfo():
 	case <-ctx.Done():
 		return
 	case <-cancel:
+		d.recordTerminal(start, metrics.ResultCancelled)
 		d.listener.OnDownloadError(errCancelled)
 		return
 	}
@@ -168,6 +186,7 @@ func (d *Download) Start(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-cancel:
+			d.recordTerminal(start, metrics.ResultCancelled)
 			d.listener.OnDownloadError(errCancelled)
 			return
 		case <-ticker.C:
@@ -179,6 +198,7 @@ func (d *Download) Start(ctx context.Context) {
 				d.mu.Lock()
 				d.completedTime = time.Now()
 				d.mu.Unlock()
+				d.recordTerminal(start, metrics.ResultComplete)
 				if d.seed {
 					d.seeding.Store(true)
 				}
@@ -224,9 +244,9 @@ func (d *Download) TotalLength() int64 {
 	}
 	return d.t.Length()
 }
-func (d *Download) Speed() int64  { return d.speed.Load() }
-func (d *Download) GID() string   { return d.gid }
-func (d *Download) Path() string  { return filepath.Join(d.baseDir, d.t.Name()) }
+func (d *Download) Speed() int64 { return d.speed.Load() }
+func (d *Download) GID() string  { return d.gid }
+func (d *Download) Path() string { return filepath.Join(d.baseDir, d.t.Name()) }
 
 func (d *Download) Percentage() float32 {
 	if !d.hasInfo() {

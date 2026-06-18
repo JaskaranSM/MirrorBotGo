@@ -13,6 +13,8 @@ import (
 	"github.com/gotd/botapi"
 	"github.com/gotd/td/telegram/downloader"
 	"github.com/gotd/td/tg"
+
+	"mirrorbot/internal/metrics"
 )
 
 // ReplyMedia describes a downloadable media object extracted from a message.
@@ -131,6 +133,7 @@ func (b *Bot) InterceptMedia(fn func(chatID int64, msgID int, media *ReplyMedia)
 func existingNewMessageHandler(disp *tg.UpdateDispatcher) (h tg.Handler) {
 	defer func() {
 		if r := recover(); r != nil {
+			metrics.Panics.WithLabelValues("interceptor").Inc()
 			log.Printf("tgbot: could not read existing update handler to chain: %v", r)
 			h = nil
 		}
@@ -265,5 +268,6 @@ func largestPhotoSize(p *tg.Photo) (thumbType string, size int64) {
 // DownloadMedia streams a Telegram media location to w over MTProto.
 func (b *Bot) DownloadMedia(ctx context.Context, loc tg.InputFileLocationClass, w io.Writer) error {
 	_, err := downloader.NewDownloader().Download(b.api.Raw(), loc).Stream(ctx, w)
+	metrics.TelegramOps.WithLabelValues("download", result(err)).Inc()
 	return err
 }

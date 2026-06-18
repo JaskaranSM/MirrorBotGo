@@ -19,18 +19,18 @@ type fakeStatus struct {
 	index     int
 }
 
-func (f *fakeStatus) Name() string            { return f.name }
-func (f *fakeStatus) CompletedLength() int64  { return f.completed }
-func (f *fakeStatus) TotalLength() int64      { return f.total }
-func (f *fakeStatus) Speed() int64            { return f.speed }
-func (f *fakeStatus) ETA() *time.Duration     { return f.eta }
-func (f *fakeStatus) GID() string             { return f.gid }
-func (f *fakeStatus) Path() string            { return "" }
-func (f *fakeStatus) Percentage() float32     { return f.pct }
-func (f *fakeStatus) StatusType() StatusType  { return f.st }
-func (f *fakeStatus) Index() int              { return f.index }
-func (f *fakeStatus) SetIndex(i int)          { f.index = i }
-func (f *fakeStatus) Cancel() bool            { return true }
+func (f *fakeStatus) Name() string           { return f.name }
+func (f *fakeStatus) CompletedLength() int64 { return f.completed }
+func (f *fakeStatus) TotalLength() int64     { return f.total }
+func (f *fakeStatus) Speed() int64           { return f.speed }
+func (f *fakeStatus) ETA() *time.Duration    { return f.eta }
+func (f *fakeStatus) GID() string            { return f.gid }
+func (f *fakeStatus) Path() string           { return "" }
+func (f *fakeStatus) Percentage() float32    { return f.pct }
+func (f *fakeStatus) StatusType() StatusType { return f.st }
+func (f *fakeStatus) Index() int             { return f.index }
+func (f *fakeStatus) SetIndex(i int)         { f.index = i }
+func (f *fakeStatus) Cancel() bool           { return true }
 
 type fakeTorrent struct {
 	fakeStatus

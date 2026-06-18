@@ -1,0 +1,13 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: mirrorbot
+    # The bot exposes Prometheus metrics on HEALTH_ADDR (default :7870).
+    static_configs:
+      - targets: ['mirrorbot:7870']
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ['localhost:9090']

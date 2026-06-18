@@ -11,6 +11,7 @@ import (
 
 	"github.com/gotd/botapi"
 
+	"mirrorbot/internal/metrics"
 	"mirrorbot/internal/mirror"
 	"mirrorbot/internal/sources/bulktg"
 	"mirrorbot/internal/tgbot"
@@ -76,6 +77,12 @@ func (m *bulkManager) get(chatID int64) *bulkSession {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return m.sessions[chatID]
+}
+
+func (m *bulkManager) count() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.sessions)
 }
 
 func (m *bulkManager) add(chatID int64, item bulkItem) *bulkSession {
@@ -198,6 +205,7 @@ func (a *App) captureBulkMedia(chatID int64, msgID int, media *tgbot.ReplyMedia)
 	if s == nil {
 		return false
 	}
+	metrics.BulkFilesQueued.Inc()
 	a.scheduleBulkPrompt(s)
 	return true
 }
@@ -443,4 +451,3 @@ func sanitizeFolder(name string) string {
 	}
 	return out
 }
-

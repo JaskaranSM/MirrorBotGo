@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"sync/atomic"
+
+	"mirrorbot/internal/metrics"
 )
 
 // Server is a tiny HTTP server exposing /health and /healthcount.
@@ -27,6 +29,7 @@ func (s *Server) Start(addr string) {
 	mux.HandleFunc("/healthcount", func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = fmt.Fprintf(w, "%d", s.checked.Load())
 	})
+	mux.Handle("/metrics", metrics.Handler())
 	go func() {
 		_ = http.ListenAndServe(addr, mux)
 	}()

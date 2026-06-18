@@ -23,6 +23,40 @@ services:
     # depends_on:
     #   - db
 
+  # Prometheus scrapes the bot's /metrics (mirrorbot:7870) and stores the series.
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    container_name: mirrorbot-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+    ports:
+      - "9090:9090"
+    depends_on:
+      - mirrorbot
+
+  # Grafana, pre-provisioned with the Prometheus datasource and the MirrorBot dashboard.
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: mirrorbot-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+
   # Optional PostgreSQL backend. To use it, set in .env:
   #   DB_DRIVER=postgres
   #   DB_DSN=postgres://mirrorbot:mirrorbot@db:5432/mirrorbot?sslmode=disable
@@ -36,3 +70,7 @@ services:
   #     POSTGRES_DB: mirrorbot
   #   volumes:
   #     - ./pgdata:/var/lib/postgresql/data
+
+volumes:
+  prometheus-data:
+  grafana-data:

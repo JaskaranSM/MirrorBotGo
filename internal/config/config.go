@@ -26,14 +26,14 @@ type Config struct {
 	DownloadDir string
 
 	// Google Drive
-	UseSA               bool
-	SADir               string
-	GDriveCredentials   string
-	GDriveTokenFile     string
-	GDriveParentID      string
-	IsTeamDrive         bool
-	IndexURL            string
-	GDriveConcurrency   int
+	UseSA             bool
+	SADir             string
+	GDriveCredentials string
+	GDriveTokenFile   string
+	GDriveParentID    string
+	IsTeamDrive       bool
+	IndexURL          string
+	GDriveConcurrency int
 
 	// Database
 	DBDriver string // "sqlite" | "postgres"

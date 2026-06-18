@@ -16,6 +16,8 @@ import (
 	"github.com/gotd/log/logzap"
 	"go.uber.org/zap"
 	"golang.org/x/time/rate"
+
+	"mirrorbot/internal/metrics"
 )
 
 const (
@@ -42,8 +44,8 @@ type Bot struct {
 // If debug is true, the underlying MTProto client logs verbosely to stderr.
 func New(token string, appID int, appHash string, msgsPerWindow, windowSeconds int, debug bool) (*Bot, error) {
 	opts := botapi.Options{
-		AppID:   appID,
-		AppHash: appHash,
+		AppID:     appID,
+		AppHash:   appHash,
 		FloodWait: true,
 		OnStart: func(ctx context.Context) {
 			log.Println("[telegram] bot authorized and update gap recovery live")
@@ -97,7 +99,7 @@ func (b *Bot) SendHTML(ctx context.Context, chatID int64, text string, replyTo i
 		opts = append(opts, botapi.WithReplyMarkup(markup))
 	}
 	var msg *botapi.Message
-	err := b.withRetry(ctx, func() error {
+	err := b.withRetry(ctx, "send", func() error {
 		m, err := b.api.SendMessage(ctx, botapi.ID(chatID), b.scrub(text), opts...)
 		if err == nil {
 			msg = m
@@ -114,7 +116,7 @@ func (b *Bot) EditHTML(ctx context.Context, chatID int64, messageID int, text st
 	if markup != nil {
 		opts = append(opts, botapi.WithReplyMarkup(markup))
 	}
-	return b.withRetry(ctx, func() error {
+	return b.withRetry(ctx, "edit", func() error {
 		_, err := b.api.EditMessageText(ctx, botapi.ID(chatID), messageID, b.scrub(text), opts...)
 		return err
 	})
@@ -122,7 +124,7 @@ func (b *Bot) EditHTML(ctx context.Context, chatID int64, messageID int, text st
 
 // Delete removes a message, ignoring "not found".
 func (b *Bot) Delete(ctx context.Context, chatID int64, messageID int) error {
-	err := b.withRetry(ctx, func() error {
+	err := b.withRetry(ctx, "delete", func() error {
 		return b.api.DeleteMessage(ctx, botapi.ID(chatID), messageID)
 	})
 	if errors.Is(err, ErrMessageNotFound) {
@@ -137,7 +139,9 @@ func (b *Bot) SendDocument(ctx context.Context, chatID int64, path, caption stri
 	if replyTo != 0 {
 		opts = append(opts, botapi.ReplyTo(replyTo))
 	}
-	return b.api.SendDocument(ctx, botapi.ID(chatID), botapi.FileFromPath(path), caption, opts...)
+	msg, err := b.api.SendDocument(ctx, botapi.ID(chatID), botapi.FileFromPath(path), caption, opts...)
+	metrics.TelegramOps.WithLabelValues("document", result(err)).Inc()
+	return msg, err
 }
 
 // DownloadToPath downloads a Telegram file to a local path.
@@ -147,12 +151,24 @@ func (b *Bot) DownloadToPath(ctx context.Context, fileID, path string) error {
 
 // DownloadToWriter streams a Telegram file into w (used for progress tracking).
 func (b *Bot) DownloadToWriter(ctx context.Context, fileID string, w io.Writer) (int64, error) {
-	return b.api.DownloadFile(ctx, fileID, w)
+	n, err := b.api.DownloadFile(ctx, fileID, w)
+	metrics.TelegramOps.WithLabelValues("download", result(err)).Inc()
+	return n, err
 }
 
 // AnswerCallback acknowledges a callback query (clears the loading spinner).
 func (b *Bot) AnswerCallback(ctx context.Context, callbackID string) error {
-	return b.api.AnswerCallbackQuery(ctx, callbackID)
+	err := b.api.AnswerCallbackQuery(ctx, callbackID)
+	metrics.TelegramOps.WithLabelValues("answer_callback", result(err)).Inc()
+	return err
+}
+
+// result maps an error to the ok/error result label.
+func result(err error) string {
+	if err == nil {
+		return metrics.ResultOK
+	}
+	return metrics.ResultError
 }
 
 // QueueSend runs fn through the per-chat rate limiter (used for status message
@@ -162,23 +178,31 @@ func (b *Bot) QueueSend(ctx context.Context, chatID int64, fn func()) {
 }
 
 // withRetry runs op with bounded retries, flood-wait sleeps, and tolerant
-// handling of "not modified" / "not found" edit errors.
-func (b *Bot) withRetry(ctx context.Context, op func() error) error {
+// handling of "not modified" / "not found" edit errors. opName labels the
+// emitted Prometheus metrics.
+func (b *Bot) withRetry(ctx context.Context, opName string, op func() error) error {
 	var lastErr error
 	for retries := 1; retries <= maxRetries; retries++ {
+		if retries > 1 {
+			metrics.TelegramRetries.Inc()
+		}
 		err := op()
 		if err == nil {
+			metrics.TelegramOps.WithLabelValues(opName, metrics.ResultOK).Inc()
 			return nil
 		}
 		if isNotModified(err) {
+			metrics.TelegramOps.WithLabelValues(opName, metrics.ResultOK).Inc()
 			return nil
 		}
 		if isNotFound(err) {
+			metrics.TelegramOps.WithLabelValues(opName, "notfound").Inc()
 			return ErrMessageNotFound
 		}
 		lastErr = err
 		var sleep time.Duration
 		if d, ok := botapi.AsFloodWait(err); ok {
+			metrics.TelegramFloodWaits.Inc()
 			sleep = d
 		} else {
 			sleep = time.Duration(sleepMultiplier*float32(retries)) * time.Second
@@ -188,10 +212,12 @@ func (b *Bot) withRetry(ctx context.Context, op func() error) error {
 		}
 		select {
 		case <-ctx.Done():
+			metrics.TelegramOps.WithLabelValues(opName, metrics.ResultError).Inc()
 			return ctx.Err()
 		case <-time.After(sleep):
 		}
 	}
+	metrics.TelegramOps.WithLabelValues(opName, metrics.ResultError).Inc()
 	return lastErr
 }
 
@@ -235,6 +261,7 @@ func (q *senderQueue) run(ctx context.Context, chatID int64, fn func()) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
+				metrics.Panics.WithLabelValues("queued_send").Inc()
 				log.Printf("tgbot: recovered from panic in queued send: %v", r)
 			}
 		}()

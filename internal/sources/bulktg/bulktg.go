@@ -13,6 +13,7 @@ import (
 
 	"github.com/gotd/td/tg"
 
+	"mirrorbot/internal/metrics"
 	"mirrorbot/internal/status"
 	"mirrorbot/internal/tgbot"
 	"mirrorbot/internal/util"
@@ -60,6 +61,15 @@ func New(bot *tgbot.Bot, items []Item, folderName, baseDir, gid string, listener
 
 // Start downloads each file in order into baseDir, then signals completion.
 func (d *Download) Start(ctx context.Context) {
+	start := time.Now()
+	result := metrics.ResultError
+	metrics.MirrorsStarted.WithLabelValues(metrics.SourceBulkTG).Inc()
+	defer func() {
+		metrics.MirrorsFinished.WithLabelValues(metrics.SourceBulkTG, result).Inc()
+		metrics.DownloadBytes.WithLabelValues(metrics.SourceBulkTG).Add(float64(d.completed.Load()))
+		metrics.DownloadDuration.WithLabelValues(metrics.SourceBulkTG).Observe(time.Since(start).Seconds())
+	}()
+
 	if err := os.MkdirAll(d.baseDir, 0o755); err != nil {
 		d.fail(err)
 		return
@@ -71,6 +81,7 @@ func (d *Download) Start(ctx context.Context) {
 	seen := map[string]int{}
 	for _, it := range d.items {
 		if d.cancelled.Load() {
+			result = metrics.ResultCancelled
 			d.listener.OnDownloadError(errCancelled)
 			return
 		}
@@ -85,6 +96,7 @@ func (d *Download) Start(ctx context.Context) {
 		f.Close()
 		if err != nil {
 			if d.cancelled.Load() || errors.Is(err, errCancelled) {
+				result = metrics.ResultCancelled
 				d.listener.OnDownloadError(errCancelled)
 				return
 			}
@@ -92,6 +104,7 @@ func (d *Download) Start(ctx context.Context) {
 			return
 		}
 	}
+	result = metrics.ResultComplete
 	d.listener.OnDownloadComplete()
 }
 
@@ -103,11 +116,11 @@ func (d *Download) fail(err error) {
 // --- status.Status ---
 
 func (d *Download) Name() string           { return d.folderName }
-func (d *Download) CompletedLength() int64  { return d.completed.Load() }
-func (d *Download) TotalLength() int64      { return d.total.Load() }
-func (d *Download) Speed() int64            { return d.speed.Load() }
-func (d *Download) GID() string             { return d.gid }
-func (d *Download) Path() string            { return d.baseDir }
+func (d *Download) CompletedLength() int64 { return d.completed.Load() }
+func (d *Download) TotalLength() int64     { return d.total.Load() }
+func (d *Download) Speed() int64           { return d.speed.Load() }
+func (d *Download) GID() string            { return d.gid }
+func (d *Download) Path() string           { return d.baseDir }
 
 func (d *Download) Percentage() float32 {
 	total := d.total.Load()

@@ -16,7 +16,8 @@ import (
 
 // Upload uploads a local file or directory to parentID. Returns the created
 // Drive file/folder id.
-func (t *Transfer) Upload(ctx context.Context, path, parentID string) (string, error) {
+func (t *Transfer) Upload(ctx context.Context, path, parentID string) (_ string, retErr error) {
+	defer func() { t.recordDone(retErr) }()
 	t.setName(filepath.Base(path))
 	t.nameMu.Lock()
 	t.path = path
@@ -155,7 +156,8 @@ func (t *Transfer) uploadFile(ctx context.Context, path, parentID string) error 
 }
 
 // Download downloads a Drive file/folder to localDir. Returns the local output path.
-func (t *Transfer) Download(ctx context.Context, fileID, localDir string) (string, error) {
+func (t *Transfer) Download(ctx context.Context, fileID, localDir string) (_ string, retErr error) {
+	defer func() { t.recordDone(retErr) }()
 	t.startObserver()
 	defer t.stopObserver()
 
@@ -307,7 +309,8 @@ func (t *Transfer) downloadFile(ctx context.Context, file *drive.File, localDir 
 }
 
 // Clone server-side copies a Drive file/folder into destID. Returns the new id.
-func (t *Transfer) Clone(ctx context.Context, srcID, destID string) (string, error) {
+func (t *Transfer) Clone(ctx context.Context, srcID, destID string) (_ string, retErr error) {
+	defer func() { t.recordDone(retErr) }()
 	t.startObserver()
 	defer t.stopObserver()
 
