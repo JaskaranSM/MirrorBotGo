@@ -127,7 +127,7 @@ func (a *App) cmdBulkStart(c *botapi.Context) error {
 		return nil
 	}
 	msg := c.Message()
-	folder := util.ParseMessageArgs(msg.Text)
+	folder := util.ParseMessageArgs(messageText(msg))
 	sess := a.bulk.start(msg.Chat.ID, effectiveUserID(msg), msg.MessageID, folder)
 	a.refreshBulkPrompt(a.deps.Ctx, sess)
 	return nil
@@ -184,11 +184,11 @@ func (a *App) onBulkMessage(c *botapi.Context) error {
 	if msg == nil {
 		return nil
 	}
-	if strings.HasPrefix(msg.Text, "/deletebulktg_") {
+	if text := messageText(msg); strings.HasPrefix(text, "/deletebulktg_") {
 		if !a.authorized(c, msg) {
 			return nil
 		}
-		return a.handleDeleteBulk(c, msg.Text)
+		return a.handleDeleteBulk(c, text)
 	}
 	return nil
 }

@@ -125,7 +125,7 @@ func (a *App) Register() {
 	api.Use(func(next botapi.Handler) botapi.Handler {
 		return func(c *botapi.Context) error {
 			if msg := c.Message(); msg != nil {
-				if name := commandNameOf(msg.Text); name != "" {
+				if name := commandNameOf(messageText(msg)); name != "" {
 					metrics.Commands.WithLabelValues(name).Inc()
 				}
 			}
@@ -133,79 +133,79 @@ func (a *App) Register() {
 		}
 	})
 
-	api.OnCommand("start", "Start the bot", a.cmdStart)
+	a.onCommand(api, "start", "Start the bot", a.cmdStart)
 
-	api.OnCommand("mirror", "Mirror a link to Google Drive", a.handler(func(c *botapi.Context) error {
+	a.onCommand(api, "mirror", "Mirror a link to Google Drive", a.handler(func(c *botapi.Context) error {
 		a.prepareMirror(c, false, false, true, false)
 		return nil
 	}))
-	api.OnCommand("mirrors", "Mirror silently", a.handler(func(c *botapi.Context) error {
+	a.onCommand(api, "mirrors", "Mirror silently", a.handler(func(c *botapi.Context) error {
 		a.prepareMirror(c, false, false, false, false)
 		return nil
 	}))
-	api.OnCommand("tarmirror", "Mirror then archive", a.handler(func(c *botapi.Context) error {
+	a.onCommand(api, "tarmirror", "Mirror then archive", a.handler(func(c *botapi.Context) error {
 		a.prepareMirror(c, true, false, true, false)
 		return nil
 	}))
-	api.OnCommand("tarmirrors", "Mirror then archive silently", a.handler(func(c *botapi.Context) error {
+	a.onCommand(api, "tarmirrors", "Mirror then archive silently", a.handler(func(c *botapi.Context) error {
 		a.prepareMirror(c, true, false, false, false)
 		return nil
 	}))
-	api.OnCommand("unarchmirror", "Mirror then extract", a.handler(func(c *botapi.Context) error {
+	a.onCommand(api, "unarchmirror", "Mirror then extract", a.handler(func(c *botapi.Context) error {
 		a.prepareMirror(c, false, true, true, false)
 		return nil
 	}))
-	api.OnCommand("unarchmirrors", "Mirror then extract silently", a.handler(func(c *botapi.Context) error {
+	a.onCommand(api, "unarchmirrors", "Mirror then extract silently", a.handler(func(c *botapi.Context) error {
 		a.prepareMirror(c, false, true, false, false)
 		return nil
 	}))
-	api.OnCommand("seedtorrent", "Mirror torrent with seeding", a.handler(func(c *botapi.Context) error {
+	a.onCommand(api, "seedtorrent", "Mirror torrent with seeding", a.handler(func(c *botapi.Context) error {
 		a.prepareMirror(c, false, false, true, true)
 		return nil
 	}))
-	api.OnCommand("seedtorrents", "Mirror torrent with seeding silently", a.handler(func(c *botapi.Context) error {
+	a.onCommand(api, "seedtorrents", "Mirror torrent with seeding silently", a.handler(func(c *botapi.Context) error {
 		a.prepareMirror(c, false, false, false, true)
 		return nil
 	}))
 
-	api.OnCommand("clone", "Clone a Google Drive link", a.handler(func(c *botapi.Context) error {
+	a.onCommand(api, "clone", "Clone a Google Drive link", a.handler(func(c *botapi.Context) error {
 		a.cmdClone(c, true)
 		return nil
 	}))
-	api.OnCommand("clones", "Clone silently", a.handler(func(c *botapi.Context) error {
+	a.onCommand(api, "clones", "Clone silently", a.handler(func(c *botapi.Context) error {
 		a.cmdClone(c, false)
 		return nil
 	}))
 
-	api.OnCommand("status", "Show mirror status", a.cmdStatus)
+	a.onCommand(api, "status", "Show mirror status", a.cmdStatus)
 	api.OnCallbackQuery(a.cbStatus("first"), botapi.CallbackPrefix("first"))
 	api.OnCallbackQuery(a.cbStatus("previous"), botapi.CallbackPrefix("previous"))
 	api.OnCallbackQuery(a.cbStatus("next"), botapi.CallbackPrefix("next"))
 	api.OnCallbackQuery(a.cbStatus("last"), botapi.CallbackPrefix("last"))
 
-	api.OnCommand("cancel", "Cancel a mirror", a.cmdCancel)
-	api.OnCommand("cancelall", "Cancel all mirrors", a.cmdCancelAll)
-	api.OnCommand("cid", "Cancel by index", a.cmdCancelByIndex)
+	a.onCommand(api, "cancel", "Cancel a mirror", a.cmdCancel)
+	a.onCommand(api, "cancelall", "Cancel all mirrors", a.cmdCancelAll)
+	a.onCommand(api, "cid", "Cancel by index", a.cmdCancelByIndex)
 
-	api.OnCommand("list", "Search Google Drive", a.cmdList)
-	api.OnCommand("stats", "Bot and system stats", a.cmdStats)
-	api.OnCommand("ping", "Ping the bot", a.cmdPing)
-	api.OnCommand("sh", "Run a shell command (owner)", a.cmdShell)
-	api.OnCommand("log", "Send the log file (owner)", a.cmdLog)
+	a.onCommand(api, "list", "Search Google Drive", a.cmdList)
+	a.onCommand(api, "stats", "Bot and system stats", a.cmdStats)
+	a.onCommand(api, "ping", "Ping the bot", a.cmdPing)
+	a.onCommand(api, "sh", "Run a shell command (owner)", a.cmdShell)
+	a.onCommand(api, "log", "Send the log file (owner)", a.cmdLog)
 
-	api.OnCommand("adduser", "Authorize a user (owner)", a.cmdAddUser)
-	api.OnCommand("rmuser", "De-authorize a user (owner)", a.cmdRemoveUser)
-	api.OnCommand("addchat", "Authorize a chat (owner)", a.cmdAddChat)
-	api.OnCommand("rmchat", "De-authorize a chat (owner)", a.cmdRemoveChat)
+	a.onCommand(api, "adduser", "Authorize a user (owner)", a.cmdAddUser)
+	a.onCommand(api, "rmuser", "De-authorize a user (owner)", a.cmdRemoveUser)
+	a.onCommand(api, "addchat", "Authorize a chat (owner)", a.cmdAddChat)
+	a.onCommand(api, "rmchat", "De-authorize a chat (owner)", a.cmdRemoveChat)
 
-	api.OnCommand("setgotdthreads", "Set Telegram download threads (owner)", a.cmdSetGotdThreads)
-	api.OnCommand("getgotdthreads", "Get Telegram download threads (owner)", a.cmdGetGotdThreads)
-	api.OnCommand("mirrormsg", "Inspect a mirror by gid (owner)", a.cmdMirrorMsg)
+	a.onCommand(api, "setgotdthreads", "Set Telegram download threads (owner)", a.cmdSetGotdThreads)
+	a.onCommand(api, "getgotdthreads", "Get Telegram download threads (owner)", a.cmdGetGotdThreads)
+	a.onCommand(api, "mirrormsg", "Inspect a mirror by gid (owner)", a.cmdMirrorMsg)
 
 	// Bulk Telegram mirror: forward many files, then mirror them as one folder.
-	api.OnCommand("bulktgmirror", "Start a bulk Telegram file listener", a.cmdBulkStart)
-	api.OnCommand("bulktglist", "List files queued in the bulk session", a.cmdBulkList)
-	api.OnCommand("cancelbulktgmirror", "Cancel the bulk Telegram listener", a.cmdBulkCancel)
+	a.onCommand(api, "bulktgmirror", "Start a bulk Telegram file listener", a.cmdBulkStart)
+	a.onCommand(api, "bulktglist", "List files queued in the bulk session", a.cmdBulkList)
+	a.onCommand(api, "cancelbulktgmirror", "Cancel the bulk Telegram listener", a.cmdBulkCancel)
 	api.OnCallbackQuery(a.cbBulkFinish, botapi.CallbackPrefix("bulkfinish"))
 	api.OnCallbackQuery(a.cbBulkCancel, botapi.CallbackPrefix("bulkcancel"))
 	api.OnCallbackQuery(a.cbBulkList, botapi.CallbackPrefix("bulklist:"))
@@ -288,6 +288,44 @@ func commandNameOf(text string) string {
 		field = field[:i]
 	}
 	return field
+}
+
+// messageText returns the message's text, falling back to its caption. Telegram
+// attaches a link preview (tg.MessageMediaWebPage) to messages that contain a
+// URL, and gotd/botapi then delivers the message text in Message.Caption rather
+// than Message.Text. Command routing and argument parsing must therefore read
+// from either field.
+func messageText(msg *botapi.Message) string {
+	if msg == nil {
+		return ""
+	}
+	if msg.Text != "" {
+		return msg.Text
+	}
+	return msg.Caption
+}
+
+// onCommand registers a command handler together with a caption-aware fallback.
+// botapi's Command predicate only inspects Message.Text, so a command sent on a
+// message carrying a link preview (whose text lands in Message.Caption) would
+// otherwise never match and silently fall through to the catch-all handler.
+func (a *App) onCommand(api *botapi.Bot, name, description string, h botapi.Handler) {
+	api.OnCommand(name, description, h)
+	api.OnMessage(h, captionCommand(name))
+}
+
+// captionCommand matches a message whose Text or Caption begins with the named
+// command (e.g. "/mirror"). It complements botapi.Command for caption-carried
+// commands.
+func captionCommand(name string) botapi.Predicate {
+	name = strings.TrimPrefix(name, "/")
+	return func(u *botapi.Update) bool {
+		m := u.EffectiveMessage()
+		if m == nil {
+			return false
+		}
+		return commandNameOf(messageText(m)) == name
+	}
 }
 
 // splitParent splits "link | drive-folder-link" into (link, parentFolderID).

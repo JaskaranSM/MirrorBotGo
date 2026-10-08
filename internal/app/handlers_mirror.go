@@ -33,7 +33,7 @@ func (a *App) prepareMirror(c *botapi.Context, isTar, doUnArchive, sendStatus, s
 	replyTo := msg.MessageID
 	dir := filepath.Join(a.cfg.DownloadDir, strconv.FormatInt(uid, 10))
 
-	arg := util.ParseMessageArgs(msg.Text)
+	arg := util.ParseMessageArgs(messageText(msg))
 	link, parentID := splitParent(arg)
 	listener := mirror.NewMirrorListener(a.deps, uid, chatID, replyTo, isTar, doUnArchive, seed, parentID)
 
@@ -140,7 +140,7 @@ func (a *App) show(c *botapi.Context, sendStatus bool) {
 func (a *App) cmdClone(c *botapi.Context, sendStatus bool) {
 	msg := c.Message()
 	uid := int64(msg.MessageID)
-	arg := util.ParseMessageArgs(msg.Text)
+	arg := util.ParseMessageArgs(messageText(msg))
 	link, parentID := splitParent(arg)
 	if parentID == "" {
 		parentID = a.cfg.GDriveParentID
@@ -199,7 +199,7 @@ func (a *App) cmdCancel(c *botapi.Context) error {
 		return nil
 	}
 	msg := c.Message()
-	gid := util.ParseMessageArgs(msg.Text)
+	gid := util.ParseMessageArgs(messageText(msg))
 	var dl status.Status
 	if msg.ReplyToMessage != nil {
 		dl = a.mgr.Get(int64(msg.ReplyToMessage.MessageID))
@@ -240,7 +240,7 @@ func (a *App) cmdCancelByIndex(c *botapi.Context) error {
 	if !a.isOwner(c.Message()) {
 		return nil
 	}
-	idx, err := strconv.Atoi(util.ParseMessageArgs(c.Message().Text))
+	idx, err := strconv.Atoi(util.ParseMessageArgs(messageText(c.Message())))
 	if err != nil {
 		a.reply(c, "Provide a valid index.")
 		return nil

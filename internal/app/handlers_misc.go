@@ -58,7 +58,7 @@ func (a *App) cmdList(c *botapi.Context) error {
 	if !a.authorized(c, c.Message()) {
 		return nil
 	}
-	name := util.ParseMessageArgs(c.Message().Text)
+	name := util.ParseMessageArgs(messageText(c.Message()))
 	if name == "" {
 		a.reply(c, "Provide a search query.")
 		return nil
@@ -89,7 +89,7 @@ func (a *App) cmdShell(c *botapi.Context) error {
 	if !a.isOwner(c.Message()) {
 		return nil
 	}
-	cmdText := util.ParseMessageArgs(c.Message().Text)
+	cmdText := util.ParseMessageArgs(messageText(c.Message()))
 	if cmdText == "" {
 		a.reply(c, "Provide proper arguments")
 		return nil
@@ -213,7 +213,7 @@ func (a *App) cmdSetGotdThreads(c *botapi.Context) error {
 	if !a.isOwner(c.Message()) {
 		return nil
 	}
-	n, err := strconv.Atoi(util.ParseMessageArgs(c.Message().Text))
+	n, err := strconv.Atoi(util.ParseMessageArgs(messageText(c.Message())))
 	if err != nil || n <= 0 {
 		a.reply(c, "Provide a positive integer.")
 		return nil
@@ -242,7 +242,7 @@ func (a *App) cmdMirrorMsg(c *botapi.Context) error {
 	if !a.isOwner(c.Message()) {
 		return nil
 	}
-	gid := util.ParseMessageArgs(c.Message().Text)
+	gid := util.ParseMessageArgs(messageText(c.Message()))
 	if gid == "" {
 		a.reply(c, "Provide a gid.")
 		return nil
@@ -263,11 +263,11 @@ func extractUserID(msg *botapi.Message) int64 {
 	if msg.ReplyToMessage != nil && msg.ReplyToMessage.From != nil {
 		return msg.ReplyToMessage.From.ID
 	}
-	return util.ParseInt64(util.ParseMessageArgs(msg.Text))
+	return util.ParseInt64(util.ParseMessageArgs(messageText(msg)))
 }
 
 func extractChatID(msg *botapi.Message) int64 {
-	if arg := util.ParseMessageArgs(msg.Text); arg != "" {
+	if arg := util.ParseMessageArgs(messageText(msg)); arg != "" {
 		return util.ParseInt64(arg)
 	}
 	return msg.Chat.ID
