@@ -22,8 +22,6 @@ func (t *Transfer) Upload(ctx context.Context, path, parentID string) (_ string,
 	t.nameMu.Lock()
 	t.path = path
 	t.nameMu.Unlock()
-	t.startObserver()
-	defer t.stopObserver()
 
 	fi, err := os.Stat(path)
 	if err != nil {
@@ -158,8 +156,6 @@ func (t *Transfer) uploadFile(ctx context.Context, path, parentID string) error 
 // Download downloads a Drive file/folder to localDir. Returns the local output path.
 func (t *Transfer) Download(ctx context.Context, fileID, localDir string) (_ string, retErr error) {
 	defer func() { t.recordDone(retErr) }()
-	t.startObserver()
-	defer t.stopObserver()
 
 	srv, err := t.client.auth.Service(ctx)
 	if err != nil {
@@ -311,8 +307,6 @@ func (t *Transfer) downloadFile(ctx context.Context, file *drive.File, localDir 
 // Clone server-side copies a Drive file/folder into destID. Returns the new id.
 func (t *Transfer) Clone(ctx context.Context, srcID, destID string) (_ string, retErr error) {
 	defer func() { t.recordDone(retErr) }()
-	t.startObserver()
-	defer t.stopObserver()
 
 	srv, err := t.client.auth.Service(ctx)
 	if err != nil {
